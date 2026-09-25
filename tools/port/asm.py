@@ -34,10 +34,16 @@ class Prog:
         self.ins = load(path)
         self.addrs = [i[0] for i in self.ins]
         self.index = {a: k for k, a in enumerate(self.addrs)}
+        # Inkrementell gelinkte Builds (London) rufen über Sprung-Thunks "jmp Funktion" auf
+        self.thunks = {}
+        for k, (a, mn, ops) in enumerate(self.ins):
+            if mn == "jmp" and re.fullmatch(r"[0-9A-F]{8}", ops) and a < 0x410000 and k > 0 and \
+               self.ins[k - 1][1] in ("jmp", "int") and (k + 1 == len(self.ins) or self.ins[k + 1][1] in ("jmp", "int")):
+                self.thunks[a] = int(ops, 16)
         starts = set()
         for a, mn, ops in self.ins:
             if mn == "call" and re.fullmatch(r"[0-9A-F]{8}", ops):
-                starts.add(int(ops, 16))
+                starts.add(self.resolve(int(ops, 16)))
         self.starts = sorted(s for s in starts if s in self.index)
         self.funcs = {}
         for n, s in enumerate(self.starts):
@@ -46,6 +52,9 @@ class Prog:
             k1 = bisect.bisect_left(self.addrs, e)
             body = [i for i in self.ins[k0:k1] if i[1] != "int"]
             self.funcs[s] = body
+
+    def resolve(self, addr):
+        return self.thunks.get(addr, addr)
 
     def func_of(self, addr):
         n = bisect.bisect_right(self.starts, addr) - 1

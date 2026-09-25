@@ -79,7 +79,7 @@ def build(src, dst):
             pairs, _ = align(src.funcs[s], dst.funcs[d])
             for (a1, m1, o1), (a2, m2, o2) in pairs:
                 if m1 == "call" and re.fullmatch(r"[0-9A-F]{8}", o1) and re.fullmatch(r"[0-9A-F]{8}", o2):
-                    votes[int(o1, 16)][int(o2, 16)] += 1
+                    votes[src.resolve(int(o1, 16))][dst.resolve(int(o2, 16))] += 1
                 x1, x2 = addrs_in(o1), addrs_in(o2)
                 if len(x1) == len(x2):
                     for p, q in zip(x1, x2):
