@@ -181,6 +181,17 @@ namespace gta1
         a.QuitLevel = 0x441F70;
         a.ArrowResolve = 0x4B0E30;
         a.ArrowMainOn = 0x847CF4; a.ArrowMain = 0x848200; a.ArrowRedOn = 0x8481E8; a.ArrowRed = 0x848BC0;
+        // Hauptschleife 0x41F390: Eingabe (0x444AC0) und Zeichnen (0x442480) laufen über Thunks
+        a.ReadInput = 0x401C12; a.ReadInputCall = 0x41F3A1;
+        a.RenderFrame = 0x401B90; a.RenderCall = 0x41F425;
+        // Tastenzustände aus dem Druck-Handler 0x444DC0 (gleiche Reihenfolge und Paketbits wie 1.0.0.1)
+        a.InSteer = 0x572F50; a.InGas = 0x572DCC; a.InBrake = 0x572EE8; a.InJump = 0x572DD0;
+        a.InFire = 0x572DC8; a.InNext = 0x572EEC; a.InPrev = 0x572F18; a.InSpecial = 0x572F54;
+        a.KeyScancodes = 0x572F20;
+        // Fußgänger wie in 1.0.0.1 (235 Byte), Position über 0x47E2B0
+        a.PedStruct = 0x7E2370; a.PedAngle = 0x7E2409; a.PedRemap = 0x7E23C8; a.PedDrawRemap = 0x7E2403;
+        a.PlayerPedId = 0x80CF2A; a.PlayerCharacter = 0x80D0C4;
+        a.Camera = 0x80CF40;      // Kameradaten; die Kameraführung selbst ist umgebaut (noch ohne Steuerung)
         a.LocalPlayer = 0x80D5B0; a.NumPlayers = 0x80D5AC;
         a.PlayerCtrl = 0x80CFF5; a.PlayerObject = 0x80CFF9; a.RunState = 0x572ACC;
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
