@@ -211,6 +211,46 @@ namespace gta1
         return a;
     }
 
+    // GTA_London_1961.exe (London 1961, Build vom 26.06.1999): zu 79 % gleich wie London 1969, Daten meist um
+    // 0x1C08 verschoben (MGL um 0x1498); mit tools/port/sigport.py aus den 1969er Adressen übertragen
+    static Addresses AddressesLondon61()
+    {
+        Addresses a;
+        a.name = "GTA_London_1961.exe (London 1961)";
+        a.timestamp = 0x3773D5BB;
+        a.HudDraw = 0x4AEE20; a.HudCallJmp = 0x402671;
+        a.GetPlayerPos = 0x483190;
+        a.PauseAll = 0x442190; a.ResumeAll = 0x4421C0;
+        a.QuitLevel = 0x442250;
+        a.ArrowResolve = 0x4B1B30;
+        a.ArrowMainOn = 0x849904; a.ArrowMain = 0x849E10; a.ArrowRedOn = 0x849DF8; a.ArrowRed = 0x84A7D8;
+        a.ReadInput = 0x401C17; a.ReadInputCall = 0x41F631;
+        a.RenderFrame = 0x401B95; a.RenderCall = 0x41F6B5;
+        a.InSteer = 0x574B58; a.InGas = 0x5749D4; a.InBrake = 0x574AF0; a.InJump = 0x5749D8;
+        a.InFire = 0x5749D0; a.InNext = 0x574AF4; a.InPrev = 0x574B20; a.InSpecial = 0x574B5C;
+        a.KeyScancodes = 0x574B28;
+        a.PedStruct = 0x7E3F78; a.PedAngle = 0x7E4011; a.PedRemap = 0x7E3FD0; a.PedDrawRemap = 0x7E400B;
+        a.PlayerPedId = 0x80EB32; a.PlayerCharacter = 0x80ECCC;
+        a.Camera = 0x80EB48;
+        a.LocalPlayer = 0x80F1B8; a.NumPlayers = 0x80F1B4;
+        a.PlayerCtrl = 0x80EBFD; a.PlayerObject = 0x80EC01; a.RunState = 0x5746D4;
+        a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
+        a.IatGetProcAddress = 0x859738; a.IatPeekMessageA = 0x8597F8;
+        a.LoadGetProcAddress[0] = 0x4BF733;
+        a.LoadPeekMessageA[0] = 0x420A10; a.LoadPeekMessageA[1] = 0x4BEA4C; a.LoadPeekMessageA[2] = 0x4BAA7B;
+        const Addresses::Sig sigs[] = {
+            { 0x4AEE20, { 0xA1, 0xAC, 0x1E, 0x56, 0x00, 0x85, 0xC0 }, 7 },                   // HudDraw
+            { 0x483190, { 0x8B, 0x4C, 0x24, 0x04, 0x56, 0x33, 0xF6, 0x8D, 0x04, 0x49 }, 10 }, // GetPlayerPos
+            { 0x442195, { 0xC7, 0x05, 0xD4, 0x46, 0x57, 0x00, 0x02, 0x00, 0x00, 0x00 }, 10 }, // PauseAll: RunState = 2
+            { 0x4421C5, { 0xC7, 0x05, 0xD4, 0x46, 0x57, 0x00, 0x01, 0x00, 0x00, 0x00 }, 10 }, // ResumeAll: RunState = 1
+            { 0x442250, { 0xC7, 0x05, 0xC0, 0x46, 0x57, 0x00, 0x02, 0x00, 0x00, 0x00 }, 10 }, // QuitLevel
+            { 0x4B1B30, { 0x8B, 0x44, 0x24, 0x04, 0x56, 0x57, 0x8B, 0x08, 0x83, 0xF9 }, 10 }, // ArrowResolve
+            { 0x4B17E0, { 0xA1, 0xB8, 0xF1, 0x80, 0x00 }, 5 },                               // Debug-Anzeige: LocalPlayer
+        };
+        std::copy(std::begin(sigs), std::end(sigs), a.sigs);
+        return a;
+    }
+
     static Addresses A;               // erkannte Version
 
 #pragma pack(push, 1)
@@ -367,7 +407,7 @@ namespace gta1
         const uint32_t stamp = nt->FileHeader.TimeDateStamp;
         if (reinterpret_cast<uintptr_t>(exe) != 0x400000)
             return false;
-        for (Addresses (*make)() : { &AddressesR2P, &AddressesLondon69 })
+        for (Addresses (*make)() : { &AddressesR2P, &AddressesLondon69, &AddressesLondon61 })
         {
             const Addresses a = make();
             if (a.timestamp != stamp)
