@@ -1,0 +1,23 @@
+# Build-Ausgaben und IDE
+/Debug/
+/Release/
+/GTA1Plus/
+/GTA1_wid.68FC361D/
+.vs/
+.vscode/
+*.vcxproj.user
+*.aps
+
+# Reste des ersten Anlaufs (Juni 2026), vom Mod nicht verwendet
+/minhook/
+/MinHook.h
+/*.lib
+/stdafx.*
+/targetver.h
+/resource.*
+/test.bmp
+
+# Dateien des Spiels gehören nicht ins Repository
+/idb/
+*.exe
+*.dll
