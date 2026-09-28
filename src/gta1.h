@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace gta1
 {
@@ -79,6 +80,32 @@ namespace gta1
     bool EnableQuickRetry();       // nach "MISSION FEHLGESCHLAGEN" Skriptpausen bis zum Neuaufbau verkürzen
     bool EnableSteadyCamera();     // Kamera folgt enger statt zu schwimmen (Patch aus GTAforums: shl 5 -> shl 2)
 
+    // Ereignisse aus dem Missionsskript (Spiel-Thread): Ansage mit Textnummer, geschaffte Mission
+    enum class ScriptEvent { Brief, MissionEnd };
+    bool SetScriptEventCallback(void (*cb)(ScriptEvent event, int value));
+    // Eine Telefonmission läuft gerade (auch gescheitert, solange der neue Versuch aussteht)
+    bool MissionActive();
+    // Text zur Nummer aus den Texten des Spiels (FXT), leer wenn unbekannt
+    bool LookupText(int id, std::wstring& out);
+
+    // Spielstand zwischen Missionen: Skriptzustand (Objekte, Prozesse, Zeilen) und Spielerwerte
+    struct GameState
+    {
+        uint32_t exeStamp = 0, levelHash = 0;
+        int character = -1;
+        int32_t score = 0;
+        int16_t multiplier = 1, armor = 0;
+        uint8_t jailCard = 0, lives = 0, ammo[4] = {};
+        bool hasPos = false, hasAngle = false;
+        int32_t x = 0, y = 0, z = 0;    // Festkomma wie im Spiel (22 Nachkommabits = 1 Block)
+        int16_t angle = 0;
+        std::vector<uint8_t> objects, procBlock, procState, lines;
+    };
+    bool CanUseSaves();                        // im Level, Einzelspieler, Adressen bekannt
+    uint32_t LevelHash();                      // erkennt den Level (Abschnitt der mission.ini)
+    bool CaptureGameState(GameState& out);     // Spiel-Thread
+    const char* RestoreGameState(const GameState& in); // Spiel-Thread; nullptr = geladen, sonst Grund
+
     // Ziel des Missionspfeils (which 0) bzw. des roten Pfeils (which 1) in Blockkoordinaten
     bool GetArrowTarget(int which, float& x, float& y);
 
@@ -119,4 +146,5 @@ namespace gta1
 
     std::string MapFile();         // zuletzt vom Spiel geöffnete .cmp (voller Pfad)
     unsigned MapGeneration();      // zählt hoch, sobald eine andere Karte geöffnet wird
+    unsigned LevelLoads();         // zählt bei jedem Levelstart hoch (Karte wird geöffnet)
 }

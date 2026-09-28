@@ -95,6 +95,9 @@
     <ClInclude Include="src\log.h" />
     <ClInclude Include="src\camera.h" />
     <ClInclude Include="src\fire.h" />
+    <ClInclude Include="src\options.h" />
+    <ClInclude Include="src\briefings.h" />
+    <ClInclude Include="src\saves.h" />
     <ClInclude Include="src\controls.h" />
     <ClInclude Include="src\text.h" />
     <ClInclude Include="src\nav.h" />
@@ -113,6 +116,9 @@
     <ClCompile Include="src\mod.cpp" />
     <ClCompile Include="src\camera.cpp" />
     <ClCompile Include="src\fire.cpp" />
+    <ClCompile Include="src\options.cpp" />
+    <ClCompile Include="src\briefings.cpp" />
+    <ClCompile Include="src\saves.cpp" />
     <ClCompile Include="src\controls.cpp" />
     <ClCompile Include="src\text.cpp" />
     <ClCompile Include="src\nav.cpp" />

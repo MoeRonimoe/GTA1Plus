@@ -4,10 +4,11 @@
 #include <algorithm>
 #include <cwchar>
 #include <cwctype>
+#include <string>
 
 Config g_cfg;
 
-static const int kConfigVersion = 12;
+static const int kConfigVersion = 13;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -15,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=12\r\n"
+    "Version=13\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -72,6 +73,9 @@ static const char kDefaultIni[] =
     "; On fire: press the jump key to roll on the ground and put out the flames (a hint appears).\r\n"
     "; While rolling the fire does no more damage. In the original game burning is certain death\r\n"
     "Extinguish=1\r\n"
+    "; Save automatically after every completed mission (one save per character and level;\r\n"
+    "; save and load by hand in the pause menu)\r\n"
+    "Autosave=1\r\n"
     "\r\n"
     "[Camera]\r\n"
     "; Shift the camera with the mouse or right stick to see further ahead\r\n"
@@ -171,6 +175,7 @@ namespace
         { L"Gameplay", L"QuickRetry",     Kind::Bool, &g_cfg.quickRetry,     nullptr, nullptr },
         { L"Gameplay", L"AllCharacters",  Kind::Bool, &g_cfg.allCharacters,  nullptr, nullptr },
         { L"Gameplay", L"Extinguish",     Kind::Bool, &g_cfg.extinguish,     nullptr, nullptr },
+        { L"Gameplay", L"Autosave",       Kind::Bool, &g_cfg.autosave,       nullptr, nullptr },
         { L"Camera",   L"Enabled",        Kind::Bool, &g_cfg.camera,             nullptr, nullptr },
         { L"Camera",   L"MouseInVehicle", Kind::Bool, &g_cfg.cameraMouseVehicle, nullptr, nullptr },
         { L"Camera",   L"RangeOnFoot",    Kind::Int,  &g_cfg.cameraRangeFoot,    nullptr, nullptr },
@@ -261,8 +266,24 @@ namespace
     }
 }
 
+static std::wstring s_iniPath;
+
+bool SaveConfigValue(const void* value)
+{
+    wchar_t buf[64];
+    for (const Setting& s : kSettings)
+    {
+        if (s.value != value)
+            continue;
+        Format(s, buf, 64);
+        return s_iniPath.size() && WritePrivateProfileStringW(s.section, s.key, buf, s_iniPath.c_str());
+    }
+    return false;
+}
+
 void LoadConfig(const wchar_t* ini)
 {
+    s_iniPath = ini;
     const bool exists = GetFileAttributesW(ini) != INVALID_FILE_ATTRIBUTES;
     const int version = exists ? (int)GetPrivateProfileIntW(L"Info", L"Version", 1, ini) : kConfigVersion;
 

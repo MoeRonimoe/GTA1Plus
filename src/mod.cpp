@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <string>
 
+#include "briefings.h"
 #include "camera.h"
 #include "config.h"
 #include "controls.h"
@@ -10,6 +11,7 @@
 #include "hooks.h"
 #include "log.h"
 #include "overlay.h"
+#include "saves.h"
 #include "text.h"
 
 namespace
@@ -97,6 +99,21 @@ namespace
         fire::BeforeRender(); // nach der Twin-Stick-Blickrichtung, das Wälzen hat Vorrang
         ApplyPlayerColor();
         CheckDebugRequests();
+        saves::Tick();
+    }
+
+    // Aus dem Missionsskript: Ansagen für die Briefings, geschaffte Missionen für das Autosave
+    void OnScriptEvent(gta1::ScriptEvent event, int value)
+    {
+        switch (event)
+        {
+        case gta1::ScriptEvent::Brief:
+            briefings::OnBrief(value);
+            break;
+        case gta1::ScriptEvent::MissionEnd:
+            saves::OnMissionEnd();
+            break;
+        }
     }
 
     std::wstring SiblingPath(HMODULE self, const wchar_t* ext)
@@ -149,10 +166,12 @@ void ModInit(HMODULE self)
             LOG("Alle Charaktere wählbar: %s", gta1::EnableAllCharacters() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.quickRetry)
             LOG("Schneller neuer Versuch nach Fehlschlag: %s", gta1::EnableQuickRetry() ? "aktiv" : "Spielcode passt nicht");
+        saves::Init(SiblingPath(self, L"").c_str());
+        LOG("Briefings und Spielstände: %s", gta1::SetScriptEventCallback(&OnScriptEvent) ? "aktiv" : "Spielcode passt nicht");
         controls::Init(); // auch für die Maus im Pausemenü
         fire::Init();
-        if (g_cfg.twinStick || g_cfg.controller || g_cfg.extinguish)
-            gta1::SetInputFilter(&controls::ProcessPacket);
+        // Immer einhängen: Steuerung und Controller lassen sich im Optionsmenü während des Spiels umschalten
+        gta1::SetInputFilter(&controls::ProcessPacket);
         if (g_cfg.cameraSteady)
             LOG("Ruhigere Kamera: %s", gta1::EnableSteadyCamera() ? "aktiv" : "Spielcode passt nicht");
         if ((g_cfg.twinStick || g_cfg.controller) && g_cfg.camera)

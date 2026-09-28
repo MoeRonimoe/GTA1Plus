@@ -23,6 +23,7 @@ struct Config
     bool quickRetry     = true;  // nach gescheiterter Mission ohne lange Wartezeit neu versuchen
     bool allCharacters  = true;  // Frauen im Hauptmenü auch in nicht-englischen Versionen wählbar
     bool extinguish     = true;  // brennend mit der Sprungtaste am Boden wälzen und löschen
+    bool autosave       = true;  // nach jeder geschafften Mission automatisch speichern
 
     // [Camera]
     bool camera              = true; // Kamera mit Maus/rechtem Stick verschieben
@@ -65,3 +66,5 @@ struct Config
 extern Config g_cfg;
 
 void LoadConfig(const wchar_t* iniPath);
+// Einen geänderten Wert aus g_cfg (Adresse des Felds) in die INI zurückschreiben
+bool SaveConfigValue(const void* value);

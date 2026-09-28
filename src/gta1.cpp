@@ -97,7 +97,14 @@ namespace gta1
         bool      ScriptRegsEdi = false;
         uintptr_t ScriptSurvive = 0;  // Befehl SURVIVE
         uintptr_t ScriptProc = 0, ScriptState = 0, ScriptActive = 0, ScriptObjSlot = 0, ScriptObjects = 0;
+        uintptr_t ScriptLines = 0;     // 5000 Zeilen zu 22 Byte (ScriptLine), SURVIVE zählt darin herunter
+        uintptr_t ScriptProcBlock = 0; // Tabellen je Prozess (aktuelle Zeile, Verkettung ...), 0x4A0 Byte
 
+        // Spielerwerte (Spieler 0, weitere im Abstand PlayerStride)
+        uintptr_t PlayerScore = 0, PlayerMultiplier = 0, PlayerJailCard = 0, PlayerLives = 0, PlayerAmmo = 0, PlayerArmor = 0;
+
+        uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
+        uintptr_t TextBuffer = 0;     // char*: "[Schlüssel]Text\0..." bis "[]"
         uintptr_t MglPrimary = 0;     // IDirectDrawSurface* (Primary von MGL)
         uintptr_t MglPageCount = 0;   // Anzahl Seiten der Flip-Kette
         uintptr_t IatGetProcAddress = 0, IatPeekMessageA = 0;
@@ -148,6 +155,10 @@ namespace gta1
         a.ScriptDispatch = 0x4822EA; a.ScriptJumps = 0x487FDC; a.ScriptSurvive = 0x476120;
         a.ScriptProc = 0x736A08; a.ScriptState = 0x6DB660; a.ScriptActive = 0x6FB768;
         a.ScriptObjSlot = 0x6DB768; a.ScriptObjects = 0x6796F8;
+        a.ScriptLines = 0x6FBC08; a.ScriptProcBlock = 0x6FB768;
+        a.PlayerScore = 0x6576B8; a.PlayerMultiplier = 0x6576BC; a.PlayerJailCard = 0x6576BE;
+        a.PlayerLives = 0x65774C; a.PlayerAmmo = 0x657718; a.PlayerArmor = 0x65775C;
+        a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
         a.IatGetProcAddress = 0x787474; a.IatPeekMessageA = 0x78754C;
         a.LoadGetProcAddress[0] = 0x49AFC3;
@@ -210,8 +221,12 @@ namespace gta1
         a.ScriptDispatch = 0x45F639; a.ScriptJumps = 0x461490; a.ScriptRegsEdi = true; a.ScriptSurvive = 0x456B00;
         a.ScriptProc = 0x736A00; a.ScriptState = 0x6DB658; a.ScriptActive = 0x6FB760;
         a.ScriptObjSlot = 0x6DB760; a.ScriptObjects = 0x6796F0;
+        a.ScriptLines = 0x6FBC00; a.ScriptProcBlock = 0x6FB760;
+        a.PlayerScore = 0x80D018; a.PlayerMultiplier = 0x80D01C; a.PlayerJailCard = 0x80D01E;
+        a.PlayerLives = 0x80D0AC; a.PlayerAmmo = 0x80D078; a.PlayerArmor = 0x80D0BC;
         a.LocalPlayer = 0x80D5B0; a.NumPlayers = 0x80D5AC;
         a.PlayerCtrl = 0x80CFF5; a.PlayerObject = 0x80CFF9; a.RunState = 0x572ACC;
+        a.TextReady = 0x8378A0; a.TextBuffer = 0x8378CC;   // aus GetText 0x4A6CB0
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
         a.IatGetProcAddress = 0x858738; a.IatPeekMessageA = 0x8587F8;
         a.LoadGetProcAddress[0] = 0x4BEA13;
@@ -261,8 +276,12 @@ namespace gta1
         a.ScriptDispatch = 0x45FDF9; a.ScriptJumps = 0x461C80; a.ScriptRegsEdi = true; a.ScriptSurvive = 0x456FE0;
         a.ScriptProc = 0x738608; a.ScriptState = 0x6DD260; a.ScriptActive = 0x6FD368;
         a.ScriptObjSlot = 0x6DD368; a.ScriptObjects = 0x67B2F8;
+        a.ScriptLines = 0x6FD808; a.ScriptProcBlock = 0x6FD368;
+        a.PlayerScore = 0x80EC20; a.PlayerMultiplier = 0x80EC24; a.PlayerJailCard = 0x80EC26;
+        a.PlayerLives = 0x80ECB4; a.PlayerAmmo = 0x80EC80; a.PlayerArmor = 0x80ECC4;
         a.LocalPlayer = 0x80F1B8; a.NumPlayers = 0x80F1B4;
         a.PlayerCtrl = 0x80EBFD; a.PlayerObject = 0x80EC01; a.RunState = 0x5746D4;
+        a.TextReady = 0x8394B0; a.TextBuffer = 0x8394DC;
         a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
         a.IatGetProcAddress = 0x859738; a.IatPeekMessageA = 0x8597F8;
         a.LoadGetProcAddress[0] = 0x4BF733;
@@ -322,6 +341,7 @@ namespace gta1
     static CRITICAL_SECTION s_mapLock;
     static std::string s_mapPath;
     static volatile unsigned s_mapGen = 0;
+    static volatile unsigned s_levelLoads = 0;
 
     static HANDLE (WINAPI* s_origCreateFileA)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE) = nullptr;
 
@@ -416,6 +436,7 @@ namespace gta1
                 if (!GetFullPathNameA(name, MAX_PATH, full, nullptr))
                     strcpy_s(full, name);
                 EnterCriticalSection(&s_mapLock);
+                ++s_levelLoads; // auch dieselbe Karte wird bei jedem Levelstart neu gelesen
                 if (_stricmp(s_mapPath.c_str(), full) != 0)
                 {
                     s_mapPath = full;
@@ -881,6 +902,7 @@ namespace gta1
     }
 
     unsigned MapGeneration() { return s_mapGen; }
+    unsigned LevelLoads() { return s_levelLoads; }
 
     // ---- Spielregeln ([Gameplay]) ----
 
@@ -898,7 +920,7 @@ namespace gta1
             CmdCompare = 128, CmdReset = 129, CmdKeepThisProc = 130, CmdDeadArrested = 132,
             CmdStopFrenzy = 134, CmdKfCancelBriefing = 138, CmdKfCancelGeneral = 140,
             CmdResetWithBriefs = 145, CmdRedArrowOff = 146,
-            CmdMPhone = 16, CmdMissionEnd = 45,
+            CmdMPhone = 16, CmdMissionEnd = 45, CmdBrief = 15, CmdSpeechBrief = 110,
         };
         // Objekttypen in der Objekttabelle (= Index der Namenstabelle 0x4C2580 minus 4)
         constexpr int32_t kObjMPhones = 34, kObjPhoneToggle = 39;
@@ -1063,11 +1085,23 @@ namespace gta1
             s_failedAt[proc] = 0;
         }
 
+        bool s_quickRetry = false;
+        void (*s_scriptEvent)(ScriptEvent event, int value) = nullptr;
+
         void __cdecl OnScriptCommand(uint32_t command, ScriptLine* line)
         {
             const int proc = *reinterpret_cast<int16_t*>(A.ScriptProc);
             if (proc < 0 || proc >= addr::ScriptProcs)
                 return;
+
+            if (s_scriptEvent)
+            {
+                // Text der Telefon-/Pager-Ansagen steht in <score>
+                if (command == CmdBrief || command == CmdSpeechBrief || command == CmdMobileBrief)
+                    s_scriptEvent(ScriptEvent::Brief, line->score);
+                else if (command == CmdMissionEnd)
+                    s_scriptEvent(ScriptEvent::MissionEnd, 0);
+            }
 
             // Beendete Prozesse vergessen, damit ein neuer Prozess im selben Platz normal läuft
             if (s_failedCount)
@@ -1093,6 +1127,13 @@ namespace gta1
                 break;
             default:
                 break;
+            }
+            if (!s_quickRetry)
+            {
+                // Ohne schnellen neuen Versuch nur mitverfolgen, ob eine Telefonmission läuft (für das Speichern)
+                if (command == CmdMessageBrief && line->score == kBriefMissionFailed)
+                    s_mission.active = false;
+                return;
             }
 
             DWORD& failedAt = s_failedAt[proc];
@@ -1213,8 +1254,13 @@ namespace gta1
                hooks::WriteMemory(reinterpret_cast<void*>(A.PickNextCheck), patch, sizeof(patch));
     }
 
-    bool EnableQuickRetry()
+    // Einstieg in den Missions-Interpreter; wird einmal installiert und von schnellem neuem Versuch, Briefings
+    // und Spielständen gemeinsam benutzt
+    static bool EnableScriptHook()
     {
+        static bool s_installed = false;
+        if (s_installed)
+            return true;
         if (!s_supported || !A.ScriptDispatch || !A.ScriptJumps || !A.ScriptSurvive)
             return false;
         // jmp dword ptr [ebx*4 + ScriptJumps] (FF 24 9D) bzw. [edi*4 + ScriptJumps] (FF 24 BD)
@@ -1236,7 +1282,197 @@ namespace gta1
         uint8_t patch[7] = { 0xE9, 0, 0, 0, 0, 0x90, 0x90 };
         const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(hook) - (A.ScriptDispatch + 5));
         memcpy(patch + 1, &rel, 4);
-        return hooks::WriteMemory(reinterpret_cast<void*>(A.ScriptDispatch), patch, sizeof(patch));
+        s_installed = hooks::WriteMemory(reinterpret_cast<void*>(A.ScriptDispatch), patch, sizeof(patch));
+        return s_installed;
+    }
+
+    bool EnableQuickRetry()
+    {
+        s_quickRetry = EnableScriptHook();
+        return s_quickRetry;
+    }
+
+    bool SetScriptEventCallback(void (*cb)(ScriptEvent event, int value))
+    {
+        if (!EnableScriptHook())
+            return false;
+        s_scriptEvent = cb;
+        return true;
+    }
+
+    bool MissionActive() { return s_mission.active; }
+
+    // ---- Spielstände ----
+
+    namespace
+    {
+        constexpr int kScriptLines = 5000, kScriptLineSize = 22, kProcBlockSize = 0x4A0;
+
+        uint32_t Fnv(uint32_t h, const void* data, size_t n)
+        {
+            const uint8_t* p = static_cast<const uint8_t*>(data);
+            for (size_t i = 0; i < n; ++i)
+                h = (h ^ p[i]) * 16777619u;
+            return h;
+        }
+
+        bool StateAddressesKnown()
+        {
+            return s_supported && A.ScriptLines && A.ScriptProcBlock && A.ScriptState && A.ScriptObjects && A.ScriptObjSlot &&
+                   A.PlayerScore && A.PlayerMultiplier && A.PlayerLives && A.PlayerAmmo && A.PlayerArmor && A.PlayerCharacter;
+        }
+    }
+
+    // Level (Abschnitt der mission.ini) an den unveränderlichen Feldern der Skriptzeilen erkennen: Befehl und
+    // <obj> ändern sich im Spiel nie; so unterscheiden sich auch zwei Levels mit derselben Stadtkarte.
+    // Die übrigen Felder benutzen manche Befehle als Speicher (SURVIVE zählt in <fail>, Befehl 89 schreibt
+    // beim Levelstart <data> und <score>).
+    uint32_t LevelHash()
+    {
+        if (!StateAddressesKnown())
+            return 0;
+        uint32_t h = Fnv(2166136261u, &A.timestamp, 4);   // auch je Spielversion verschieden
+        for (int i = 0; i < kScriptLines; ++i)
+            h = Fnv(h, reinterpret_cast<const uint8_t*>(A.ScriptLines + i * kScriptLineSize), 6); // Befehl, obj
+        return h;
+    }
+
+    bool CanUseSaves() { return StateAddressesKnown() && InGame() && IsSinglePlayer(); }
+
+    bool CaptureGameState(GameState& out)
+    {
+        if (!CanUseSaves())
+            return false;
+        const int p = *reinterpret_cast<int*>(A.LocalPlayer);
+        if (p < 0 || p > 3)
+            return false;
+        const uintptr_t po = p * addr::PlayerStride;
+        out = GameState();
+        out.exeStamp = A.timestamp;
+        out.levelHash = LevelHash();
+        out.character = *reinterpret_cast<uint8_t*>(A.PlayerCharacter + po);
+        out.score = *reinterpret_cast<int32_t*>(A.PlayerScore + po);
+        out.multiplier = *reinterpret_cast<int16_t*>(A.PlayerMultiplier + po);
+        out.jailCard = *reinterpret_cast<uint8_t*>(A.PlayerJailCard + po);
+        out.lives = *reinterpret_cast<uint8_t*>(A.PlayerLives + po);
+        memcpy(out.ammo, reinterpret_cast<const void*>(A.PlayerAmmo + po), 4);
+        out.armor = *reinterpret_cast<int16_t*>(A.PlayerArmor + po);
+
+        // Position zu Fuß oder im Fahrzeug; geladen wird sie nur auf die Figur zu Fuß
+        int type = -1;
+        if (const GtaPos* pos = ControlledPos(p, type))
+        {
+            out.hasPos = true;
+            out.x = pos->x;
+            out.y = pos->y;
+            out.z = pos->z;
+        }
+        const int ped = PlayerPed();
+        if (ped >= 0)
+        {
+            out.angle = *reinterpret_cast<const int16_t*>(A.PedStruct + ped * addr::PedStride + addr::PedAngleOfs);
+            out.hasAngle = true;
+        }
+
+        const int slots = ObjectSlotCount();
+        const uint8_t* objects = reinterpret_cast<const uint8_t*>(A.ScriptObjects);
+        out.objects.assign(objects, objects + slots * addr::ScriptObjSize);
+        const uint8_t* block = reinterpret_cast<const uint8_t*>(A.ScriptProcBlock);
+        out.procBlock.assign(block, block + kProcBlockSize);
+        const uint8_t* state = reinterpret_cast<const uint8_t*>(A.ScriptState);
+        out.procState.assign(state, state + addr::ScriptProcs * 2);
+        const uint8_t* lines = reinterpret_cast<const uint8_t*>(A.ScriptLines);
+        out.lines.assign(lines, lines + kScriptLines * kScriptLineSize);
+        return true;
+    }
+
+    const char* RestoreGameState(const GameState& in)
+    {
+        if (!CanUseSaves())
+            return "nicht im Level";
+        const int p = *reinterpret_cast<int*>(A.LocalPlayer);
+        if (p < 0 || p > 3)
+            return "kein Spieler";
+        const uintptr_t po = p * addr::PlayerStride;
+        if (in.exeStamp != A.timestamp || in.levelHash != LevelHash())
+            return "anderes Level";
+        if (in.objects.size() != (size_t)ObjectSlotCount() * addr::ScriptObjSize || in.procBlock.size() != kProcBlockSize ||
+            in.procState.size() != addr::ScriptProcs * 2 || in.lines.size() != (size_t)kScriptLines * kScriptLineSize)
+            return "Daten passen nicht";
+
+        // Skript: Objekte (Zähler, Telefone, Missionsobjekte), Prozesse und Zeilen genau wie beim Speichern
+        memcpy(reinterpret_cast<void*>(A.ScriptObjects), in.objects.data(), in.objects.size());
+        memcpy(reinterpret_cast<void*>(A.ScriptProcBlock), in.procBlock.data(), in.procBlock.size());
+        memcpy(reinterpret_cast<void*>(A.ScriptState), in.procState.data(), in.procState.size());
+        memcpy(reinterpret_cast<void*>(A.ScriptLines), in.lines.data(), in.lines.size());
+        s_mission = MissionLog();
+        s_phones = PhoneGroup();
+        memset(s_failedAt, 0, sizeof(s_failedAt));
+        s_failedCount = 0;
+
+        *reinterpret_cast<int32_t*>(A.PlayerScore + po) = in.score;
+        *reinterpret_cast<int16_t*>(A.PlayerMultiplier + po) = in.multiplier;
+        *reinterpret_cast<uint8_t*>(A.PlayerJailCard + po) = in.jailCard;
+        *reinterpret_cast<uint8_t*>(A.PlayerLives + po) = in.lives;
+        memcpy(reinterpret_cast<void*>(A.PlayerAmmo + po), in.ammo, 4);
+        *reinterpret_cast<int16_t*>(A.PlayerArmor + po) = in.armor;
+
+        // Position nur zu Fuß: Figur versetzen und die Kamera gleich mitnehmen
+        const int ped = PlayerPed();
+        if (in.hasPos && ped >= 0)
+        {
+            uint8_t* pd = reinterpret_cast<uint8_t*>(A.PedStruct + ped * addr::PedStride);
+            memcpy(pd + 0x83, &in.x, 4);
+            memcpy(pd + 0x87, &in.y, 4);
+            memcpy(pd + 0x8B, &in.z, 4);
+            if (in.hasAngle)
+                memcpy(pd + addr::PedAngleOfs, &in.angle, 2);
+            if (A.Camera)
+            {
+                CameraData& cam = CameraOf(p);
+                cam.x = in.x >> 16;
+                cam.y = in.y >> 16;
+            }
+        }
+        return nullptr;
+    }
+
+    bool LookupText(int id, std::wstring& out)
+    {
+        out.clear();
+        if (!s_supported || !A.TextReady || !A.TextBuffer || !*reinterpret_cast<int*>(A.TextReady))
+            return false;
+        const char* p = *reinterpret_cast<const char* const*>(A.TextBuffer);
+        if (!p)
+            return false;
+        // Aufbau wie in der FXT-Datei: "[Schlüssel]Text\0[Schlüssel]Text\0 ... []"
+        char key[16];
+        const int keyLen = sprintf_s(key, "[%d]", id);
+        for (int guard = 0; guard < 4 * 1024 * 1024 && *p; ++guard)
+        {
+            if (p[0] == '[' && p[1] == ']')
+                return false;
+            if (strncmp(p, key, keyLen) == 0)
+            {
+                p += keyLen;
+                size_t n = 0;
+                while (p[n] && p[n] != '[' && n < 2000)
+                    ++n;
+                // Die Texte des R2P-Pakets sind UTF-8, die der Original-CD Windows-1252
+                UINT cp = CP_UTF8;
+                int w = MultiByteToWideChar(cp, MB_ERR_INVALID_CHARS, p, (int)n, nullptr, 0);
+                if (w <= 0)
+                {
+                    cp = 1252;
+                    w = MultiByteToWideChar(cp, 0, p, (int)n, nullptr, 0);
+                }
+                out.resize(w);
+                MultiByteToWideChar(cp, 0, p, (int)n, &out[0], w);
+                return !out.empty();
+            }
+            ++p;
+        }
+        return false;
     }
 
     bool EnableSteadyCamera()

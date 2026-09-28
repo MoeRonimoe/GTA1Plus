@@ -8,6 +8,9 @@
 #include "gta1.h"
 #include "log.h"
 #include "nav.h"
+#include "options.h"
+#include "saves.h"
+#include "briefings.h"
 #include "text.h"
 
 #include <algorithm>
@@ -22,8 +25,9 @@ namespace overlay
     namespace
     {
         enum class Menu { Closed, Requested, Open };
-        enum class Page { List, Map, Confirm };
-        enum class Item { Resume, Map, Quit };
+        enum class Page { List, Map, Confirm, Options, Briefings };
+        enum class Item { Resume, Map, Briefings, Save, Load, Options, Quit };
+        enum class Confirm { Quit, Load, StartLoad };
 
         struct Entry
         {
@@ -154,8 +158,8 @@ namespace overlay
             l.mapY = l.top;
             l.mapW = W - l.mapX - l.m;
             l.mapH = l.areaH;
-            l.boxW = std::max(W * 36 / 100, 300);
-            l.boxH = g_fonts.normalPx * 6 + l.m * 2;
+            l.boxW = std::min(std::max(W * 44 / 100, 320), W - 2 * l.m);
+            l.boxH = l.m * 3 + g_fonts.normalPx * 4 + g_fonts.smallPx * 17 / 4;
             l.boxX = (W - l.boxW) / 2;
             l.boxY = (H - l.boxH) / 2;
             l.btnW = l.boxW / 4;
@@ -205,11 +209,119 @@ namespace overlay
 
         std::vector<Entry> Entries()
         {
+            const bool single = gta1::Supported() && gta1::IsSinglePlayer();
             return {
                 { Item::Resume, text::Get(text::Resume), true },
                 { Item::Map, text::Get(g_cfg.waypoints ? text::MapAndWaypoints : text::Map), true },
-                { Item::Quit, text::Get(text::QuitLevel), gta1::Supported() && gta1::IsSinglePlayer() },
+                { Item::Briefings, text::Get(text::MenuBriefings), true },
+                { Item::Save, text::Get(text::MenuSave), single && saves::Available() },
+                { Item::Load, text::Get(text::MenuLoad), single && saves::HasSave() },
+                { Item::Options, text::Get(text::MenuOptions), true },
+                { Item::Quit, text::Get(text::QuitLevel), single },
             };
+        }
+
+        // Kurze Rückmeldung im Menü (z.B. "Spielstand gespeichert")
+        std::wstring g_status;
+        DWORD g_statusTick = 0;
+        bool g_statusError = false;
+
+        void ShowStatus(const std::wstring& msg, bool error = false)
+        {
+            g_status = msg;
+            g_statusTick = GetTickCount();
+            g_statusError = error;
+            g_dirty = true;
+        }
+
+        Confirm g_confirmKind = Confirm::Quit;
+        std::wstring g_slotInfo;             // Datum und Punkte des Spielstands für die Ladeabfrage
+        int g_optSel = 1, g_optScroll = 0;   // Optionen: gewählter Eintrag, erste sichtbare Zeile
+        int g_optHover = -1;
+        int g_briefScroll = 0;               // Briefings: erste sichtbare Textzeile
+        int g_briefMaxScroll = 0;
+
+        // Meldung im Spiel (z.B. "Automatisch gespeichert"), unten in der Bildmitte
+        std::wstring g_toast;
+        DWORD g_toastTick = 0;
+        bool g_toastError = false;
+        constexpr DWORD kToastTime = 2600;
+
+        void ShowToast(const std::wstring& msg, bool error = false)
+        {
+            g_toast = msg;
+            g_toastTick = GetTickCount();
+            g_toastError = error;
+        }
+
+        // Optionen und Briefings stehen rechts an der Stelle der Karte
+        struct Panel
+        {
+            int x, y, w, h;
+            int titleH, rowH, rowsY, rows;   // Optionen: Zeilenraster
+            int footY;                       // Hinweiszeile unten im Feld
+
+            int ValueW() const { return std::max(w * 3 / 10, 90); }
+            int RowAt(float my) const { return my >= rowsY && my < rowsY + rows * rowH ? (int)(my - rowsY) / rowH : -1; }
+        };
+
+        Panel MakePanel(const Layout& L)
+        {
+            Panel p;
+            p.x = L.mapX;
+            p.y = L.mapY;
+            p.w = L.mapW;
+            p.h = L.mapH;
+            p.titleH = g_fonts.normalPx * 2 + L.m / 2;
+            p.rowH = g_fonts.smallPx + std::max(6, g_fonts.smallPx * 2 / 3);
+            p.rowsY = p.y + p.titleH;
+            p.footY = p.y + p.h - g_fonts.smallPx - L.m / 2;
+            p.rows = std::max(1, (p.footY - L.m / 4 - p.rowsY) / p.rowH);
+            return p;
+        }
+
+        // Gewählte Option sichtbar halten, die Gruppenüberschrift darüber möglichst mit
+        void ClampOptionScroll(int rows)
+        {
+            const int n = options::Count();
+            if (g_optSel - 1 >= 0 && options::IsHeader(g_optSel - 1) && g_optSel - 1 < g_optScroll)
+                g_optScroll = g_optSel - 1;
+            if (g_optSel < g_optScroll)
+                g_optScroll = g_optSel;
+            if (g_optSel >= g_optScroll + rows)
+                g_optScroll = g_optSel - rows + 1;
+            g_optScroll = std::max(0, std::min(g_optScroll, n - rows));
+        }
+
+        // Text auf Zeilen der Breite width umbrechen
+        std::vector<std::wstring> Wrap(Canvas& c, const std::wstring& text, HFONT font, int width)
+        {
+            std::vector<std::wstring> lines;
+            std::wstring line;
+            size_t i = 0;
+            while (i < text.size())
+            {
+                while (i < text.size() && text[i] == L' ')
+                    ++i;
+                size_t j = i;
+                while (j < text.size() && text[j] != L' ')
+                    ++j;
+                if (j == i)
+                    break;
+                const std::wstring word = text.substr(i, j - i);
+                const std::wstring test = line.empty() ? word : line + L' ' + word;
+                if (!line.empty() && c.TextWidth(test.c_str(), font) > width)
+                {
+                    lines.push_back(line);
+                    line = word;
+                }
+                else
+                    line = test;
+                i = j;
+            }
+            if (!line.empty())
+                lines.push_back(line);
+            return lines;
         }
 
         void KeyName(int vk, wchar_t* out, size_t n)
@@ -423,6 +535,7 @@ namespace overlay
             g_openedOnMap = g_page == Page::Map;
             g_sel = 0;
             g_hover = -1;
+            g_status.clear();
             g_dragging = false;
             g_cursorShown = false;
 
@@ -467,6 +580,54 @@ namespace overlay
             gta1::QuitLevel();
         }
 
+        void LoadGame()
+        {
+            if (const char* error = saves::Load())
+            {
+                LOG("Laden fehlgeschlagen: %s", error);
+                g_page = Page::List;
+                ShowStatus(text::Get(text::LoadFailed), true);
+                return;
+            }
+            CloseMenu();
+            ShowToast(text::Get(text::LoadDone));
+        }
+
+        void ConfirmYes()
+        {
+            if (g_confirmKind == Confirm::Quit)
+                QuitLevel();
+            else
+                LoadGame();
+        }
+
+        void ConfirmNo()
+        {
+            // Die Abfrage beim Levelstart hat das Menü selbst geöffnet
+            if (g_confirmKind == Confirm::StartLoad)
+                CloseMenu();
+            else
+                g_page = Page::List;
+        }
+
+        void OpenConfirm(Confirm kind)
+        {
+            g_confirmKind = kind;
+            g_confirmYes = kind == Confirm::StartLoad;
+            if (kind != Confirm::Quit)
+                saves::SlotInfo(g_slotInfo);
+            g_page = Page::Confirm;
+        }
+
+        void FirstOption()
+        {
+            g_optSel = 0;
+            while (g_optSel < options::Count() - 1 && options::IsHeader(g_optSel))
+                ++g_optSel;
+            g_optScroll = 0;
+            g_optHover = -1;
+        }
+
         void Activate(Item item)
         {
             switch (item)
@@ -478,9 +639,125 @@ namespace overlay
                 g_page = Page::Map;
                 g_openedOnMap = false;
                 break;
+            case Item::Briefings:
+                g_page = Page::Briefings;
+                g_briefScroll = 0;
+                break;
+            case Item::Save:
+                if (!saves::CanSave())
+                    ShowStatus(text::Get(text::SaveBlocked), true);
+                else if (saves::Save(false))
+                    ShowStatus(text::Get(text::SaveDone));
+                else
+                    ShowStatus(text::Get(text::SaveFailed), true);
+                break;
+            case Item::Load:
+                if (saves::HasSave())
+                    OpenConfirm(Confirm::Load);
+                else
+                    ShowStatus(text::Get(text::NoSave), true);
+                break;
+            case Item::Options:
+                g_page = Page::Options;
+                FirstOption();
+                break;
             case Item::Quit:
-                g_page = Page::Confirm;
-                g_confirmYes = false;
+                OpenConfirm(Confirm::Quit);
+                break;
+            }
+        }
+
+        // Option ändern und, was ohne Neustart geht, gleich übernehmen
+        void ChangeOption(int i, int dir)
+        {
+            const bool minimap = g_cfg.minimap;
+            const int style = g_cfg.mapStyle;
+            if (!options::Change(i, dir))
+                return;
+            if (g_cfg.minimap != minimap)
+                g_minimap = g_cfg.minimap;
+            if (g_cfg.mapStyle != style)
+                g_style = g_map.HasTextures() ? g_cfg.mapStyle : CityMap::Schematic;
+            if (options::NeedsRestart(i))
+                ShowStatus(text::Get(text::OptRestart));
+        }
+
+        void HandleOptionsKey(int vk, bool repeat)
+        {
+            const int n = options::Count();
+            switch (vk)
+            {
+            case VK_UP:
+            case VK_DOWN:
+            {
+                const int step = vk == VK_UP ? -1 : 1;
+                int i = g_optSel + step;
+                while (i >= 0 && i < n && options::IsHeader(i))
+                    i += step;
+                if (i >= 0 && i < n)
+                    g_optSel = i;
+                else if (vk == VK_UP)
+                    g_optScroll = 0; // Überschrift ganz oben zeigen
+                break;
+            }
+            case VK_PRIOR:
+            case VK_NEXT:
+                for (int k = 0; k < 8; ++k)
+                    HandleOptionsKey(vk == VK_PRIOR ? VK_UP : VK_DOWN, false);
+                break;
+            case VK_LEFT:
+            case VK_SUBTRACT:
+            case VK_OEM_MINUS:
+                ChangeOption(g_optSel, -1);
+                break;
+            case VK_RIGHT:
+            case VK_ADD:
+            case VK_OEM_PLUS:
+                ChangeOption(g_optSel, 1);
+                break;
+            case VK_RETURN:
+            case VK_SPACE:
+                if (!repeat)
+                    ChangeOption(g_optSel, 1);
+                break;
+            case VK_ESCAPE:
+            case VK_BACK:
+                if (!repeat)
+                    g_page = Page::List;
+                break;
+            default:
+                break;
+            }
+        }
+
+        void HandleBriefingsKey(int vk, bool repeat)
+        {
+            switch (vk)
+            {
+            case VK_UP:
+                g_briefScroll = std::max(0, g_briefScroll - 1);
+                break;
+            case VK_DOWN:
+                g_briefScroll = std::min(g_briefMaxScroll, g_briefScroll + 1);
+                break;
+            case VK_PRIOR:
+            case VK_SUBTRACT:
+                g_briefScroll = std::max(0, g_briefScroll - 8);
+                break;
+            case VK_NEXT:
+            case VK_ADD:
+                g_briefScroll = std::min(g_briefMaxScroll, g_briefScroll + 8);
+                break;
+            case VK_HOME:
+                g_briefScroll = 0;
+                break;
+            case VK_ESCAPE:
+            case VK_BACK:
+            case VK_RETURN:
+                if (!repeat)
+                    g_page = Page::List;
+                break;
+            default:
                 break;
             }
         }
@@ -589,24 +866,24 @@ namespace overlay
                 g_confirmYes = !g_confirmYes;
                 break;
             case 'Y':
-                QuitLevel();
+                ConfirmYes();
                 break;
             case VK_RETURN:
             case VK_SPACE:
                 if (g_confirmYes)
-                    QuitLevel();
+                    ConfirmYes();
                 else
-                    g_page = Page::List;
+                    ConfirmNo();
                 break;
             case 'N':
             case VK_ESCAPE:
             case VK_BACK:
-                g_page = Page::List;
+                ConfirmNo();
                 break;
             default:
                 // Anfangsbuchstabe von "Ja"/"Oui"/"Sì" in der eingestellten Sprache
                 if (vk == (int)towupper(text::Get(text::Yes)[0]))
-                    QuitLevel();
+                    ConfirmYes();
                 break;
             }
         }
@@ -622,6 +899,8 @@ namespace overlay
             case Page::List: HandleListKey(vk, repeat); break;
             case Page::Map: HandleMapKey(vk, repeat); break;
             case Page::Confirm: HandleConfirmKey(vk, repeat); break;
+            case Page::Options: HandleOptionsKey(vk, repeat); break;
+            case Page::Briefings: HandleBriefingsKey(vk, repeat); break;
             }
             g_dirty = true;
         }
@@ -652,6 +931,25 @@ namespace overlay
                     if (my >= L.RowY(i) && my < L.RowY(i) + L.rowH)
                         hover = i;
 
+            // Optionen: Zeile unter der Maus
+            const Panel P = MakePanel(L);
+            const bool panelPage = g_page == Page::Options || g_page == Page::Briefings;
+            int optHover = -1;
+            if (g_page == Page::Options && L.InMap(mx, my))
+            {
+                const int row = P.RowAt(my);
+                const int i = row >= 0 ? g_optScroll + row : -1;
+                if (i >= 0 && i < options::Count() && !options::IsHeader(i))
+                    optHover = i;
+            }
+            if (optHover != g_optHover)
+            {
+                g_optHover = optHover;
+                if (optHover >= 0)
+                    g_optSel = optHover;
+                g_dirty = true;
+            }
+
             switch (msg.message)
             {
             case WM_MOUSEMOVE:
@@ -677,9 +975,9 @@ namespace overlay
                         if (mx >= L.BtnX(i) && mx < L.BtnX(i) + L.btnW && my >= L.btnY && my < L.btnY + L.btnH)
                         {
                             if (i == 0)
-                                QuitLevel();
+                                ConfirmYes();
                             else
-                                g_page = Page::List;
+                                ConfirmNo();
                             g_dirty = true;
                             return;
                         }
@@ -694,6 +992,17 @@ namespace overlay
                     g_dirty = true;
                     return;
                 }
+                if (g_page == Page::Options && optHover >= 0)
+                {
+                    // Klick auf die linke Hälfte der Wertespalte ("‹"): zurück, sonst weiter
+                    const int valueX = P.x + P.w - L.m - P.ValueW();
+                    const bool back = mx >= valueX && mx < valueX + P.ValueW() / 2;
+                    ChangeOption(optHover, back ? -1 : 1);
+                    g_dirty = true;
+                    return;
+                }
+                if (panelPage)
+                    break;
                 if (L.InMap(mx, my) && g_map.Loaded())
                 {
                     if (g_page != Page::Map)
@@ -723,6 +1032,19 @@ namespace overlay
             case WM_MOUSEWHEEL:
             {
                 const int steps = GET_WHEEL_DELTA_WPARAM(msg.wParam) / WHEEL_DELTA;
+                if (g_page == Page::Options)
+                {
+                    g_optScroll = std::max(0, std::min(g_optScroll - steps * 2, options::Count() - P.rows));
+                    g_optHover = -1;
+                    g_dirty = true;
+                    break;
+                }
+                if (g_page == Page::Briefings)
+                {
+                    g_briefScroll = std::max(0, std::min(g_briefScroll - steps * 3, g_briefMaxScroll));
+                    g_dirty = true;
+                    break;
+                }
                 const int zoom = std::min(std::max(g_zoom + steps, 0), kZoomCount - 1);
                 if (zoom == g_zoom || !g_map.Loaded() || (g_page != Page::Map && !L.InMap(mx, my)))
                     break;
@@ -762,6 +1084,117 @@ namespace overlay
             c.Triangle(x - 1.5f, y - 3.0f, x - 1.5f, y + s + 3.0f, x + s * 0.72f + 3.0f, y + s * 0.72f + 1.0f, 0x101418, 220);
             c.Triangle(x, y, x, y + s, x + s * 0.72f, y + s * 0.72f, 0xFFFFFF);
             c.WriteTo(v, bx, by, bw, bh);
+        }
+
+        void PanelFrame(Canvas& c, const Panel& P, int m, const wchar_t* title)
+        {
+            c.Frame(P.x - 2, P.y - 2, P.w + 4, P.h + 4, kAccent, 2);
+            c.Blend(P.x, P.y, P.w, P.h, 0x0B0E12, 215);
+            c.Text(P.x + m, P.y + (P.titleH - g_fonts.normalPx) / 2 - 2, title, g_fonts.normalFont, 0xFFFFFF, TA_LEFT | TA_TOP, false);
+            c.Fill(P.x + m / 2, P.rowsY - 2, P.w - m, 1, 0x3A424C);
+        }
+
+        void ScrollBar(Canvas& c, int x, int y, int h, int first, int visible, int total)
+        {
+            if (total <= visible || h <= 0)
+                return;
+            c.Fill(x, y, 3, h, 0x2A3038);
+            const int thumbH = std::max(12, h * visible / total);
+            const int thumbY = y + (h - thumbH) * first / std::max(1, total - visible);
+            c.Fill(x, thumbY, 3, thumbH, 0x8A929C);
+        }
+
+        void RenderOptions(Canvas& c, const Layout& L)
+        {
+            const Panel P = MakePanel(L);
+            const int m = L.m;
+            PanelFrame(c, P, m, text::Get(text::MenuOptions));
+            ClampOptionScroll(P.rows);
+
+            const int n = options::Count();
+            const int valueW = P.ValueW();
+            const int valueX = P.x + P.w - m - valueW;
+            for (int r = 0; r < P.rows && g_optScroll + r < n; ++r)
+            {
+                const int i = g_optScroll + r;
+                const int y = P.rowsY + r * P.rowH;
+                const int ty = y + (P.rowH - g_fonts.smallPx) / 2 - 1;
+                const wchar_t* label = options::Label(i);
+                if (options::IsHeader(i))
+                {
+                    c.Text(P.x + m, ty, label, g_fonts.smallFont, kAccent, TA_LEFT | TA_TOP, false);
+                    const int tw = c.TextWidth(label, g_fonts.smallFont);
+                    c.Fill(P.x + m + tw + m / 2, y + P.rowH / 2, P.w - 2 * m - tw - m / 2, 1, 0x3A424C);
+                    continue;
+                }
+                const bool sel = i == g_optSel;
+                if (sel)
+                {
+                    c.Blend(P.x + m / 2, y, P.w - m, P.rowH, 0x2A3441, 230);
+                    c.Fill(P.x + m / 2, y, 3, P.rowH, kAccent);
+                }
+                std::wstring name = label;
+                if (options::NeedsRestart(i))
+                    name += L" *";
+                c.Text(P.x + m + m / 2, ty, name.c_str(), g_fonts.smallFont, sel ? 0xFFFFFF : 0xC9CFD6, TA_LEFT | TA_TOP, false);
+                const std::wstring value = options::Value(i);
+                c.Text(valueX + valueW / 2, ty, value.c_str(), g_fonts.smallFont, sel ? 0xFFFFFF : 0xB9C0C8, TA_CENTER | TA_TOP, false);
+                if (sel)
+                {
+                    c.Text(valueX + 4, ty, L"\u2039", g_fonts.smallFont, kAccent, TA_LEFT | TA_TOP, false);
+                    c.Text(valueX + valueW - 4, ty, L"\u203A", g_fonts.smallFont, kAccent, TA_RIGHT | TA_TOP, false);
+                }
+            }
+            ScrollBar(c, P.x + P.w - m / 3 - 3, P.rowsY, P.rows * P.rowH, g_optScroll, P.rows, n);
+
+            std::wstring foot = L"* ";
+            foot += text::Get(text::OptRestart);
+            c.Text(P.x + m, P.footY, foot.c_str(), g_fonts.smallFont, 0x8A929C, TA_LEFT | TA_TOP, false);
+        }
+
+        void RenderBriefings(Canvas& c, const Layout& L)
+        {
+            const Panel P = MakePanel(L);
+            const int m = L.m;
+            PanelFrame(c, P, m, text::Get(text::MenuBriefings));
+
+            const int count = briefings::Count();
+            if (count == 0)
+            {
+                g_briefMaxScroll = g_briefScroll = 0;
+                c.Text(P.x + P.w / 2, P.y + P.h / 2 - g_fonts.smallPx, text::Get(text::BriefingsEmpty), g_fonts.smallFont, 0xB0B6BE, TA_CENTER | TA_TOP, false);
+                return;
+            }
+
+            // Neueste Nachricht oben; zwischen den Nachrichten eine Leerzeile
+            struct Line { std::wstring text; int entry; };
+            std::vector<Line> lines;
+            const int textX = P.x + m + m / 2 + 3;
+            const int textW = P.x + P.w - m - textX;
+            for (int e = 0; e < count; ++e)
+            {
+                for (std::wstring& t : Wrap(c, briefings::Text(e), g_fonts.smallFont, textW))
+                    lines.push_back({ std::move(t), e });
+                lines.push_back({ L"", -1 });
+            }
+            lines.pop_back();
+
+            const int lh = g_fonts.smallPx + 5;
+            const int top = P.rowsY + m / 4, bottom = P.footY - m / 4;
+            const int visible = std::max(1, (bottom - top) / lh);
+            g_briefMaxScroll = std::max(0, (int)lines.size() - visible);
+            g_briefScroll = std::min(g_briefScroll, g_briefMaxScroll);
+            for (int r = 0; r < visible && g_briefScroll + r < (int)lines.size(); ++r)
+            {
+                const Line& ln = lines[g_briefScroll + r];
+                if (ln.entry < 0)
+                    continue;
+                const int y = top + r * lh;
+                const bool newest = ln.entry == 0;
+                c.Fill(P.x + m, y, 3, lh, newest ? kAccent : 0x4A515B);
+                c.Text(textX, y + 2, ln.text.c_str(), g_fonts.smallFont, newest ? 0xFFFFFF : 0xC9CFD6, TA_LEFT | TA_TOP, false);
+            }
+            ScrollBar(c, P.x + P.w - m / 3 - 3, top, visible * lh, g_briefScroll, visible, (int)lines.size());
         }
 
         void RenderMenu(Canvas& c)
@@ -830,10 +1263,16 @@ namespace overlay
                 }
             }
 
-            // Karte
+            // Rechts: Optionen, Briefings oder die Karte
             const bool mapActive = g_page == Page::Map;
-            c.Fill(mapX - 2, mapY - 2, mapW + 4, mapH + 4, mapActive ? kAccent : 0x4A515B);
-            if (g_map.Loaded())
+            const bool panelPage = g_page == Page::Options || g_page == Page::Briefings;
+            if (!panelPage)
+                c.Fill(mapX - 2, mapY - 2, mapW + 4, mapH + 4, mapActive ? kAccent : 0x4A515B);
+            if (g_page == Page::Options)
+                RenderOptions(c, L);
+            else if (g_page == Page::Briefings)
+                RenderBriefings(c, L);
+            else if (g_map.Loaded())
             {
                 const float ppb = kZoom[g_zoom];
                 if ((g_follow || !mapActive) && g_havePlayer)
@@ -906,8 +1345,17 @@ namespace overlay
                 const int bw = L.boxW, bh = L.boxH, bx = L.boxX, by = L.boxY;
                 c.Blend(bx, by, bw, bh, 0x11151A, 240);
                 c.Fill(bx, by, bw, 4, kAccent);
-                c.Text(bx + m, by + m, text::Get(text::ConfirmTitle), g_fonts.normalFont, 0xFFFFFF, TA_LEFT | TA_TOP, false);
-                c.Text(bx + m, by + m + g_fonts.normalPx * 2, text::Get(text::ConfirmText), g_fonts.smallFont, 0xB9C0C8, TA_LEFT | TA_TOP, false);
+                const bool quit = g_confirmKind == Confirm::Quit;
+                const text::Id title = quit ? text::ConfirmTitle : g_confirmKind == Confirm::Load ? text::LoadTitle : text::StartLoadTitle;
+                const text::Id body = quit ? text::ConfirmText : g_confirmKind == Confirm::Load ? text::LoadText : text::StartLoadText;
+                c.Text(bx + m, by + m, text::Get(title), g_fonts.normalFont, 0xFFFFFF, TA_LEFT | TA_TOP, false);
+                std::vector<std::wstring> lines = Wrap(c, text::Get(body), g_fonts.smallFont, bw - 2 * m);
+                lines.resize(std::min<size_t>(lines.size(), quit ? 3 : 2));
+                if (!quit && !g_slotInfo.empty())
+                    lines.push_back(g_slotInfo);
+                for (size_t k = 0; k < lines.size(); ++k)
+                    c.Text(bx + m, by + m + g_fonts.normalPx * 9 / 5 + (int)k * g_fonts.smallPx * 27 / 20, lines[k].c_str(), g_fonts.smallFont,
+                           !quit && k + 1 == lines.size() && !g_slotInfo.empty() ? kAccent : 0xB9C0C8, TA_LEFT | TA_TOP, false);
                 const int btnW = L.btnW, btnH = L.btnH, btnY = L.btnY;
                 const wchar_t* labels[2] = { text::Get(text::Yes), text::Get(text::No) };
                 for (int i = 0; i < 2; ++i)
@@ -930,9 +1378,25 @@ namespace overlay
                 wcscpy_s(buf, text::Get(g_cfg.waypoints ? text::HelpMapMouse : text::HelpMapMouseNoWaypoints));
             else if (g_page == Page::Map)
                 wcscpy_s(buf, text::Get(g_cfg.waypoints ? text::HelpMap : text::HelpMapNoWaypoints));
+            else if (g_page == Page::Options)
+                wcscpy_s(buf, text::Get(text::HelpOptions));
+            else if (g_page == Page::Briefings)
+                wcscpy_s(buf, text::Get(text::HelpBriefings));
             else
                 wcscpy_s(buf, text::Get(text::HelpConfirm));
             c.Text(W / 2, H - m / 2 - g_fonts.smallPx - 2, buf, g_fonts.smallFont, 0xD5DAE0, TA_CENTER | TA_TOP);
+
+            // Kurze Rückmeldung unten links unter der Menüliste
+            if (!g_status.empty())
+            {
+                const int pad = m / 2;
+                const int tw = c.TextWidth(g_status.c_str(), g_fonts.smallFont);
+                const int bw = std::min(tw + 2 * pad + 4, W - 2 * m), bh = g_fonts.smallPx + pad + 4;
+                const int bx = m, by = top + areaH - bh;
+                c.Blend(bx, by, bw, bh, g_statusError ? 0x3A1010 : 0x10301A, 235);
+                c.Fill(bx, by, 4, bh, g_statusError ? 0xE8262E : 0x4CC36B);
+                c.Text(bx + pad + 4, by + pad / 2 + 1, g_status.c_str(), g_fonts.smallFont, 0xFFFFFF, TA_LEFT | TA_TOP, false);
+            }
         }
 
         void DrawMenu(SurfaceView& v)
@@ -1174,6 +1638,21 @@ namespace overlay
             c.WriteTo(v, x, y, bw, bh);
         }
 
+        // Meldung im Spiel, z.B. "Automatisch gespeichert"
+        void DrawToast(SurfaceView& v)
+        {
+            Canvas& c = g_canvas;
+            const int padX = v.height / 45, padY = v.height / 100;
+            const int bw = c.TextWidth(g_toast.c_str(), g_fonts.normalFont) + 2 * padX;
+            const int bh = g_fonts.normalPx + 2 * padY + 2;
+            const int x = (v.width - bw) / 2, y = v.height * 80 / 100;
+            c.ReadFrom(v, x, y, bw, bh);
+            c.Blend(x, y, bw, bh, 0x0B0E12, 200);
+            c.Fill(x, y, 4, bh, g_toastError ? 0xE8262E : 0x4CC36B);
+            c.Text(x + padX, y + padY, g_toast.c_str(), g_fonts.normalFont, 0xFFFFFF, TA_LEFT | TA_TOP, false);
+            c.WriteTo(v, x, y, bw, bh);
+        }
+
         void DrawInfo(SurfaceView& v)
         {
             Canvas& c = g_canvas;
@@ -1235,6 +1714,8 @@ namespace overlay
             c.WriteTo(v, bx, by, bs, bs);
         }
 
+        void Request(Page page);
+
         void DrawHud(SurfaceView& v)
         {
             if (!g_canvas.Resize(v.width, v.height))
@@ -1264,8 +1745,23 @@ namespace overlay
                 DrawCrosshair(v, cx, cy);
             else if (havePlayer && controls::LookCursor(cx, cy))
                 DrawLookCursor(v, cx, cy);
+            std::wstring notice;
+            bool noticeError = false;
+            if (saves::TakeNotice(notice, noticeError))
+                ShowToast(notice, noticeError);
+            if (!g_toast.empty() && now - g_toastTick < kToastTime && inGame)
+                DrawToast(v);
             if (g_cfg.showInfo)
                 DrawInfo(v);
+
+            // Beim Levelstart einen vorhandenen Spielstand anbieten
+            if (inGame && g_cfg.pauseMenu && gta1::IsSinglePlayer() && saves::TakeLoadOffer())
+            {
+                g_confirmKind = Confirm::StartLoad;
+                g_confirmYes = true;
+                saves::SlotInfo(g_slotInfo);
+                Request(Page::Confirm);
+            }
         }
 
         void Request(Page page)
@@ -1442,6 +1938,11 @@ namespace overlay
         }
         else
             g_panHold = 0;
+        if (!g_status.empty() && now - g_statusTick > 2500)
+        {
+            g_status.clear();
+            g_dirty = true;
+        }
         if (now - g_blinkTick >= 500)
         {
             g_blink = !g_blink;
