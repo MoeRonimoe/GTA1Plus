@@ -25,16 +25,11 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 | Game | Status |
 |---|---|
 | `GTA.exe` 1.0.0.1 (October 1997, e.g. *Ready2Play*; also `GTA_Intro.exe`) | All features |
-| `GTA_London.exe` (London 1969) | Pause menu, map, minimap, GPS, hearts, twin-stick, controller |
-| `GTA_London_1961.exe` (London 1961) | Same as London 1969 |
+| `GTA_London.exe` (London 1969) | All features except portrait colours |
+| `GTA_London_1961.exe` (London 1961) | All features except portrait colours |
 | 2002 freeware release (`Grand Theft Auto.exe`) | Not yet supported (different data layout) |
 
-The London versions don't support camera control, putting out fires or the gameplay options yet. Unknown executables start normally without the mod's features. The DOS version (e.g. in DOSBox) can't load ASI plugins.
-
-## Known issues
-
-- **Quick retry of phone missions:** the third phone mission in Liberty City stays unavailable after it fails. Its script doesn't release the phone the way the other missions do.
-- **Switching from mouse to controller:** the crosshair stays at the last mouse position and shots don't go where it points. With AlwaysAim the mouse keeps steering the aim.
+London has its own characters, so the portrait colours (made for the GTA1 characters) stay off there. Unknown executables start normally without the mod's features. The DOS version (e.g. in DOSBox) can't load ASI plugins.
 
 ## Installation
 

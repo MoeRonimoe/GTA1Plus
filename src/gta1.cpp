@@ -92,8 +92,9 @@ namespace gta1
         uintptr_t NotEnglish = 0;     // Hauptmenü: "nicht Englisch" -> Frauen überspringen
         uintptr_t PickPrevCheck = 0, PickNextCheck = 0;
 
-        uintptr_t ScriptDispatch = 0; // jmp [ebx*4+ScriptJumps], ebx = Befehl, ecx = Skriptzeile
+        uintptr_t ScriptDispatch = 0; // jmp [reg*4+ScriptJumps]: 1.0.0.1 ebx = Befehl, ecx = Zeile; London edi, ebp
         uintptr_t ScriptJumps = 0;
+        bool      ScriptRegsEdi = false;
         uintptr_t ScriptSurvive = 0;  // Befehl SURVIVE
         uintptr_t ScriptProc = 0, ScriptState = 0, ScriptActive = 0, ScriptObjSlot = 0, ScriptObjects = 0;
 
@@ -195,8 +196,20 @@ namespace gta1
         // Fußgänger wie in 1.0.0.1 (235 Byte), Position über 0x47E2B0
         a.PedStruct = 0x7E2370; a.PedAngle = 0x7E2409; a.PedRemap = 0x7E23C8; a.PedDrawRemap = 0x7E2403;
         a.PlayerPedId = 0x80CF2A; a.PlayerCharacter = 0x80D0C4;
-        a.Camera = 0x80CF40;      // Kameradaten; die Kameraführung selbst ist umgebaut (noch ohne Steuerung)
+        // Kameraführung endet wie in 1.0.0.1 mit ViewRect(player); Sichtbereich dort als (h + 0x180) * 160 / zoom
+        a.Camera = 0x80CF40; a.ViewRect = 0x450BC0; a.ViewRectCall = 0x450B87;
         a.SteadyCamera[0] = 0x451581;
+        // Objekte wie in 1.0.0.1 (130 Byte); Anzünden in 0x465FEF, Sprite der Figuren in 0x467FE0
+        a.ObjectCreate = 0x40222F; a.ObjectDelete = 0x401924; a.Objects = 0x75CDC0; a.ActiveObjects = 0x7CBF18;
+        a.PedSprite = 0x467FE0;
+        a.BurnDamage = 0x47A760;  // Brennschaden: cmp [esi+52h],-1 / je / Lebensenergie - 1 (anders geschrieben)
+        a.PedFire = 0x402AEF; a.PedFireCall = 0x47A71D;
+        a.MultHalve = 0x48307E;   // eigene Funktion 0x483070 halbiert den Multiplikator (0x80D01C)
+        a.NotEnglish = 0x40286F; a.PickPrevCheck = 0x439D19; a.PickNextCheck = 0x439D69;
+        // Missionsskript: Daten gegenüber 1.0.0.1 um 8 Byte verschoben, gleiche Befehls- und Objektnummern
+        a.ScriptDispatch = 0x45F639; a.ScriptJumps = 0x461490; a.ScriptRegsEdi = true; a.ScriptSurvive = 0x456B00;
+        a.ScriptProc = 0x736A00; a.ScriptState = 0x6DB658; a.ScriptActive = 0x6FB760;
+        a.ScriptObjSlot = 0x6DB760; a.ScriptObjects = 0x6796F0;
         a.LocalPlayer = 0x80D5B0; a.NumPlayers = 0x80D5AC;
         a.PlayerCtrl = 0x80CFF5; a.PlayerObject = 0x80CFF9; a.RunState = 0x572ACC;
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
@@ -236,8 +249,18 @@ namespace gta1
         a.KeyScancodes = 0x574B28;
         a.PedStruct = 0x7E3F78; a.PedAngle = 0x7E4011; a.PedRemap = 0x7E3FD0; a.PedDrawRemap = 0x7E400B;
         a.PlayerPedId = 0x80EB32; a.PlayerCharacter = 0x80ECCC;
-        a.Camera = 0x80EB48;
+        a.Camera = 0x80EB48; a.ViewRect = 0x450F80; a.ViewRectCall = 0x450F47;
         a.SteadyCamera[0] = 0x451941;
+        a.ObjectCreate = 0x402275; a.ObjectDelete = 0x401924; a.Objects = 0x75E9C8; a.ActiveObjects = 0x7CDB20;
+        a.PedSprite = 0x4687F0;
+        a.BurnDamage = 0x47AFF0;
+        a.PedFire = 0x402B3F; a.PedFireCall = 0x47AFAD;
+        a.MultHalve = 0x48391E;
+        a.NotEnglish = 0x4028BA; a.PickPrevCheck = 0x439FE9; a.PickNextCheck = 0x43A039;
+        // Missionsskript: 156 Befehle (Drive-by-Befehle angehängt), Nummern bis dahin wie in 1.0.0.1
+        a.ScriptDispatch = 0x45FDF9; a.ScriptJumps = 0x461C80; a.ScriptRegsEdi = true; a.ScriptSurvive = 0x456FE0;
+        a.ScriptProc = 0x738608; a.ScriptState = 0x6DD260; a.ScriptActive = 0x6FD368;
+        a.ScriptObjSlot = 0x6DD368; a.ScriptObjects = 0x67B2F8;
         a.LocalPlayer = 0x80F1B8; a.NumPlayers = 0x80F1B4;
         a.PlayerCtrl = 0x80EBFD; a.PlayerObject = 0x80EC01; a.RunState = 0x5746D4;
         a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
@@ -700,7 +723,8 @@ namespace gta1
 
     bool EnableBurnPause()
     {
-        static const uint8_t expect[] = { 0x66, 0x83, 0x7E, 0x52, 0xFF, 0x74, 0x11, 0xFE, 0x4E, 0x44 };
+        // cmp word ptr [esi+52h],-1 / je ... (Sprungweite je Version verschieden)
+        static const uint8_t expect[] = { 0x66, 0x83, 0x7E, 0x52, 0xFF, 0x74 };
         if (!s_supported || !A.BurnDamage || !hooks::BytesMatch(A.BurnDamage, expect, sizeof(expect)))
             return false;
         uint8_t patch[5] = { 0xE8 };
@@ -924,16 +948,17 @@ namespace gta1
         }
 
         // Telefongruppe (MPHONE): Wer abhebt, dessen Telefon setzt das Spiel dauerhaft auf Handle -1 (0x4776F4)
-        // und es klingelt nie wieder. Außerdem wandelt die Mission ihre "künftigen" Objekte um (PARKED_ON macht
-        // aus FUTURECAR ein Auto und überschreibt dabei Modell und Typ). Für einen neuen Versuch sichern wir beim
-        // Abheben die ganze Objekttabelle und stellen nach dem Fehlschlag Zähler, umgewandelte Objekte und das
-        // Telefon wieder her.
+        // und es klingelt nie wieder. Außerdem zählt die Mission ihren Zähler "noch zu haben" herunter und wandelt
+        // ihre "künftigen" Objekte um (PARKED_ON macht aus FUTURECAR ein Auto und überschreibt Modell und Typ).
+        // Für einen neuen Versuch sichern wir beim Abheben die ganze Objekttabelle und stellen nach dem Fehlschlag
+        // Zähler, umgewandelte Objekte und das Telefon wieder her.
         constexpr int32_t kObjCounter = 12;
+        constexpr DWORD   kRestoreTimeout = 900000;  // so lange wartet ein gescheiterter Missionsstand auf die Freigabe
         struct PhoneGroup { int line = -1, count = 0; int32_t handles[8] = {}; };
         struct MissionLog
         {
-            bool active = false, failed = false, phonesBack = false;
-            int failProc = -1;
+            bool active = false, failed = false;
+            DWORD failTick = 0;
             int phoneLine = -1;
             int32_t phoneHandle = -1;
             int slots = 0;                   // Anzahl gesicherter Objekte
@@ -997,38 +1022,45 @@ namespace gta1
                     s_mission.converted.push_back(i);
         }
 
-        // Ende der Wartephase nach einem Fehlschlag: Hat das Skript die Telefongruppe wieder freigegeben
-        // (wie in Liberty City), steht die gescheiterte Mission wieder zur Wahl, als wäre sie nie angenommen worden
+        // Gibt das Skript nach dem Fehlschlag die Telefongruppe wieder frei (ENABLE auf MPHONES/PHONE_TOGG), steht
+        // die gescheiterte Mission wieder zur Wahl, als wäre sie nie angenommen worden. Das geschieht genau dort,
+        // bevor das Skript prüft, welche Missionen noch zu haben sind (Liberty City: COMPARE auf 548..551).
+        // Die Aufräumbefehle davor sind je Mission verschieden (die dritte in Liberty City setzt erst Power-ups).
+        void RestoreMission()
+        {
+            if (ObjectSlotCount() != s_mission.slots || GetTickCount() - s_mission.failTick > kRestoreTimeout)
+            {
+                LOG("Gemerkter Missionsstand verworfen (anderes Level oder zu alt)");
+                s_mission = MissionLog();
+                return;
+            }
+            // Umgewandelte Objekte wieder in den Ausgangszustand (z.B. FUTURECAR mit Modell statt Auto-Handle)
+            for (int slot : s_mission.converted)
+                memcpy(ObjectSlot(slot), &s_mission.start[slot * addr::ScriptObjSize], addr::ScriptObjSize);
+            // Zähler auf den Stand vor der Mission
+            int counters = 0;
+            for (int i = 0; i < s_mission.slots; ++i)
+            {
+                uint8_t* entry = ObjectSlot(i);
+                const uint8_t* before = &s_mission.start[i * addr::ScriptObjSize];
+                if (SlotType(entry) == kObjCounter && SlotType(before) == kObjCounter && memcmp(entry + 4, before + 4, 4) != 0)
+                {
+                    memcpy(entry + 4, before + 4, 4);
+                    ++counters;
+                }
+            }
+            int32_t* phone = ObjectValue(s_mission.phoneLine);
+            if (phone && *phone == -1)
+                *phone = s_mission.phoneHandle;
+            LOG("Neuer Versuch möglich: Telefon aus Zeile %d klingelt wieder, %d Objekte und %d Zähler zurückgesetzt",
+                s_mission.phoneLine, (int)s_mission.converted.size(), counters);
+            s_mission = MissionLog();
+        }
+
+        // Ende der Wartephase nach einem Fehlschlag; der gemerkte Missionsstand bleibt bis zur Freigabe erhalten
         void FinishFailure(int proc)
         {
             s_failedAt[proc] = 0;
-            if (!s_mission.active || !s_mission.failed || s_mission.failProc != proc)
-                return;
-            if (s_mission.phonesBack)
-            {
-                // Umgewandelte Objekte wieder in den Ausgangszustand (z.B. FUTURECAR mit Modell statt Auto-Handle)
-                for (int slot : s_mission.converted)
-                    memcpy(ObjectSlot(slot), &s_mission.start[slot * addr::ScriptObjSize], addr::ScriptObjSize);
-                // Zähler auf den Stand vor der Mission
-                int counters = 0;
-                for (int i = 0; i < s_mission.slots; ++i)
-                {
-                    uint8_t* entry = ObjectSlot(i);
-                    const uint8_t* before = &s_mission.start[i * addr::ScriptObjSize];
-                    if (SlotType(entry) == kObjCounter && SlotType(before) == kObjCounter && memcmp(entry + 4, before + 4, 4) != 0)
-                    {
-                        memcpy(entry + 4, before + 4, 4);
-                        ++counters;
-                    }
-                }
-                int32_t* phone = ObjectValue(s_mission.phoneLine);
-                if (phone && *phone == -1)
-                    *phone = s_mission.phoneHandle;
-                LOG("Neuer Versuch möglich: Telefon aus Zeile %d klingelt wieder, %d Objekte und %d Zähler zurückgesetzt",
-                    s_mission.phoneLine, (int)s_mission.converted.size(), counters);
-            }
-            s_mission.active = false;
-            s_mission.start.clear();
         }
 
         void __cdecl OnScriptCommand(uint32_t command, ScriptLine* line)
@@ -1075,10 +1107,17 @@ namespace gta1
                 if (s_mission.active && !s_mission.failed)
                 {
                     s_mission.failed = true;
-                    s_mission.failProc = proc;
+                    s_mission.failTick = GetTickCount();
                     NoteConversions();
                 }
                 return;
+            }
+            if (command == CmdEnable && s_mission.active && s_mission.failed)
+            {
+                const uint8_t* o = ScriptObject(line->obj);
+                const int32_t type = o ? *reinterpret_cast<const int32_t*>(o) : -1;
+                if (type == kObjMPhones || type == kObjPhoneToggle)
+                    RestoreMission();
             }
             if (!failedAt)
                 return;
@@ -1087,20 +1126,16 @@ namespace gta1
                 FinishFailure(proc);
                 return;
             }
-            if (command == CmdEnable && s_mission.failed)
-            {
-                const uint8_t* o = ScriptObject(line->obj);
-                const int32_t type = o ? *reinterpret_cast<const int32_t*>(o) : -1;
-                if (type == kObjMPhones || type == kObjPhoneToggle)
-                    s_mission.phonesBack = true;
-            }
             // SURVIVE kopiert beim ersten Durchlauf die Dauer <data> nach <fail> und zählt dort jeden Frame herunter
             if (command == CmdSurvive && *reinterpret_cast<int16_t*>(A.ScriptState + proc * 2) != 1 && line->fail > kRetryWait)
                 line->fail = kRetryWait;
         }
 
         // Ersetzt "jmp [ebx*4+ScriptJumps]" im Interpreter, alle Register bleiben erhalten
-        __declspec(naked) void ScriptDispatchHook()
+        uintptr_t s_scriptJumps = 0;
+
+        // Ersetzt "jmp [ebx*4+ScriptJumps]" im Interpreter (ebx = Befehl, ecx = Zeile), alle Register bleiben erhalten
+        __declspec(naked) void ScriptDispatchHookEbx()
         {
             __asm
             {
@@ -1112,19 +1147,51 @@ namespace gta1
                 add esp, 8
                 popad
                 popfd
-                jmp dword ptr [ebx * 4 + 0x487FDC] // ScriptJumps von 1.0.0.1 (nur dort aktiv, siehe EnableQuickRetry)
+                push eax
+                mov eax, s_scriptJumps
+                mov eax, [eax + ebx * 4]
+                xchg eax, [esp]
+                ret
+            }
+        }
+
+        // London: "jmp [edi*4+ScriptJumps]" mit edi = Befehl, ebp = Zeile
+        __declspec(naked) void ScriptDispatchHookEdi()
+        {
+            __asm
+            {
+                pushfd
+                pushad
+                push ebp
+                push edi
+                call OnScriptCommand
+                add esp, 8
+                popad
+                popfd
+                push eax
+                mov eax, s_scriptJumps
+                mov eax, [eax + edi * 4]
+                xchg eax, [esp]
+                ret
             }
         }
     }
 
     bool EnableKeepMultiplier()
     {
-        // mov ax,[edi+6576BC]; shr ax,1; mov [edi+6576BC],ax  ->  das Halbieren entfällt
-        static const uint8_t expect[] = { 0x66, 0x8B, 0x87, 0xBC, 0x76, 0x65, 0x00, 0x66, 0xD1, 0xE8, 0x66, 0x89, 0x87, 0xBC, 0x76, 0x65, 0x00 };
+        // 1.0.0.1: mov ax,[edi+6576BC]; shr ax,1; mov [edi+6576BC],ax  ->  "shr ax,1" (3 Byte) entfällt
+        // London:  shr word ptr [edx+eax+Multiplikator],1 in einer eigenen Funktion  ->  8 Byte entfallen
+        static const uint8_t r2p[] = { 0x66, 0x8B, 0x87, 0xBC, 0x76, 0x65, 0x00, 0x66, 0xD1, 0xE8, 0x66, 0x89, 0x87, 0xBC, 0x76, 0x65, 0x00 };
+        static const uint8_t shrMem[] = { 0x66, 0xD1, 0xAC, 0x02 };
         static const uint8_t nop3[] = { 0x0F, 0x1F, 0x00 };
-        if (!s_supported || !A.MultHalve || !hooks::BytesMatch(A.MultHalve - 7, expect, sizeof(expect)))
+        static const uint8_t nop8[] = { 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        if (!s_supported || !A.MultHalve)
             return false;
-        return hooks::WriteMemory(reinterpret_cast<void*>(A.MultHalve), nop3, sizeof(nop3));
+        if (hooks::BytesMatch(A.MultHalve - 7, r2p, sizeof(r2p)))
+            return hooks::WriteMemory(reinterpret_cast<void*>(A.MultHalve), nop3, sizeof(nop3));
+        if (hooks::BytesMatch(A.MultHalve, shrMem, sizeof(shrMem)))
+            return hooks::WriteMemory(reinterpret_cast<void*>(A.MultHalve), nop8, sizeof(nop8));
+        return false;
     }
 
     bool EnableAllCharacters()
@@ -1148,18 +1215,26 @@ namespace gta1
 
     bool EnableQuickRetry()
     {
-        static const uint8_t dispatch[] = { 0xFF, 0x24, 0x9D, 0xDC, 0x7F, 0x48, 0x00 };
-        // SURVIVE liest den Zustand aus ScriptState und zählt in <fail> (Zeile + 0x0A) herunter
-        static const uint8_t state[] = { 0x66, 0x8B, 0x34, 0x4D, 0x60, 0xB6, 0x6D, 0x00 };
-        static const uint8_t countdown[] = { 0x8B, 0x82, 0x12, 0xBC, 0x6F, 0x00, 0x48, 0x89, 0x82, 0x12, 0xBC, 0x6F, 0x00 };
-        // ScriptDispatchHook springt fest in die Tabelle von 1.0.0.1
-        if (!s_supported || A.ScriptJumps != 0x487FDC || !hooks::BytesMatch(A.ScriptDispatch, dispatch, sizeof(dispatch)) ||
-            !hooks::BytesMatch(A.ScriptSurvive + 0x09, state, sizeof(state)) ||
-            !hooks::BytesMatch(A.ScriptSurvive + 0x50, countdown, sizeof(countdown)))
+        if (!s_supported || !A.ScriptDispatch || !A.ScriptJumps || !A.ScriptSurvive)
+            return false;
+        // jmp dword ptr [ebx*4 + ScriptJumps] (FF 24 9D) bzw. [edi*4 + ScriptJumps] (FF 24 BD)
+        uint8_t dispatch[7] = { 0xFF, 0x24, static_cast<uint8_t>(A.ScriptRegsEdi ? 0xBD : 0x9D) };
+        memcpy(dispatch + 3, &A.ScriptJumps, 4);
+        // SURVIVE (beide Versionen): beim ersten Durchlauf ScriptState 1 -> 2 und Dauer nach <fail> (Zeile + 0x0A),
+        // danach zählt <fail> jeden Frame herunter. Stichprobe: "mov ...,[ecx*2 + ScriptState]" am Anfang
+        uint8_t state[4];
+        memcpy(state, &A.ScriptState, 4);
+        const uint8_t* survive = reinterpret_cast<const uint8_t*>(A.ScriptSurvive);
+        bool stateRef = false;
+        for (int i = 0; i + 4 <= 0x20 && !stateRef; ++i)
+            stateRef = memcmp(survive + i, state, 4) == 0;
+        if (!hooks::BytesMatch(A.ScriptDispatch, dispatch, sizeof(dispatch)) || !stateRef)
             return false;
 
+        s_scriptJumps = A.ScriptJumps;
+        const void* hook = A.ScriptRegsEdi ? reinterpret_cast<const void*>(&ScriptDispatchHookEdi) : reinterpret_cast<const void*>(&ScriptDispatchHookEbx);
         uint8_t patch[7] = { 0xE9, 0, 0, 0, 0, 0x90, 0x90 };
-        const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(&ScriptDispatchHook) - (A.ScriptDispatch + 5));
+        const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(hook) - (A.ScriptDispatch + 5));
         memcpy(patch + 1, &rel, 4);
         return hooks::WriteMemory(reinterpret_cast<void*>(A.ScriptDispatch), patch, sizeof(patch));
     }

@@ -57,6 +57,9 @@ namespace controls
         bool g_crosshair = false;
         float g_crossX = 0, g_crossY = 0;
         DWORD g_mouseMoved = 0;
+        // Zuletzt benutztes Gerät: Solange der Controller aktiv ist, zählt die (stehende) Maus weder fürs Zielen
+        // noch für Kamera und Fadenkreuz. Echte Mausbewegung, Klicks oder WASD schalten zurück.
+        bool g_padActive = false;
         int g_renderAngle = -1;
 
         // Kamerasteuerung: Ziel aus Maus bzw. rechtem Stick in Pixeln der Spielauflösung (siehe camera.cpp)
@@ -483,6 +486,22 @@ namespace controls
             g_lookCursor = false;
         }
 
+        // Fadenkreuz für den rechten Stick: ein Stück von der Figur entfernt in Zielrichtung, also dort, wohin
+        // sie schießt
+        void StickCrosshair(float x, float y)
+        {
+            int gw = 0, gh = 0;
+            const float mag = std::sqrt(x * x + y * y);
+            if (mag <= 0 || !overlay::ScreenSize(gw, gh))
+                return;
+            float px = gw * 0.5f, py = gh * 0.5f;
+            gta1::PlayerScreenPos(px, py);
+            const float r = gh * 0.17f;
+            g_crossX = px + x / mag * r;
+            g_crossY = py + y / mag * r;
+            g_crosshair = true;
+        }
+
         void GatherKeyboardMouse(Intent& in, bool onFoot)
         {
             g_crosshair = false;
@@ -499,7 +518,7 @@ namespace controls
             {
                 // Umschauen: Mauszeiger Richtung Bildrand verschiebt die Kamera
                 int gw = 0, gh = 0;
-                if (g_cfg.camera && g_cfg.cameraMouseVehicle && overlay::ScreenSize(gw, gh) && MouseToGame(g_crossX, g_crossY))
+                if (!g_padActive && g_cfg.camera && g_cfg.cameraMouseVehicle && overlay::ScreenSize(gw, gh) && MouseToGame(g_crossX, g_crossY))
                 {
                     const bool pulling = MouseCamera(g_cfg.cameraRangeVehicle, gw, gh);
                     g_lookCursor = pulling || GetTickCount() - g_mouseMoved < 2500;
@@ -527,7 +546,7 @@ namespace controls
             const bool moving = mx != 0 || my != 0;
 
             int gw = 0, gh = 0;
-            const bool haveMouse = overlay::ScreenSize(gw, gh) && MouseToGame(g_crossX, g_crossY);
+            const bool haveMouse = !g_padActive && overlay::ScreenSize(gw, gh) && MouseToGame(g_crossX, g_crossY);
             g_dbg.haveMouse = haveMouse;
             float ax = 0, ay = 0;
             if (haveMouse)
@@ -589,6 +608,9 @@ namespace controls
             const float rt = g.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD ? g.bRightTrigger / 255.0f : 0.0f;
             const float lt = g.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD ? g.bLeftTrigger / 255.0f : 0.0f;
 
+            if (lx != 0 || ly != 0 || rx != 0 || ry != 0 || rt > 0 || lt > 0 || g.wButtons)
+                g_padActive = true;
+
             // Namen nach Xbox-Layout; PS4/PS5: A = Kreuz, B = Kreis, X = Quadrat, Y = Dreieck
             if (pressed & XINPUT_GAMEPAD_Y)
                 in.enterExit = true;
@@ -603,7 +625,10 @@ namespace controls
                 const bool moving = lx != 0 || ly != 0;
                 const bool aiming = rx != 0 || ry != 0;
                 if (aiming)
+                {
                     StickCamera(rx, ry, g_cfg.cameraRangeFoot); // in Zielrichtung vorausschauen
+                    StickCrosshair(rx, ry);
+                }
                 if (!moving && !aiming)
                     return;
                 in.drive = true;
@@ -847,6 +872,9 @@ namespace controls
         case WM_SYSKEYDOWN:
             if (msg.wParam < 256)
                 g_down[msg.wParam] = true;
+            for (int vk : { g_cfg.moveUpKey, g_cfg.moveLeftKey, g_cfg.moveDownKey, g_cfg.moveRightKey })
+                if ((int)msg.wParam == vk)
+                    g_padActive = false;
             return;
         case WM_KEYUP:
         case WM_SYSKEYUP:
@@ -862,8 +890,12 @@ namespace controls
         default:
             return;
         }
-        // Mausmeldungen tragen die Position in Client-Koordinaten
-        g_mouse = { GET_X_LPARAM(msg.lParam), GET_Y_LPARAM(msg.lParam) };
+        // Mausmeldungen tragen die Position in Client-Koordinaten. Nur eine echte Bewegung oder ein Klick
+        // macht die Maus wieder zum aktiven Gerät (manche Wrapper schicken WM_MOUSEMOVE auch ohne Bewegung).
+        const POINT pos = { GET_X_LPARAM(msg.lParam), GET_Y_LPARAM(msg.lParam) };
+        if (msg.message != WM_MOUSEMOVE || std::abs(pos.x - g_mouse.x) + std::abs(pos.y - g_mouse.y) > 3)
+            g_padActive = false;
+        g_mouse = pos;
         if (!g_haveMouse)
             LOG("Erste Mausmeldung 0x%X bei (%d, %d)", msg.message, g_mouse.x, g_mouse.y);
         g_mouseWnd = msg.hwnd;
