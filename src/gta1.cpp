@@ -63,6 +63,9 @@ namespace gta1
         uintptr_t Camera = 0;         // CameraData je Spieler (Abstand wie die Spieler-Struktur)
         uintptr_t ViewRect = 0;       // void __cdecl(int player), Sichtbereich aus der Kamera
         uintptr_t ViewRectCall = 0;   // call ViewRect am Ende der Kameraführung
+        // Kameraführung: "lea eax,[eax+eax*4] / shl eax,5 / cdq" berechnet, wie weit sich die Figur vom
+        // Bildmittelpunkt entfernen darf, bevor die Kamera nachzieht (Abstand * 160 / Tempo)
+        uintptr_t SteadyCamera[2] = {};
 
         uintptr_t ReadInput = 0;      // liefert das Eingabepaket des lokalen Spielers
         uintptr_t ReadInputCall = 0;  // call ReadInput in der Hauptschleife
@@ -124,6 +127,7 @@ namespace gta1
         // schreibt den Bildmittelpunkt in die Kamera und berechnet daraus in ViewRect den Sichtbereich für die
         // Spiellogik (0x6575CC). Zeichnen und Ton lesen danach die Kamera (0x42B780/0x42B7E0).
         a.Camera = 0x6575E0; a.ViewRect = 0x42BB40; a.ViewRectCall = 0x42BB0B;
+        a.SteadyCamera[0] = 0x42B9F2; a.SteadyCamera[1] = 0x42C761;
         a.ReadInput = 0x4365E0; a.ReadInputCall = 0x45CFD3;
         a.InSteer = 0x600A80; a.InGas = 0x6008FC; a.InBrake = 0x600A18; a.InJump = 0x600900;
         a.InFire = 0x6008F8; a.InNext = 0x600A1C; a.InPrev = 0x600A48; a.InSpecial = 0x600A84;
@@ -192,6 +196,7 @@ namespace gta1
         a.PedStruct = 0x7E2370; a.PedAngle = 0x7E2409; a.PedRemap = 0x7E23C8; a.PedDrawRemap = 0x7E2403;
         a.PlayerPedId = 0x80CF2A; a.PlayerCharacter = 0x80D0C4;
         a.Camera = 0x80CF40;      // Kameradaten; die Kameraführung selbst ist umgebaut (noch ohne Steuerung)
+        a.SteadyCamera[0] = 0x451581;
         a.LocalPlayer = 0x80D5B0; a.NumPlayers = 0x80D5AC;
         a.PlayerCtrl = 0x80CFF5; a.PlayerObject = 0x80CFF9; a.RunState = 0x572ACC;
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
@@ -232,6 +237,7 @@ namespace gta1
         a.PedStruct = 0x7E3F78; a.PedAngle = 0x7E4011; a.PedRemap = 0x7E3FD0; a.PedDrawRemap = 0x7E400B;
         a.PlayerPedId = 0x80EB32; a.PlayerCharacter = 0x80ECCC;
         a.Camera = 0x80EB48;
+        a.SteadyCamera[0] = 0x451941;
         a.LocalPlayer = 0x80F1B8; a.NumPlayers = 0x80F1B4;
         a.PlayerCtrl = 0x80EBFD; a.PlayerObject = 0x80EC01; a.RunState = 0x5746D4;
         a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
@@ -1156,5 +1162,23 @@ namespace gta1
         const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(&ScriptDispatchHook) - (A.ScriptDispatch + 5));
         memcpy(patch + 1, &rel, 4);
         return hooks::WriteMemory(reinterpret_cast<void*>(A.ScriptDispatch), patch, sizeof(patch));
+    }
+
+    bool EnableSteadyCamera()
+    {
+        // lea eax,[eax+eax*4] / shl eax,5 / cdq  ->  shl eax,2: die Figur darf nur ein Achtel so weit aus der
+        // Bildmitte, bevor die Kamera nachzieht. Mit dem Hex-Editor schon gepatchte Stellen gelten als erledigt.
+        static const uint8_t original[] = { 0x8D, 0x04, 0x80, 0xC1, 0xE0, 0x05, 0x99 };
+        static const uint8_t steady[] = { 0x8D, 0x04, 0x80, 0xC1, 0xE0, 0x02, 0x99 };
+        if (!s_supported || !A.SteadyCamera[0])
+            return false;
+        for (uintptr_t site : A.SteadyCamera)
+            if (site && !hooks::BytesMatch(site, original, sizeof(original)) && !hooks::BytesMatch(site, steady, sizeof(steady)))
+                return false;
+        bool ok = true;
+        for (uintptr_t site : A.SteadyCamera)
+            if (site && hooks::BytesMatch(site, original, sizeof(original)))
+                ok &= hooks::WriteMemory(reinterpret_cast<void*>(site + 5), &steady[5], 1);
+        return ok;
     }
 }

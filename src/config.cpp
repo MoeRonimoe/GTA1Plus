@@ -7,7 +7,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 11;
+static const int kConfigVersion = 12;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -15,7 +15,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=11\r\n"
+    "Version=12\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -85,6 +85,9 @@ static const char kDefaultIni[] =
     "RangeInVehicle=60\r\n"
     "; Inner screen area in percent where the mouse does not shift the camera yet\r\n"
     "DeadZone=40\r\n"
+    "; Steadier camera: it follows the character more closely instead of drifting behind\r\n"
+    "; (the well-known GTAforums hex patch, applied in memory - the exe stays unchanged). Works without Enabled=1\r\n"
+    "Steady=1\r\n"
     "\r\n"
     "[PlayerColors]\r\n"
     "; Color variant per portrait, only with PortraitColors=1. 0 = as in the original game (yellow top),\r\n"
@@ -173,6 +176,7 @@ namespace
         { L"Camera",   L"RangeOnFoot",    Kind::Int,  &g_cfg.cameraRangeFoot,    nullptr, nullptr },
         { L"Camera",   L"RangeInVehicle", Kind::Int,  &g_cfg.cameraRangeVehicle, nullptr, nullptr },
         { L"Camera",   L"DeadZone",       Kind::Int,  &g_cfg.cameraDeadZone,     nullptr, nullptr },
+        { L"Camera",   L"Steady",         Kind::Bool, &g_cfg.cameraSteady,       nullptr, nullptr },
         { L"PlayerColors", L"Character1", Kind::Int,  &g_cfg.playerColors[0], nullptr, nullptr },
         { L"PlayerColors", L"Character2", Kind::Int,  &g_cfg.playerColors[1], nullptr, nullptr },
         { L"PlayerColors", L"Character3", Kind::Int,  &g_cfg.playerColors[2], nullptr, nullptr },

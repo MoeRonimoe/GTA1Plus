@@ -30,6 +30,7 @@ struct Config
     int  cameraRangeFoot     = 50;   // höchstens so viel Prozent der halben Bildgröße
     int  cameraRangeVehicle  = 60;
     int  cameraDeadZone      = 40;   // Prozent: innerer Bereich, in dem die Maus nichts verschiebt
+    bool cameraSteady        = true; // Kamera folgt enger (Patch aus GTAforums)
 
     // [Keys]
     int mapKey          = 'M';

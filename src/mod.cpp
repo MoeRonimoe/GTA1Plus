@@ -153,6 +153,8 @@ void ModInit(HMODULE self)
         fire::Init();
         if (g_cfg.twinStick || g_cfg.controller || g_cfg.extinguish)
             gta1::SetInputFilter(&controls::ProcessPacket);
+        if (g_cfg.cameraSteady)
+            LOG("Ruhigere Kamera: %s", gta1::EnableSteadyCamera() ? "aktiv" : "Spielcode passt nicht");
         if ((g_cfg.twinStick || g_cfg.controller) && g_cfg.camera)
             LOG("Kamerasteuerung: %s", gta1::SetCameraFilter(&camera::Filter) ? "aktiv" : "Spielcode passt nicht");
     }

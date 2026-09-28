@@ -77,6 +77,7 @@ namespace gta1
     bool EnableKeepMultiplier();   // Verhaftung halbiert den Multiplikator nicht mehr
     bool EnableAllCharacters();    // Hauptmenü: Frauen auch in nicht-englischen Sprachversionen wählbar
     bool EnableQuickRetry();       // nach "MISSION FEHLGESCHLAGEN" Skriptpausen bis zum Neuaufbau verkürzen
+    bool EnableSteadyCamera();     // Kamera folgt enger statt zu schwimmen (Patch aus GTAforums: shl 5 -> shl 2)
 
     // Ziel des Missionspfeils (which 0) bzw. des roten Pfeils (which 1) in Blockkoordinaten
     bool GetArrowTarget(int which, float& x, float& y);

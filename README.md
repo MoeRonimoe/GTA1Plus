@@ -10,6 +10,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **Twin-stick controls**: WASD movement and mouse aiming on foot, optional strafing (always face the crosshair), and WASD driving.
 - **Controllers**: Xbox (XInput) and PS4/PS5 or other DirectInput pads, in levels and in the main menu.
 - **Steerable camera**: look ahead with the mouse or the right stick.
+- **Steadier camera**: the well-known GTAforums hex patch, applied in memory. The camera follows the character more closely instead of drifting behind. Works in all supported versions.
 - **Health hearts**: five hearts below the score.
 - **Put out fires**: when you are on fire, press jump to roll on the ground and put the flames out. In the original game burning is certain death.
 - **Gameplay options**:
@@ -29,6 +30,11 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 | 2002 freeware release (`Grand Theft Auto.exe`) | Not yet supported (different data layout) |
 
 The London versions don't support camera control, putting out fires or the gameplay options yet. Unknown executables start normally without the mod's features. The DOS version (e.g. in DOSBox) can't load ASI plugins.
+
+## Known issues
+
+- **Quick retry of phone missions:** the third phone mission in Liberty City stays unavailable after it fails. Its script doesn't release the phone the way the other missions do.
+- **Switching from mouse to controller:** the crosshair stays at the last mouse position and shots don't go where it points. With AlwaysAim the mouse keeps steering the aim.
 
 ## Installation
 
