@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 13;
+static const int kConfigVersion = 14;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=13\r\n"
+    "Version=14\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -92,6 +92,14 @@ static const char kDefaultIni[] =
     "; Steadier camera: it follows the character more closely instead of drifting behind\r\n"
     "; (the well-known GTAforums hex patch, applied in memory - the exe stays unchanged). Works without Enabled=1\r\n"
     "Steady=1\r\n"
+    "; Tilted camera in the style of GTA Chinatown Wars (prototype): 0 = off, 1 = in vehicles, 2 = always.\r\n"
+    "; The mod tilts the finished game picture; to see further ahead the game draws the world smaller,\r\n"
+    "; so the picture gets softer. Buildings keep their straight top-down look\r\n"
+    "Tilt=0\r\n"
+    "; Tilt angle in degrees (0..45)\r\n"
+    "TiltAngle=35\r\n"
+    "; In vehicles the picture turns with the vehicle, so that the driving direction points up\r\n"
+    "TiltRotate=1\r\n"
     "\r\n"
     "[PlayerColors]\r\n"
     "; Color variant per portrait, only with PortraitColors=1. 0 = as in the original game (yellow top),\r\n"
@@ -182,6 +190,9 @@ namespace
         { L"Camera",   L"RangeInVehicle", Kind::Int,  &g_cfg.cameraRangeVehicle, nullptr, nullptr },
         { L"Camera",   L"DeadZone",       Kind::Int,  &g_cfg.cameraDeadZone,     nullptr, nullptr },
         { L"Camera",   L"Steady",         Kind::Bool, &g_cfg.cameraSteady,       nullptr, nullptr },
+        { L"Camera",   L"Tilt",           Kind::Int,  &g_cfg.tilt,               nullptr, nullptr },
+        { L"Camera",   L"TiltAngle",      Kind::Int,  &g_cfg.tiltAngle,          nullptr, nullptr },
+        { L"Camera",   L"TiltRotate",     Kind::Bool, &g_cfg.tiltRotate,         nullptr, nullptr },
         { L"PlayerColors", L"Character1", Kind::Int,  &g_cfg.playerColors[0], nullptr, nullptr },
         { L"PlayerColors", L"Character2", Kind::Int,  &g_cfg.playerColors[1], nullptr, nullptr },
         { L"PlayerColors", L"Character3", Kind::Int,  &g_cfg.playerColors[2], nullptr, nullptr },
@@ -298,6 +309,8 @@ void LoadConfig(const wchar_t* ini)
     g_cfg.cameraRangeFoot = std::clamp(g_cfg.cameraRangeFoot, 0, 90);
     g_cfg.cameraRangeVehicle = std::clamp(g_cfg.cameraRangeVehicle, 0, 90);
     g_cfg.cameraDeadZone = std::clamp(g_cfg.cameraDeadZone, 0, 90);
+    g_cfg.tilt = std::clamp(g_cfg.tilt, 0, 2);
+    g_cfg.tiltAngle = std::clamp(g_cfg.tiltAngle, 0, 45);
 
     // Neue oder veraltete INI: kommentierte Vorlage schreiben und die aktuellen Werte übernehmen
     if (!exists || version < kConfigVersion)

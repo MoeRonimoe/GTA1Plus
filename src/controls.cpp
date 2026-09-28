@@ -6,6 +6,7 @@
 #include "hooks.h"
 #include "log.h"
 #include "overlay.h"
+#include "tiltcam.h"
 
 #include <windows.h>
 #include <windowsx.h>
@@ -56,6 +57,7 @@ namespace controls
 
         bool g_crosshair = false;
         float g_crossX = 0, g_crossY = 0;
+        bool  g_crossStick = false;     // Fadenkreuz vom rechten Stick: Punkt im Spielbild statt Mausposition
         DWORD g_mouseMoved = 0;
         // Zuletzt benutztes Gerät: Solange der Controller aktiv ist, zählt die (stehende) Maus weder fürs Zielen
         // noch für Kamera und Fadenkreuz. Echte Mausbewegung, Klicks oder WASD schalten zurück.
@@ -499,6 +501,7 @@ namespace controls
             const float r = gh * 0.17f;
             g_crossX = px + x / mag * r;
             g_crossY = py + y / mag * r;
+            g_crossStick = true;
             g_crosshair = true;
         }
 
@@ -551,11 +554,15 @@ namespace controls
             float ax = 0, ay = 0;
             if (haveMouse)
             {
+                g_crossStick = false;
                 // Zu Fuß steht die Figur in der Bildmitte, außer die Kamera ist verschoben
                 float px = gw * 0.5f, py = gh * 0.5f;
                 gta1::PlayerScreenPos(px, py);
-                ax = g_crossX - px;
-                ay = g_crossY - py;
+                // Kippkamera: der Zeiger steht im gekippten Bild, gezielt wird im Spielbild
+                float gx = g_crossX, gy = g_crossY;
+                tiltcam::OutputToGame(g_crossX, g_crossY, gx, gy);
+                ax = gx - px;
+                ay = gy - py;
             }
             const bool lmb = Key(VK_LBUTTON), rmb = Key(VK_RBUTTON);
             const bool aiming = haveMouse && (g_cfg.alwaysAim || lmb || rmb) && ax * ax + ay * ay > 16.0f;
@@ -851,6 +858,8 @@ namespace controls
             return false;
         x = g_crossX;
         y = g_crossY;
+        if (g_crossStick)
+            tiltcam::GameToOutput(g_crossX, g_crossY, x, y);
         return true;
     }
 

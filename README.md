@@ -14,6 +14,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **Controllers**: Xbox (XInput) and PS4/PS5 or other DirectInput pads, in levels and in the main menu.
 - **Steerable camera**: look ahead with the mouse or the right stick.
 - **Steadier camera**: the well-known GTAforums hex patch, applied in memory. The camera follows the character more closely instead of drifting behind. Works in all supported versions.
+- **Tilted camera (prototype, off by default)**: a view in the style of *GTA Chinatown Wars*. The picture is tilted so you see further ahead, and in vehicles it turns with the driving direction. The mod transforms the finished game picture, so buildings keep their top-down look and the picture gets softer. Switch it on in the pause menu (GTA1Plus options → Camera) or with `[Camera] Tilt` in the INI. Needs 32-bit colour.
 - **Health hearts**: five hearts below the score.
 - **Put out fires**: when you are on fire, press jump to roll on the ground and put the flames out. In the original game burning is certain death.
 - **Gameplay options**:

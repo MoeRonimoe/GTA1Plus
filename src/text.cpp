@@ -19,7 +19,7 @@ namespace text
             L"HintActive", L"HintMenu", L"HintMap", L"HintMinimap",
             L"HelpMapMouse", L"HelpMapMouseNoWaypoints",
             L"HintBurning", L"PadJumpButton", L"KeySpace",
-            L"MenuBriefings", L"MenuSave", L"MenuLoad", L"MenuOptions", L"OptOn", L"OptOff", L"OptRestart", L"OptGroupDisplay", L"OptGroupControls", L"OptGroupCamera", L"OptGroupGameplay", L"OptGroupOther", L"OptMinimap", L"OptMinimapOnStart", L"OptHint", L"OptGps", L"OptGpsArrow", L"OptWaypoints", L"OptHearts", L"OptMapStyle", L"OptMinimapCorner", L"OptPauseGame", L"OptTwinStick", L"OptAlwaysAim", L"OptWasdDriving", L"OptController", L"OptCamera", L"OptCameraMouseVehicle", L"OptRangeFoot", L"OptRangeVehicle", L"OptDeadZone", L"OptSteady", L"OptKeepMultiplier", L"OptAllCharacters", L"OptQuickRetry", L"OptExtinguish", L"OptPortraitColors", L"OptAutosave", L"OptLanguage", L"OptShowInfo", L"CornerBottomLeft", L"CornerBottomRight", L"CornerTopLeft", L"CornerTopRight", L"LanguageAuto", L"HelpOptions", L"BriefingsEmpty", L"HelpBriefings", L"SaveDone", L"SaveBlocked", L"SaveFailed", L"LoadTitle", L"LoadText", L"LoadDone", L"LoadFailed", L"NoSave", L"AutoSaved", L"SaveSlotInfo", L"StartLoadTitle", L"StartLoadText",
+            L"MenuBriefings", L"MenuSave", L"MenuLoad", L"MenuOptions", L"OptOn", L"OptOff", L"OptRestart", L"OptGroupDisplay", L"OptGroupControls", L"OptGroupCamera", L"OptGroupGameplay", L"OptGroupOther", L"OptMinimap", L"OptMinimapOnStart", L"OptHint", L"OptGps", L"OptGpsArrow", L"OptWaypoints", L"OptHearts", L"OptMapStyle", L"OptMinimapCorner", L"OptPauseGame", L"OptTwinStick", L"OptAlwaysAim", L"OptWasdDriving", L"OptController", L"OptCamera", L"OptCameraMouseVehicle", L"OptRangeFoot", L"OptRangeVehicle", L"OptDeadZone", L"OptSteady", L"OptKeepMultiplier", L"OptAllCharacters", L"OptQuickRetry", L"OptExtinguish", L"OptPortraitColors", L"OptAutosave", L"OptLanguage", L"OptShowInfo", L"CornerBottomLeft", L"CornerBottomRight", L"CornerTopLeft", L"CornerTopRight", L"LanguageAuto", L"HelpOptions", L"BriefingsEmpty", L"HelpBriefings", L"SaveDone", L"SaveBlocked", L"SaveFailed", L"LoadTitle", L"LoadText", L"LoadDone", L"LoadFailed", L"NoSave", L"AutoSaved", L"SaveSlotInfo", L"StartLoadTitle", L"StartLoadText", L"OptTilt", L"OptTiltAngle", L"OptTiltRotate", L"TiltAlways",
         };
 
         struct LangTable
@@ -103,6 +103,10 @@ namespace text
                 L"Stand vom %s  ·  %d Punkte",
                 L"Gespeicherten Stand laden?",
                 L"Für diesen Charakter und dieses Level gibt es einen Spielstand.",
+                L"Kippkamera (Chinatown Wars)",
+                L"Neigung der Kippkamera",
+                L"Bild dreht mit dem Fahrzeug",
+                L"immer",
             } },
             { L"en", {
                 L"PAUSED", L"Resume", L"Map & waypoints", L"Map", L"Quit level",
@@ -178,6 +182,10 @@ namespace text
                 L"Saved %s  ·  %d points",
                 L"Load your saved game?",
                 L"There is a saved game for this character and level.",
+                L"Tilted camera (Chinatown Wars)",
+                L"Tilt angle",
+                L"Picture turns with vehicle",
+                L"always",
             } },
             { L"fr", {
                 L"PAUSE", L"Reprendre", L"Carte et repères", L"Carte", L"Quitter le niveau",
@@ -253,6 +261,10 @@ namespace text
                 L"Sauvegarde du %s  ·  %d points",
                 L"Charger votre sauvegarde ?",
                 L"Il existe une sauvegarde pour ce personnage et ce niveau.",
+                L"Caméra inclinée (Chinatown Wars)",
+                L"Angle d'inclinaison",
+                L"L'image tourne avec le véhicule",
+                L"toujours",
             } },
             { L"it", {
                 L"PAUSA", L"Riprendi", L"Mappa e segnaposti", L"Mappa", L"Esci dal livello",
@@ -328,6 +340,10 @@ namespace text
                 L"Salvato il %s  ·  %d punti",
                 L"Caricare il salvataggio?",
                 L"Esiste un salvataggio per questo personaggio e livello.",
+                L"Telecamera inclinata (Chinatown Wars)",
+                L"Angolo di inclinazione",
+                L"L'immagine ruota col veicolo",
+                L"sempre",
             } },
         };
         constexpr int kBuiltinCount = sizeof(kBuiltin) / sizeof(kBuiltin[0]);

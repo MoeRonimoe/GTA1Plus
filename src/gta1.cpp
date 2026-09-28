@@ -99,9 +99,15 @@ namespace gta1
         uintptr_t ScriptProc = 0, ScriptState = 0, ScriptActive = 0, ScriptObjSlot = 0, ScriptObjects = 0;
         uintptr_t ScriptLines = 0;     // 5000 Zeilen zu 22 Byte (ScriptLine), SURVIVE zählt darin herunter
         uintptr_t ScriptProcBlock = 0; // Tabellen je Prozess (aktuelle Zeile, Verkettung ...), 0x4A0 Byte
+        uintptr_t Triggers = 0;        // 210 Einträge zu 29 Byte, +0 Zustand (1 an, 4 aus): ENABLE/DISABLE z.B. auf
+                                       // Telefongruppen (1.0.0.1: 0x48AB30 / 0x48AB90)
 
         // Spielerwerte (Spieler 0, weitere im Abstand PlayerStride)
         uintptr_t PlayerScore = 0, PlayerMultiplier = 0, PlayerJailCard = 0, PlayerLives = 0, PlayerAmmo = 0, PlayerArmor = 0;
+
+        // Zeichenpuffer: das Spiel schreibt Welt und HUD direkt in den Speicher der aktiven MGL-Seite und legt
+        // Zeiger und Zeilenlänge nach jedem Seitenwechsel hier ab (1.0.0.1: 0x42F890)
+        uintptr_t DrawBits = 0, DrawPitch = 0, DrawBytes = 0, DrawWidth = 0, DrawHeight = 0;
 
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
         uintptr_t TextBuffer = 0;     // char*: "[Schlüssel]Text\0..." bis "[]"
@@ -155,9 +161,10 @@ namespace gta1
         a.ScriptDispatch = 0x4822EA; a.ScriptJumps = 0x487FDC; a.ScriptSurvive = 0x476120;
         a.ScriptProc = 0x736A08; a.ScriptState = 0x6DB660; a.ScriptActive = 0x6FB768;
         a.ScriptObjSlot = 0x6DB768; a.ScriptObjects = 0x6796F8;
-        a.ScriptLines = 0x6FBC08; a.ScriptProcBlock = 0x6FB768;
+        a.ScriptLines = 0x6FBC08; a.ScriptProcBlock = 0x6FB768; a.Triggers = 0x7386A0;
         a.PlayerScore = 0x6576B8; a.PlayerMultiplier = 0x6576BC; a.PlayerJailCard = 0x6576BE;
         a.PlayerLives = 0x65774C; a.PlayerAmmo = 0x657718; a.PlayerArmor = 0x65775C;
+        a.DrawBits = 0x737034; a.DrawPitch = 0x5F3AB4; a.DrawBytes = 0x5F3AB8; a.DrawWidth = 0x5F5560; a.DrawHeight = 0x5F5564;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
         a.IatGetProcAddress = 0x787474; a.IatPeekMessageA = 0x78754C;
@@ -221,11 +228,12 @@ namespace gta1
         a.ScriptDispatch = 0x45F639; a.ScriptJumps = 0x461490; a.ScriptRegsEdi = true; a.ScriptSurvive = 0x456B00;
         a.ScriptProc = 0x736A00; a.ScriptState = 0x6DB658; a.ScriptActive = 0x6FB760;
         a.ScriptObjSlot = 0x6DB760; a.ScriptObjects = 0x6796F0;
-        a.ScriptLines = 0x6FBC00; a.ScriptProcBlock = 0x6FB760;
+        a.ScriptLines = 0x6FBC00; a.ScriptProcBlock = 0x6FB760; a.Triggers = 0x832FB8;   // 0x49B160
         a.PlayerScore = 0x80D018; a.PlayerMultiplier = 0x80D01C; a.PlayerJailCard = 0x80D01E;
         a.PlayerLives = 0x80D0AC; a.PlayerAmmo = 0x80D078; a.PlayerArmor = 0x80D0BC;
         a.LocalPlayer = 0x80D5B0; a.NumPlayers = 0x80D5AC;
         a.PlayerCtrl = 0x80CFF5; a.PlayerObject = 0x80CFF9; a.RunState = 0x572ACC;
+        a.DrawBits = 0x570BC4; a.DrawPitch = 0x5605F4; a.DrawBytes = 0x5605F8; a.DrawWidth = 0x5620A0; a.DrawHeight = 0x5620A4; // 0x41F730
         a.TextReady = 0x8378A0; a.TextBuffer = 0x8378CC;   // aus GetText 0x4A6CB0
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
         a.IatGetProcAddress = 0x858738; a.IatPeekMessageA = 0x8587F8;
@@ -276,11 +284,12 @@ namespace gta1
         a.ScriptDispatch = 0x45FDF9; a.ScriptJumps = 0x461C80; a.ScriptRegsEdi = true; a.ScriptSurvive = 0x456FE0;
         a.ScriptProc = 0x738608; a.ScriptState = 0x6DD260; a.ScriptActive = 0x6FD368;
         a.ScriptObjSlot = 0x6DD368; a.ScriptObjects = 0x67B2F8;
-        a.ScriptLines = 0x6FD808; a.ScriptProcBlock = 0x6FD368;
+        a.ScriptLines = 0x6FD808; a.ScriptProcBlock = 0x6FD368; a.Triggers = 0x834BC8;   // 0x49BA90
         a.PlayerScore = 0x80EC20; a.PlayerMultiplier = 0x80EC24; a.PlayerJailCard = 0x80EC26;
         a.PlayerLives = 0x80ECB4; a.PlayerAmmo = 0x80EC80; a.PlayerArmor = 0x80ECC4;
         a.LocalPlayer = 0x80F1B8; a.NumPlayers = 0x80F1B4;
         a.PlayerCtrl = 0x80EBFD; a.PlayerObject = 0x80EC01; a.RunState = 0x5746D4;
+        a.DrawBits = 0x5727CC; a.DrawPitch = 0x5621FC; a.DrawBytes = 0x562200; a.DrawWidth = 0x563CA8; a.DrawHeight = 0x563CAC; // 0x41F9C0
         a.TextReady = 0x8394B0; a.TextBuffer = 0x8394DC;
         a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
         a.IatGetProcAddress = 0x859738; a.IatPeekMessageA = 0x8597F8;
@@ -349,6 +358,10 @@ namespace gta1
     static void (*s_preRender)() = nullptr;
     static int s_fireAngle = -1;
     static void (*s_cameraFilter)(const CameraView*, float&, float&) = nullptr;
+    static void (*s_beforeHud)() = nullptr;
+    static void (*s_cameraOverride)() = nullptr;
+    static bool s_inViewRect = false;
+    static void RestoreRenderCamera();
 
     static int PlayerPed();
     static const GtaPos* ControlledPos(int player, int& type);
@@ -360,19 +373,30 @@ namespace gta1
 
     // Zwischen Kameraführung und Sichtbereich: Versatz der Kamerasteuerung aufschlagen. Die Glättung
     // des Spiels rechnet mit dem Mittelpunkt ohne unseren Versatz weiter, der Sichtbereich passt zum Bild.
+    // Kamera des Spielers als CameraView; false, solange sie nicht der Spielfigur bzw. ihrem Fahrzeug folgt
+    static bool MakeView(int player, CameraView& v)
+    {
+        int type = -1;
+        const GtaPos* p = ControlledPos(player, type);
+        const CameraData& cam = CameraOf(player);
+        if (!p || type > 2 || cam.focal <= 0 || cam.height + (p->z >> 16) <= 0)
+            return false;
+        v = { (float)cam.x, (float)cam.y, p->x / 65536.0f, p->y / 65536.0f, p->z / 65536.0f,
+              type == 2 ? 10.0f : 24.0f, (float)cam.height, (float)cam.focal,
+              cam.squash ? 5.0f / 6.0f : 1.0f, (float)cam.centerX, (float)cam.centerY, type, p->angle };
+        return true;
+    }
+
     static void __cdecl ViewRectHook(int player)
     {
+        RestoreRenderCamera(); // falls seit dem letzten Mal kein Bild gezeichnet wurde
         if (s_cameraFilter && player == *reinterpret_cast<int*>(A.LocalPlayer))
         {
-            int type = -1;
-            const GtaPos* p = ControlledPos(player, type);
             CameraData& cam = CameraOf(player);
             float dx = 0, dy = 0;
-            if (p && type <= 2 && cam.focal > 0 && cam.height + (p->z >> 16) > 0)
+            CameraView v;
+            if (MakeView(player, v))
             {
-                const CameraView v = { (float)cam.x, (float)cam.y, p->x / 65536.0f, p->y / 65536.0f, p->z / 65536.0f,
-                                       type == 2 ? 10.0f : 24.0f, (float)cam.height, (float)cam.focal,
-                                       cam.squash ? 5.0f / 6.0f : 1.0f, (float)cam.centerX, (float)cam.centerY };
                 s_cameraFilter(&v, dx, dy);
                 cam.x = std::clamp(cam.x + (int)std::lround(dx), 0, 0x3FFF);
                 cam.y = std::clamp(cam.y + (int)std::lround(dy), 0, 0x3FFF);
@@ -380,7 +404,37 @@ namespace gta1
             else
                 s_cameraFilter(nullptr, dx, dy);
         }
+        // Kippkamera: Kamera bis nach dem Zeichnen ändern. Das Spiel rechnet Boden und Figuren schon zwischen
+        // Kameraführung und RenderFrame auf den Bildschirm um, deshalb geht das nur hier.
+        if (s_cameraOverride && player == *reinterpret_cast<int*>(A.LocalPlayer))
+        {
+            s_inViewRect = true;
+            s_cameraOverride();
+            s_inViewRect = false;
+        }
         reinterpret_cast<void(__cdecl*)(int)>(A.ViewRect)(player);
+    }
+
+    // Kamera nur für ein Bild (Kippkamera): vor dem Zeichnen verändert, danach wiederhergestellt
+    struct SavedCamera
+    {
+        bool active = false;
+        int player = 0;
+        int32_t x = 0, y = 0, focal = 0, zoom = 0;
+    };
+    static SavedCamera s_savedCam;
+
+    void RestoreRenderCamera()
+    {
+        if (!s_savedCam.active)
+            return;
+        s_savedCam.active = false;
+        CameraData& cam = CameraOf(s_savedCam.player);
+        cam.x = s_savedCam.x;
+        cam.y = s_savedCam.y;
+        cam.focal = s_savedCam.focal;
+        cam.zoom = s_savedCam.zoom;
+        reinterpret_cast<void(__cdecl*)(int)>(A.ViewRect)(s_savedCam.player); // Sichtbereich wieder wie im Spiel
     }
 
     static void __cdecl RenderHook()
@@ -388,6 +442,7 @@ namespace gta1
         if (s_preRender)
             s_preRender();
         reinterpret_cast<void(__cdecl*)()>(A.RenderFrame)();
+        RestoreRenderCamera();
     }
 
     // Beim Seitwärtslaufen zeigt der Spieler während der Simulation in Laufrichtung;
@@ -412,6 +467,8 @@ namespace gta1
     {
         s_lastHud = GetTickCount();
         ++s_hudCount;
+        if (s_beforeHud)
+            s_beforeHud(); // Weltbild ist fertig, das HUD kommt erst noch
         reinterpret_cast<void(__cdecl*)()>(A.HudDraw)();
         if (s_hudCallback)
             s_hudCallback();
@@ -832,10 +889,73 @@ namespace gta1
     {
         if (!s_supported || !A.Camera)
             return false;
-        if (!s_cameraFilter && !Redirect(A.ViewRectCall, 0xE8, A.ViewRect, reinterpret_cast<void*>(&ViewRectHook)))
+        if (!s_cameraFilter && !s_cameraOverride && !Redirect(A.ViewRectCall, 0xE8, A.ViewRect, reinterpret_cast<void*>(&ViewRectHook)))
             return false;
         s_cameraFilter = filter;
         return true;
+    }
+
+    bool GetCameraView(CameraView& out)
+    {
+        if (!InGame() || !A.Camera)
+            return false;
+        const int idx = *reinterpret_cast<int*>(A.LocalPlayer);
+        return idx >= 0 && idx <= 3 && MakeView(idx, out);
+    }
+
+    bool OverrideRenderCamera(float centerX, float centerY, float shrink, float& used)
+    {
+        RestoreRenderCamera();
+        used = 1;
+        if (!s_supported || !A.Camera || !A.ViewRect)
+            return false;
+        const int idx = *reinterpret_cast<int*>(A.LocalPlayer);
+        if (idx < 0 || idx > 3)
+            return false;
+        CameraData& cam = CameraOf(idx);
+        if (cam.focal <= 0 || cam.zoom <= 0)
+            return false;
+        s_savedCam.active = true;
+        s_savedCam.player = idx;
+        s_savedCam.x = cam.x;
+        s_savedCam.y = cam.y;
+        s_savedCam.focal = cam.focal;
+        s_savedCam.zoom = cam.zoom;
+        // focal bestimmt den Maßstab beim Zeichnen, zoom den Sichtbereich (ViewRect: (h + 384) * 160 / zoom)
+        shrink = std::clamp(shrink, 1.0f, 4.0f);
+        cam.focal = std::max(1, (int)std::lround(cam.focal / shrink));
+        cam.zoom = std::max(1, (int)std::lround(cam.zoom / shrink));
+        used = (float)s_savedCam.focal / cam.focal;
+        cam.x = std::clamp((int)std::lround(centerX), 0, 0x3FFF);
+        cam.y = std::clamp((int)std::lround(centerY), 0, 0x3FFF);
+        if (!s_inViewRect)
+            reinterpret_cast<void(__cdecl*)(int)>(A.ViewRect)(idx);
+        return true;
+    }
+
+    bool SetCameraOverride(void (*cb)())
+    {
+        if (!s_supported || !A.Camera || !A.ViewRect)
+            return false;
+        if (!s_cameraFilter && !s_cameraOverride && !Redirect(A.ViewRectCall, 0xE8, A.ViewRect, reinterpret_cast<void*>(&ViewRectHook)))
+            return false;
+        s_cameraOverride = cb;
+        return true;
+    }
+
+    void SetBeforeHudCallback(void (*cb)()) { s_beforeHud = cb; }
+
+    bool GetDrawBuffer(DrawBuffer& out)
+    {
+        if (!s_supported || !A.DrawBits)
+            return false;
+        out.bits = *reinterpret_cast<uint8_t**>(A.DrawBits);
+        out.pitch = *reinterpret_cast<int*>(A.DrawPitch);
+        out.bytesPerPixel = *reinterpret_cast<uint8_t*>(A.DrawBytes);
+        out.width = *reinterpret_cast<int*>(A.DrawWidth);
+        out.height = *reinterpret_cast<int*>(A.DrawHeight);
+        return out.bits && out.width > 0 && out.width <= 8192 && out.height > 0 && out.height <= 8192 &&
+               out.bytesPerPixel >= 1 && out.pitch >= out.width * out.bytesPerPixel;
     }
 
     bool PlayerScreenPos(float& x, float& y)
@@ -921,6 +1041,7 @@ namespace gta1
             CmdStopFrenzy = 134, CmdKfCancelBriefing = 138, CmdKfCancelGeneral = 140,
             CmdResetWithBriefs = 145, CmdRedArrowOff = 146,
             CmdMPhone = 16, CmdMissionEnd = 45, CmdBrief = 15, CmdSpeechBrief = 110,
+            CmdPBrief = 37, CmdPBriefTimed = 68, CmdFrenzyBrief = 135, CmdKfBriefTimed = 137, CmdKfBriefGeneral = 139,
         };
         // Objekttypen in der Objekttabelle (= Index der Namenstabelle 0x4C2580 minus 4)
         constexpr int32_t kObjMPhones = 34, kObjPhoneToggle = 39;
@@ -1097,10 +1218,18 @@ namespace gta1
             if (s_scriptEvent)
             {
                 // Text der Telefon-/Pager-Ansagen steht in <score>
-                if (command == CmdBrief || command == CmdSpeechBrief || command == CmdMobileBrief)
+                switch (command)
+                {
+                case CmdBrief: case CmdSpeechBrief: case CmdMobileBrief: case CmdPBrief: case CmdPBriefTimed:
+                case CmdFrenzyBrief: case CmdKfBriefTimed: case CmdKfBriefGeneral:
                     s_scriptEvent(ScriptEvent::Brief, line->score);
-                else if (command == CmdMissionEnd)
+                    break;
+                case CmdMissionEnd:
                     s_scriptEvent(ScriptEvent::MissionEnd, 0);
+                    break;
+                default:
+                    break;
+                }
             }
 
             // Beendete Prozesse vergessen, damit ein neuer Prozess im selben Platz normal läuft
@@ -1306,7 +1435,7 @@ namespace gta1
 
     namespace
     {
-        constexpr int kScriptLines = 5000, kScriptLineSize = 22, kProcBlockSize = 0x4A0;
+        constexpr int kScriptLines = 5000, kScriptLineSize = 22, kProcBlockSize = 0x4A0, kTriggersSize = 210 * 29;
 
         uint32_t Fnv(uint32_t h, const void* data, size_t n)
         {
@@ -1383,6 +1512,11 @@ namespace gta1
         out.procState.assign(state, state + addr::ScriptProcs * 2);
         const uint8_t* lines = reinterpret_cast<const uint8_t*>(A.ScriptLines);
         out.lines.assign(lines, lines + kScriptLines * kScriptLineSize);
+        if (A.Triggers)
+        {
+            const uint8_t* triggers = reinterpret_cast<const uint8_t*>(A.Triggers);
+            out.triggers.assign(triggers, triggers + kTriggersSize);
+        }
         return true;
     }
 
@@ -1405,6 +1539,10 @@ namespace gta1
         memcpy(reinterpret_cast<void*>(A.ScriptProcBlock), in.procBlock.data(), in.procBlock.size());
         memcpy(reinterpret_cast<void*>(A.ScriptState), in.procState.data(), in.procState.size());
         memcpy(reinterpret_cast<void*>(A.ScriptLines), in.lines.data(), in.lines.size());
+        // Ein- und ausgeschaltete Objekte: ohne diese Tabelle bliebe z.B. die beim Missionsstart abgeschaltete
+        // Telefongruppe aus, während das geladene Skript schon auf einen Anruf wartet
+        if (A.Triggers && in.triggers.size() == kTriggersSize)
+            memcpy(reinterpret_cast<void*>(A.Triggers), in.triggers.data(), kTriggersSize);
         s_mission = MissionLog();
         s_phones = PhoneGroup();
         memset(s_failedAt, 0, sizeof(s_failedAt));
@@ -1445,32 +1583,36 @@ namespace gta1
         const char* p = *reinterpret_cast<const char* const*>(A.TextBuffer);
         if (!p)
             return false;
-        // Aufbau wie in der FXT-Datei: "[Schlüssel]Text\0[Schlüssel]Text\0 ... []"
+        // Aufbau: "[Schlüssel]Text\0[Schlüssel]Text\0 ... []", Einträge durch Null-Bytes getrennt
         char key[16];
         const int keyLen = sprintf_s(key, "[%d]", id);
-        for (int guard = 0; guard < 4 * 1024 * 1024 && *p; ++guard)
+        for (int entry = 0; entry < 50000 && p[0] == '['; ++entry)
         {
-            if (p[0] == '[' && p[1] == ']')
+            if (p[1] == ']')
                 return false;
-            if (strncmp(p, key, keyLen) == 0)
+            size_t len = 0;
+            while (p[len] && len < 4000)
+                ++len;
+            if (strncmp(p, key, keyLen) != 0)
             {
-                p += keyLen;
-                size_t n = 0;
-                while (p[n] && p[n] != '[' && n < 2000)
-                    ++n;
-                // Die Texte des R2P-Pakets sind UTF-8, die der Original-CD Windows-1252
-                UINT cp = CP_UTF8;
-                int w = MultiByteToWideChar(cp, MB_ERR_INVALID_CHARS, p, (int)n, nullptr, 0);
-                if (w <= 0)
-                {
-                    cp = 1252;
-                    w = MultiByteToWideChar(cp, 0, p, (int)n, nullptr, 0);
-                }
-                out.resize(w);
-                MultiByteToWideChar(cp, 0, p, (int)n, &out[0], w);
-                return !out.empty();
+                p += len + 1;
+                continue;
             }
-            ++p;
+            p += keyLen;
+            const int n = (int)(len - keyLen);
+            // Die Texte des R2P-Pakets sind UTF-8, die der Original-CD Windows-1252
+            UINT cp = CP_UTF8;
+            int w = MultiByteToWideChar(cp, MB_ERR_INVALID_CHARS, p, n, nullptr, 0);
+            if (w <= 0)
+            {
+                cp = 1252;
+                w = MultiByteToWideChar(cp, 0, p, n, nullptr, 0);
+            }
+            if (w <= 0)
+                return false;
+            out.resize(w);
+            MultiByteToWideChar(cp, 0, p, n, &out[0], w);
+            return true;
         }
         return false;
     }

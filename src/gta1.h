@@ -58,6 +58,8 @@ namespace gta1
         float height, focal;
         float squash;                     // senkrechter Bildfaktor (1 oder 5/6)
         float halfW, halfH;               // halbe Bildgröße in Pixeln der Spielauflösung
+        int ctrlType;                     // 0 Auto, 1 Zug, 2 zu Fuß
+        int angle;                        // Richtung der Figur bzw. des Fahrzeugs (Rohwert, 1024 = 360°)
     };
     // Kamerasteuerung: der Filter läuft jeden Frame, nachdem das Spiel den Bildmittelpunkt bestimmt hat,
     // und liefert einen zusätzlichen Versatz in Weltpixeln. view = nullptr, solange die Kamera nicht der
@@ -65,6 +67,22 @@ namespace gta1
     bool SetCameraFilter(void (*filter)(const CameraView* view, float& dx, float& dy));
     // Wo die Spielfigur (bzw. ihr Fahrzeug) im letzten Bild steht, in Pixeln der Spielauflösung
     bool PlayerScreenPos(float& x, float& y);
+    bool GetCameraView(CameraView& out);
+
+    // Kippkamera: Rückruf am Ende der Kameraführung, direkt bevor das Spiel das Bild vorbereitet und zeichnet.
+    // Nur darin OverrideRenderCamera aufrufen: Mittelpunkt (Weltpixel) und Verkleinerung (>= 1) gelten bis nach
+    // dem Zeichnen, dann stellt gta1 alles wieder her. used = tatsächliche Verkleinerung (ganzzahlige Kamerawerte)
+    bool SetCameraOverride(void (*cb)());
+    bool OverrideRenderCamera(float centerX, float centerY, float shrink, float& used);
+    // Läuft, wenn die Welt fertig gezeichnet ist und bevor das Spiel sein HUD darüberlegt
+    void SetBeforeHudCallback(void (*cb)());
+    // Speicher der Seite, in die das Spiel gerade zeichnet
+    struct DrawBuffer
+    {
+        uint8_t* bits;
+        int pitch, width, height, bytesPerPixel;
+    };
+    bool GetDrawBuffer(DrawBuffer& out);
 
     // Im Hauptmenü gewähltes Portrait (0 Ulrika .. 7 Kivlov) bzw. -1
     int PlayerCharacter();
@@ -100,6 +118,7 @@ namespace gta1
         int32_t x = 0, y = 0, z = 0;    // Festkomma wie im Spiel (22 Nachkommabits = 1 Block)
         int16_t angle = 0;
         std::vector<uint8_t> objects, procBlock, procState, lines;
+        std::vector<uint8_t> triggers;          // leer bei Spielständen der Version 1
     };
     bool CanUseSaves();                        // im Level, Einzelspieler, Adressen bekannt
     uint32_t LevelHash();                      // erkennt den Level (Abschnitt der mission.ini)

@@ -32,6 +32,9 @@ struct Config
     int  cameraRangeVehicle  = 60;
     int  cameraDeadZone      = 40;   // Prozent: innerer Bereich, in dem die Maus nichts verschiebt
     bool cameraSteady        = true; // Kamera folgt enger (Patch aus GTAforums)
+    int  tilt                = 0;    // Kippkamera wie in Chinatown Wars: 0 aus, 1 im Fahrzeug, 2 immer
+    int  tiltAngle           = 35;   // Neigung in Grad
+    bool tiltRotate          = true; // im Fahrzeug dreht sich das Bild mit (Fahrtrichtung oben)
 
     // [Keys]
     int mapKey          = 'M';

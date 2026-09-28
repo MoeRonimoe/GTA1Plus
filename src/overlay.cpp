@@ -12,6 +12,7 @@
 #include "saves.h"
 #include "briefings.h"
 #include "text.h"
+#include "tiltcam.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1524,7 +1525,7 @@ namespace overlay
             const float dx = turn.x - p.x, dy = turn.y - p.y;
             if (dx * dx + dy * dy < 1e-4f)
                 return;
-            const float a = std::atan2(dx, -dy);
+            const float a = std::atan2(dx, -dy) - tiltcam::Rotation(); // gedrehtes Bild der Kippkamera
 
             Canvas& c = g_canvas;
             const int H = v.height, W = v.width;

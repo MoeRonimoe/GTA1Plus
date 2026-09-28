@@ -101,6 +101,10 @@ namespace text
         SaveSlotInfo,
         StartLoadTitle,
         StartLoadText,
+        OptTilt,
+        OptTiltAngle,
+        OptTiltRotate,
+        TiltAlways,
         Count
     };
 

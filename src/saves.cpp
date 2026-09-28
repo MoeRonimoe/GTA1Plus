@@ -14,7 +14,7 @@ namespace saves
     namespace
     {
         constexpr uint32_t kMagic = 0x53503147;    // "G1PS"
-        constexpr uint32_t kVersion = 1;
+        constexpr uint32_t kVersion = 2;   // 2: mit Trigger-Tabelle
         constexpr DWORD kAutosaveDelay = 2500;      // nach MISSION_END, bis Belohnung und Ansage durch sind
         constexpr DWORD kOfferDelay = 3000;         // nach Levelstart, bis das Skript seine Startbefehle ausgeführt hat
 
@@ -106,6 +106,7 @@ namespace saves
             w.Blob(s.procBlock);
             w.Blob(s.procState);
             w.Blob(s.lines);
+            w.Blob(s.triggers);
             return w.buf;
         }
 
@@ -114,7 +115,7 @@ namespace saves
             Reader r{ data.data(), data.data() + data.size() };
             r.Get(h.magic);
             r.Get(h.version);
-            if (!r.ok || h.magic != kMagic || h.version != kVersion)
+            if (!r.ok || h.magic != kMagic || h.version < 1 || h.version > kVersion)
                 return false;
             r.Get(h.saved);
             r.Get(s.exeStamp);
@@ -136,6 +137,8 @@ namespace saves
             r.Blob(s.procBlock);
             r.Blob(s.procState);
             r.Blob(s.lines);
+            if (h.version >= 2)
+                r.Blob(s.triggers);
             return r.ok;
         }
 

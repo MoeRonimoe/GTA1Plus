@@ -10,7 +10,7 @@ namespace options
 {
     namespace
     {
-        enum class Type { Header, Bool, Int, Choice, Language };
+        enum class Type { Header, Bool, Int, Degrees, Choice, Language };
 
         struct Option
         {
@@ -18,7 +18,7 @@ namespace options
             text::Id label;
             void* value;
             bool restart;                   // wirkt erst nach Neustart
-            int minValue, maxValue, step;   // Int: Bereich und Schrittweite in Prozent
+            int minValue, maxValue, step;   // Int/Degrees: Bereich und Schrittweite (Prozent bzw. Grad)
             text::Id choices[4];            // Choice: Beschriftung je Wert (0..maxValue)
         };
 
@@ -51,6 +51,9 @@ namespace options
             { Type::Int, text::OptRangeVehicle, &g_cfg.cameraRangeVehicle, false, 0, 90, 10 },
             { Type::Int, text::OptDeadZone, &g_cfg.cameraDeadZone, false, 0, 90, 10 },
             { Type::Bool, text::OptSteady, &g_cfg.cameraSteady, true },
+            { Type::Choice, text::OptTilt, &g_cfg.tilt, false, 0, 2, 1, { text::OptOff, text::InVehicle, text::TiltAlways } },
+            { Type::Degrees, text::OptTiltAngle, &g_cfg.tiltAngle, false, 0, 45, 5 },
+            { Type::Bool, text::OptTiltRotate, &g_cfg.tiltRotate },
 
             { Type::Header, text::OptGroupGameplay },
             { Type::Bool, text::OptAutosave, &g_cfg.autosave },
@@ -93,6 +96,9 @@ namespace options
         case Type::Int:
             swprintf_s(buf, L"%d %%", *static_cast<int*>(o.value));
             return buf;
+        case Type::Degrees:
+            swprintf_s(buf, L"%d\u00B0", *static_cast<int*>(o.value));
+            return buf;
         case Type::Choice:
             return text::Get(o.choices[std::clamp(*static_cast<int*>(o.value), 0, o.maxValue)]);
         case Type::Language:
@@ -119,6 +125,7 @@ namespace options
             break;
         }
         case Type::Int:
+        case Type::Degrees:
         {
             int& v = *static_cast<int*>(o.value);
             const int next = std::clamp(v + dir * o.step, o.minValue, o.maxValue);

@@ -13,6 +13,7 @@
 #include "overlay.h"
 #include "saves.h"
 #include "text.h"
+#include "tiltcam.h"
 
 namespace
 {
@@ -160,6 +161,9 @@ void ModInit(HMODULE self)
 
         gta1::SetHudCallback(&OnHudDrawn);
         gta1::SetPreRenderCallback(&OnPreRender);
+        gta1::SetBeforeHudCallback(&tiltcam::Warp);
+        if (!gta1::SetCameraOverride(&tiltcam::BeginFrame))
+            LOG("Kippkamera: Spielcode passt nicht");
         if (g_cfg.keepMultiplier)
             LOG("Multiplikator bei Verhaftung behalten: %s", gta1::EnableKeepMultiplier() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.allCharacters)
