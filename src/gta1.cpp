@@ -69,7 +69,9 @@ namespace gta1
 
         uintptr_t ReadInput = 0;      // liefert das Eingabepaket des lokalen Spielers
         uintptr_t ReadInputCall = 0;  // call ReadInput in der Hauptschleife
-        uintptr_t InSteer = 0, InGas = 0, InBrake = 0, InJump = 0, InFire = 0, InNext = 0, InPrev = 0, InSpecial = 0;
+        // Tastenzustände aus der Eingabe des Spiels (1.0.0.1: 0x436A99 ff.). Die Namen folgen der Wirkung im Paket:
+        // Hupe/Pfiff setzt 0x20, nächste Waffe 0x10, vorherige Waffe 0x100 (Auswertung 0x465628 / 0x4656A0)
+        uintptr_t InSteer = 0, InGas = 0, InBrake = 0, InJump = 0, InFire = 0, InHorn = 0, InWeaponNext = 0, InWeaponPrev = 0;
         uintptr_t KeyScancodes = 0;   // int je Steuerung (Scancode, +0x100 erweitert), 4 = Springen
 
         uintptr_t PlayerCharacter = 0;  // byte, im Hauptmenü gewähltes Portrait (0 Ulrika .. 7 Kivlov)
@@ -144,7 +146,7 @@ namespace gta1
         a.SteadyCamera[0] = 0x42B9F2; a.SteadyCamera[1] = 0x42C761;
         a.ReadInput = 0x4365E0; a.ReadInputCall = 0x45CFD3;
         a.InSteer = 0x600A80; a.InGas = 0x6008FC; a.InBrake = 0x600A18; a.InJump = 0x600900;
-        a.InFire = 0x6008F8; a.InNext = 0x600A1C; a.InPrev = 0x600A48; a.InSpecial = 0x600A84;
+        a.InFire = 0x6008F8; a.InHorn = 0x600A1C; a.InWeaponNext = 0x600A48; a.InWeaponPrev = 0x600A84;
         a.KeyScancodes = 0x600A50;
         a.PlayerCharacter = 0x657764; a.CharacterColors = 0x4C1668; a.ColorToRemap = 0x4C0110;
         // Flammen an Figuren: 0x41CB30/0x404FD0 erzeugen mit ObjectCreate ein o_lfire an der Figur und merken
@@ -209,7 +211,7 @@ namespace gta1
         a.RenderFrame = 0x401B90; a.RenderCall = 0x41F425;
         // Tastenzustände aus dem Druck-Handler 0x444DC0 (gleiche Reihenfolge und Paketbits wie 1.0.0.1)
         a.InSteer = 0x572F50; a.InGas = 0x572DCC; a.InBrake = 0x572EE8; a.InJump = 0x572DD0;
-        a.InFire = 0x572DC8; a.InNext = 0x572EEC; a.InPrev = 0x572F18; a.InSpecial = 0x572F54;
+        a.InFire = 0x572DC8; a.InHorn = 0x572EEC; a.InWeaponNext = 0x572F18; a.InWeaponPrev = 0x572F54;
         a.KeyScancodes = 0x572F20;
         // Fußgänger wie in 1.0.0.1 (235 Byte), Position über 0x47E2B0
         a.PedStruct = 0x7E2370; a.PedAngle = 0x7E2409; a.PedRemap = 0x7E23C8; a.PedDrawRemap = 0x7E2403;
@@ -268,7 +270,7 @@ namespace gta1
         a.ReadInput = 0x401C17; a.ReadInputCall = 0x41F631;
         a.RenderFrame = 0x401B95; a.RenderCall = 0x41F6B5;
         a.InSteer = 0x574B58; a.InGas = 0x5749D4; a.InBrake = 0x574AF0; a.InJump = 0x5749D8;
-        a.InFire = 0x5749D0; a.InNext = 0x574AF4; a.InPrev = 0x574B20; a.InSpecial = 0x574B5C;
+        a.InFire = 0x5749D0; a.InHorn = 0x574AF4; a.InWeaponNext = 0x574B20; a.InWeaponPrev = 0x574B5C;
         a.KeyScancodes = 0x574B28;
         a.PedStruct = 0x7E3F78; a.PedAngle = 0x7E4011; a.PedRemap = 0x7E3FD0; a.PedDrawRemap = 0x7E400B;
         a.PlayerPedId = 0x80EB32; a.PlayerCharacter = 0x80ECCC;
@@ -361,6 +363,10 @@ namespace gta1
     static void (*s_beforeHud)() = nullptr;
     static void (*s_cameraOverride)() = nullptr;
     static bool s_inViewRect = false;
+    static float s_viewRectScale = 1.0f;   // Sichtbereich der Spiellogik (Verkehr entsteht knapp außerhalb)
+    static int s_vehicleHeight = 0, s_vehicleZoom = 0; // feste Fahrzeugkamera, 0 = wie im Spiel
+    static float s_heightBlend = 0;
+    static DWORD s_heightTick = 0;
     static void RestoreRenderCamera();
 
     static int PlayerPed();
@@ -371,8 +377,48 @@ namespace gta1
         return *reinterpret_cast<CameraData*>(A.Camera + player * addr::PlayerStride);
     }
 
-    // Zwischen Kameraführung und Sichtbereich: Versatz der Kamerasteuerung aufschlagen. Die Glättung
-    // des Spiels rechnet mit dem Mittelpunkt ohne unseren Versatz weiter, der Sichtbereich passt zum Bild.
+    static void CallViewRect(int player) { reinterpret_cast<void(__cdecl*)(int)>(A.ViewRect)(player); }
+
+    // Sichtbereich nach dem Zeichnen für die Spiellogik vergrößern: Verkehr entsteht knapp außerhalb davon und Autos
+    // außerhalb werden entfernt. Das Zeichnen bekommt ihn nie so groß, denn einen größeren Bereich als bei schneller
+    // Fahrt zeichnet das Spiel nicht vollständig. Er liegt direkt vor der Kamera: links, rechts, oben, unten,
+    // halbe Breite (Weltpixel); die nächste Kameraführung berechnet ihn neu.
+    static void EnlargeViewRectForLogic()
+    {
+        if (s_viewRectScale <= 1.0f || !A.ViewRect)
+            return;
+        const int player = *reinterpret_cast<int*>(A.LocalPlayer);
+        if (player < 0 || player > 3)
+            return;
+        int32_t* rect = reinterpret_cast<int32_t*>(A.Camera + player * addr::PlayerStride - 0x14);
+        const int cx = (rect[0] + rect[1]) / 2, cy = (rect[2] + rect[3]) / 2;
+        const int halfW = (int)(rect[4] * s_viewRectScale), halfH = halfW * 3 / 4;
+        rect[0] = std::max(0, cx - halfW);
+        rect[1] = std::max(0, cx + halfW);
+        rect[2] = std::max(0, cy - halfH);
+        rect[3] = std::max(0, cy + halfH);
+        rect[4] = halfW;
+    }
+
+    // Feste Fahrzeugkamera, beim Ein- und Aussteigen überblendet. Das Spiel zoomt mit dem Tempo über Höhe und zoom
+    // heraus (stehend etwa 80/126, schnell 268/90) und schreibt beide jeden Tick neu, deshalb wirkt das nicht auf
+    // seine eigene Glättung zurück. focal folgt aus zoom wie in der Kameraführung (Bezugsbreite * zoom / 320).
+    static void ApplyVehicleHeight(int player, CameraData& cam)
+    {
+        const DWORD now = GetTickCount();
+        const float dt = s_heightTick ? std::min((now - s_heightTick) / 1000.0f, 0.1f) : 0.0f;
+        s_heightTick = now;
+        const int type = *reinterpret_cast<int*>(A.PlayerCtrl + player * addr::PlayerStride);
+        const bool want = s_vehicleHeight > 0 && type == 0;
+        s_heightBlend = std::clamp(s_heightBlend + (want ? dt : -dt) / 0.8f, 0.0f, 1.0f);
+        if (s_heightBlend <= 0 || s_vehicleHeight <= 0 || s_vehicleZoom <= 0)
+            return;
+        const float t = s_heightBlend * s_heightBlend * (3 - 2 * s_heightBlend);
+        cam.height = (int)std::lround(cam.height + (s_vehicleHeight - cam.height) * t);
+        cam.zoom = (int)std::lround(cam.zoom + (s_vehicleZoom - cam.zoom) * t);
+        cam.focal = cam.baseW * cam.zoom / 320;
+    }
+
     // Kamera des Spielers als CameraView; false, solange sie nicht der Spielfigur bzw. ihrem Fahrzeug folgt
     static bool MakeView(int player, CameraView& v)
     {
@@ -387,9 +433,14 @@ namespace gta1
         return true;
     }
 
+    // Zwischen Kameraführung und Sichtbereich: Höhe im Fahrzeug festlegen und Versatz der Kamerasteuerung
+    // aufschlagen. Die Glättung des Spiels rechnet mit dem Mittelpunkt ohne unseren Versatz weiter, der
+    // Sichtbereich passt zum Bild.
     static void __cdecl ViewRectHook(int player)
     {
         RestoreRenderCamera(); // falls seit dem letzten Mal kein Bild gezeichnet wurde
+        if (player == *reinterpret_cast<int*>(A.LocalPlayer))
+            ApplyVehicleHeight(player, CameraOf(player));
         if (s_cameraFilter && player == *reinterpret_cast<int*>(A.LocalPlayer))
         {
             CameraData& cam = CameraOf(player);
@@ -412,7 +463,7 @@ namespace gta1
             s_cameraOverride();
             s_inViewRect = false;
         }
-        reinterpret_cast<void(__cdecl*)(int)>(A.ViewRect)(player);
+        CallViewRect(player);
     }
 
     // Kamera nur für ein Bild (Kippkamera): vor dem Zeichnen verändert, danach wiederhergestellt
@@ -434,7 +485,8 @@ namespace gta1
         cam.y = s_savedCam.y;
         cam.focal = s_savedCam.focal;
         cam.zoom = s_savedCam.zoom;
-        reinterpret_cast<void(__cdecl*)(int)>(A.ViewRect)(s_savedCam.player); // Sichtbereich wieder wie im Spiel
+        // Der größere Sichtbereich des gezeichneten Bildes bleibt bis zur nächsten Kameraführung stehen: so entsteht
+        // der Verkehr auch außerhalb der gekippten Ansicht
     }
 
     static void __cdecl RenderHook()
@@ -443,6 +495,7 @@ namespace gta1
             s_preRender();
         reinterpret_cast<void(__cdecl*)()>(A.RenderFrame)();
         RestoreRenderCamera();
+        EnlargeViewRectForLogic();
     }
 
     // Beim Seitwärtslaufen zeigt der Spieler während der Simulation in Laufrichtung;
@@ -701,9 +754,9 @@ namespace gta1
         k.brake = *reinterpret_cast<uint8_t*>(A.InBrake);
         k.jump = *reinterpret_cast<uint8_t*>(A.InJump) != 0;
         k.fire = *reinterpret_cast<uint8_t*>(A.InFire) != 0;
-        k.next = *reinterpret_cast<uint8_t*>(A.InNext) != 0;
-        k.prev = *reinterpret_cast<uint8_t*>(A.InPrev) != 0;
-        k.special = *reinterpret_cast<uint8_t*>(A.InSpecial) != 0;
+        k.horn = *reinterpret_cast<uint8_t*>(A.InHorn) != 0;
+        k.weaponNext = *reinterpret_cast<uint8_t*>(A.InWeaponNext) != 0;
+        k.weaponPrev = *reinterpret_cast<uint8_t*>(A.InWeaponPrev) != 0;
         return k;
     }
 
@@ -885,11 +938,20 @@ namespace gta1
     void SetPreRenderCallback(void (*cb)()) { s_preRender = cb; }
     void SetPlayerFireAngle(int angle) { s_fireAngle = angle; }
 
+    // Ende der Kameraführung (call ViewRect) einmal umbiegen; Kamerasteuerung, Kippkamera und Sichtoptionen teilen es
+    static bool HookViewRect()
+    {
+        static bool s_hooked = false;
+        if (!s_hooked)
+            s_hooked = Redirect(A.ViewRectCall, 0xE8, A.ViewRect, reinterpret_cast<void*>(&ViewRectHook));
+        return s_hooked;
+    }
+
     bool SetCameraFilter(void (*filter)(const CameraView* view, float& dx, float& dy))
     {
         if (!s_supported || !A.Camera)
             return false;
-        if (!s_cameraFilter && !s_cameraOverride && !Redirect(A.ViewRectCall, 0xE8, A.ViewRect, reinterpret_cast<void*>(&ViewRectHook)))
+        if (!HookViewRect())
             return false;
         s_cameraFilter = filter;
         return true;
@@ -929,7 +991,19 @@ namespace gta1
         cam.x = std::clamp((int)std::lround(centerX), 0, 0x3FFF);
         cam.y = std::clamp((int)std::lround(centerY), 0, 0x3FFF);
         if (!s_inViewRect)
-            reinterpret_cast<void(__cdecl*)(int)>(A.ViewRect)(idx);
+            CallViewRect(idx);
+        return true;
+    }
+
+    bool SetViewOptions(float viewRectScale, int vehicleHeight, int vehicleZoom)
+    {
+        if (!s_supported || !A.Camera || !A.ViewRect || !A.PlayerCtrl)
+            return false;
+        if (!HookViewRect())
+            return false;
+        s_viewRectScale = std::clamp(viewRectScale, 1.0f, 3.0f);
+        s_vehicleHeight = std::clamp(vehicleHeight, 0, 716);
+        s_vehicleZoom = std::clamp(vehicleZoom, 0, 500);
         return true;
     }
 
@@ -937,7 +1011,7 @@ namespace gta1
     {
         if (!s_supported || !A.Camera || !A.ViewRect)
             return false;
-        if (!s_cameraFilter && !s_cameraOverride && !Redirect(A.ViewRectCall, 0xE8, A.ViewRect, reinterpret_cast<void*>(&ViewRectHook)))
+        if (!HookViewRect())
             return false;
         s_cameraOverride = cb;
         return true;

@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 14;
+static const int kConfigVersion = 15;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=14\r\n"
+    "Version=15\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -100,6 +100,12 @@ static const char kDefaultIni[] =
     "TiltAngle=35\r\n"
     "; In vehicles the picture turns with the vehicle, so that the driving direction points up\r\n"
     "TiltRotate=1\r\n"
+    "; Camera height in vehicles: 0 = as in the game (zooms out with speed), 1 = high, 2 = very high,\r\n"
+    "; 3 = maximum (as far out as the game goes at top speed). 1..3 keep that view, also when standing still\r\n"
+    "VehicleView=0\r\n"
+    "; Traffic appears and disappears outside this range around the camera, in percent of the visible\r\n"
+    "; area (100 = as in the game, up to 250). More gives you more time to react to cars\r\n"
+    "TrafficRange=100\r\n"
     "\r\n"
     "[PlayerColors]\r\n"
     "; Color variant per portrait, only with PortraitColors=1. 0 = as in the original game (yellow top),\r\n"
@@ -128,6 +134,9 @@ static const char kDefaultIni[] =
     "MoveRight=D\r\n"
     "; Enter/exit vehicle, in addition to the key from the game settings (only with TwinStick=1)\r\n"
     "EnterExit=F\r\n"
+    "; Previous/next weapon, in addition to the keys from the game settings and the mouse wheel\r\n"
+    "PrevWeapon=Q\r\n"
+    "NextWeapon=E\r\n"
     "\r\n"
     "[Map]\r\n"
     "; Map style: 0 = textures from the game, 1 = schematic\r\n"
@@ -193,6 +202,8 @@ namespace
         { L"Camera",   L"Tilt",           Kind::Int,  &g_cfg.tilt,               nullptr, nullptr },
         { L"Camera",   L"TiltAngle",      Kind::Int,  &g_cfg.tiltAngle,          nullptr, nullptr },
         { L"Camera",   L"TiltRotate",     Kind::Bool, &g_cfg.tiltRotate,         nullptr, nullptr },
+        { L"Camera",   L"VehicleView",    Kind::Int,  &g_cfg.vehicleView,        nullptr, nullptr },
+        { L"Camera",   L"TrafficRange",   Kind::Int,  &g_cfg.trafficRange,       nullptr, nullptr },
         { L"PlayerColors", L"Character1", Kind::Int,  &g_cfg.playerColors[0], nullptr, nullptr },
         { L"PlayerColors", L"Character2", Kind::Int,  &g_cfg.playerColors[1], nullptr, nullptr },
         { L"PlayerColors", L"Character3", Kind::Int,  &g_cfg.playerColors[2], nullptr, nullptr },
@@ -208,6 +219,8 @@ namespace
         { L"Keys",     L"MoveDown",       Kind::Key,  &g_cfg.moveDownKey,    nullptr, nullptr },
         { L"Keys",     L"MoveRight",      Kind::Key,  &g_cfg.moveRightKey,   nullptr, nullptr },
         { L"Keys",     L"EnterExit",      Kind::Key,  &g_cfg.enterExitKey,   nullptr, nullptr },
+        { L"Keys",     L"PrevWeapon",     Kind::Key,  &g_cfg.prevWeaponKey,  nullptr, nullptr },
+        { L"Keys",     L"NextWeapon",     Kind::Key,  &g_cfg.nextWeaponKey,  nullptr, nullptr },
         { L"Language", L"Language",       Kind::String, g_cfg.language,      nullptr, nullptr },
         { L"Map",      L"Style",          Kind::Int,  &g_cfg.mapStyle,       L"Overlay", L"MapStyle" },
         { L"Map",      L"MinimapCorner",  Kind::Int,  &g_cfg.minimapCorner,  L"Overlay", L"MinimapCorner" },
@@ -311,6 +324,8 @@ void LoadConfig(const wchar_t* ini)
     g_cfg.cameraDeadZone = std::clamp(g_cfg.cameraDeadZone, 0, 90);
     g_cfg.tilt = std::clamp(g_cfg.tilt, 0, 2);
     g_cfg.tiltAngle = std::clamp(g_cfg.tiltAngle, 0, 45);
+    g_cfg.vehicleView = std::clamp(g_cfg.vehicleView, 0, 3);
+    g_cfg.trafficRange = std::clamp(g_cfg.trafficRange, 100, 250);
 
     // Neue oder veraltete INI: kommentierte Vorlage schreiben und die aktuellen Werte übernehmen
     if (!exists || version < kConfigVersion)

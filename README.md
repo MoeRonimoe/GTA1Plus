@@ -14,6 +14,8 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **Controllers**: Xbox (XInput) and PS4/PS5 or other DirectInput pads, in levels and in the main menu.
 - **Steerable camera**: look ahead with the mouse or the right stick.
 - **Steadier camera**: the well-known GTAforums hex patch, applied in memory. The camera follows the character more closely instead of drifting behind. Works in all supported versions.
+- **Fixed camera height in vehicles** (optional): keeps the camera high while driving instead of zooming in and out with the speed.
+- **Traffic range** (optional): new traffic appears and old traffic disappears further outside the screen, so you have more time to react. At 200 % cars appear about 5 blocks outside the picture instead of 1.
 - **Tilted camera (prototype, off by default)**: a view in the style of *GTA Chinatown Wars*. The picture is tilted so you see further ahead, and in vehicles it turns with the driving direction. The mod transforms the finished game picture, so buildings keep their top-down look and the picture gets softer. Switch it on in the pause menu (GTA1Plus options → Camera) or with `[Camera] Tilt` in the INI. Needs 32-bit colour.
 - **Health hearts**: five hearts below the score.
 - **Put out fires**: when you are on fire, press jump to roll on the ground and put the flames out. In the original game burning is certain death.
@@ -55,8 +57,9 @@ The loader forwards DirectSound unchanged and loads every `scripts\*.asi`. It do
 | Fire | Left click or Ctrl | R2 / RT or Circle / B |
 | Accelerate / brake | W / S | R2 / L2 |
 | Enter / exit vehicle | F or Enter | Triangle / Y |
-| Jump / handbrake / roll when burning | Space | Cross / A |
-| Switch weapon | game keys | L1 / R1 |
+| Jump / handbrake / roll when burning | Space | Cross / A (on foot also Square / X) |
+| Horn (in vehicles) | game key (Tab) | Square / X |
+| Switch weapon | Q / E or mouse wheel (plus the game keys) | L1 / R1 |
 
 Main menu with a controller: D-pad or stick to navigate, Cross/A or Options to confirm, Circle/B to go back.
 

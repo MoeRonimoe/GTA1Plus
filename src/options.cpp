@@ -54,6 +54,9 @@ namespace options
             { Type::Choice, text::OptTilt, &g_cfg.tilt, false, 0, 2, 1, { text::OptOff, text::InVehicle, text::TiltAlways } },
             { Type::Degrees, text::OptTiltAngle, &g_cfg.tiltAngle, false, 0, 45, 5 },
             { Type::Bool, text::OptTiltRotate, &g_cfg.tiltRotate },
+            { Type::Choice, text::OptVehicleView, &g_cfg.vehicleView, false, 0, 3, 1,
+              { text::ViewGame, text::ViewHigh, text::ViewHigher, text::ViewMax } },
+            { Type::Int, text::OptTrafficRange, &g_cfg.trafficRange, false, 100, 250, 25 },
 
             { Type::Header, text::OptGroupGameplay },
             { Type::Bool, text::OptAutosave, &g_cfg.autosave },

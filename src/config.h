@@ -35,6 +35,8 @@ struct Config
     int  tilt                = 0;    // Kippkamera wie in Chinatown Wars: 0 aus, 1 im Fahrzeug, 2 immer
     int  tiltAngle           = 35;   // Neigung in Grad
     bool tiltRotate          = true; // im Fahrzeug dreht sich das Bild mit (Fahrtrichtung oben)
+    int  vehicleView         = 0;    // Kamerahöhe im Fahrzeug: 0 wie im Spiel, 1 hoch, 2 sehr hoch, 3 maximal
+    int  trafficRange        = 100;  // Prozent: Sichtbereich, außerhalb dessen Verkehr entsteht und verschwindet
 
     // [Keys]
     int mapKey          = 'M';
@@ -44,6 +46,8 @@ struct Config
     int moveDownKey     = 'S';
     int moveRightKey    = 'D';
     int enterExitKey    = 'F';
+    int prevWeaponKey   = 'Q';     // zusätzlich zu den Tasten aus den Spieleinstellungen und dem Mausrad
+    int nextWeaponKey   = 'E';
 
     // [PlayerColors] Farbvariante der Spielfigur je Charakter (0 = wie im Original)
     int playerColors[8] = { 0, 1, 31, 35, 40, 44, 0, 50 };
@@ -71,3 +75,13 @@ extern Config g_cfg;
 void LoadConfig(const wchar_t* iniPath);
 // Einen geänderten Wert aus g_cfg (Adresse des Felds) in die INI zurückschreiben
 bool SaveConfigValue(const void* value);
+
+// Fahrzeugkamera für [Camera] VehicleView: Höhe und zoom wie beim Spiel zwischen stehend (80/126) und schneller
+// Fahrt (268/90, gemessen in 1.0.0.1); 0/0 = wie im Spiel
+inline void VehicleCameraView(int view, int& height, int& zoom)
+{
+    static const float kShare[] = { 0.0f, 0.4f, 0.7f, 1.0f };
+    const float t = view > 0 && view < 4 ? kShare[view] : 0.0f;
+    height = t > 0 ? (int)(80 + t * 188) : 0;
+    zoom = t > 0 ? (int)(126 - t * 36) : 0;
+}

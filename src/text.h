@@ -105,6 +105,12 @@ namespace text
         OptTiltAngle,
         OptTiltRotate,
         TiltAlways,
+        OptVehicleView,
+        OptTrafficRange,
+        ViewGame,
+        ViewHigh,
+        ViewHigher,
+        ViewMax,
         Count
     };
 

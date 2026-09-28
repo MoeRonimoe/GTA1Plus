@@ -19,7 +19,7 @@ namespace text
             L"HintActive", L"HintMenu", L"HintMap", L"HintMinimap",
             L"HelpMapMouse", L"HelpMapMouseNoWaypoints",
             L"HintBurning", L"PadJumpButton", L"KeySpace",
-            L"MenuBriefings", L"MenuSave", L"MenuLoad", L"MenuOptions", L"OptOn", L"OptOff", L"OptRestart", L"OptGroupDisplay", L"OptGroupControls", L"OptGroupCamera", L"OptGroupGameplay", L"OptGroupOther", L"OptMinimap", L"OptMinimapOnStart", L"OptHint", L"OptGps", L"OptGpsArrow", L"OptWaypoints", L"OptHearts", L"OptMapStyle", L"OptMinimapCorner", L"OptPauseGame", L"OptTwinStick", L"OptAlwaysAim", L"OptWasdDriving", L"OptController", L"OptCamera", L"OptCameraMouseVehicle", L"OptRangeFoot", L"OptRangeVehicle", L"OptDeadZone", L"OptSteady", L"OptKeepMultiplier", L"OptAllCharacters", L"OptQuickRetry", L"OptExtinguish", L"OptPortraitColors", L"OptAutosave", L"OptLanguage", L"OptShowInfo", L"CornerBottomLeft", L"CornerBottomRight", L"CornerTopLeft", L"CornerTopRight", L"LanguageAuto", L"HelpOptions", L"BriefingsEmpty", L"HelpBriefings", L"SaveDone", L"SaveBlocked", L"SaveFailed", L"LoadTitle", L"LoadText", L"LoadDone", L"LoadFailed", L"NoSave", L"AutoSaved", L"SaveSlotInfo", L"StartLoadTitle", L"StartLoadText", L"OptTilt", L"OptTiltAngle", L"OptTiltRotate", L"TiltAlways",
+            L"MenuBriefings", L"MenuSave", L"MenuLoad", L"MenuOptions", L"OptOn", L"OptOff", L"OptRestart", L"OptGroupDisplay", L"OptGroupControls", L"OptGroupCamera", L"OptGroupGameplay", L"OptGroupOther", L"OptMinimap", L"OptMinimapOnStart", L"OptHint", L"OptGps", L"OptGpsArrow", L"OptWaypoints", L"OptHearts", L"OptMapStyle", L"OptMinimapCorner", L"OptPauseGame", L"OptTwinStick", L"OptAlwaysAim", L"OptWasdDriving", L"OptController", L"OptCamera", L"OptCameraMouseVehicle", L"OptRangeFoot", L"OptRangeVehicle", L"OptDeadZone", L"OptSteady", L"OptKeepMultiplier", L"OptAllCharacters", L"OptQuickRetry", L"OptExtinguish", L"OptPortraitColors", L"OptAutosave", L"OptLanguage", L"OptShowInfo", L"CornerBottomLeft", L"CornerBottomRight", L"CornerTopLeft", L"CornerTopRight", L"LanguageAuto", L"HelpOptions", L"BriefingsEmpty", L"HelpBriefings", L"SaveDone", L"SaveBlocked", L"SaveFailed", L"LoadTitle", L"LoadText", L"LoadDone", L"LoadFailed", L"NoSave", L"AutoSaved", L"SaveSlotInfo", L"StartLoadTitle", L"StartLoadText", L"OptTilt", L"OptTiltAngle", L"OptTiltRotate", L"TiltAlways", L"OptVehicleView", L"OptTrafficRange", L"ViewGame", L"ViewHigh", L"ViewHigher", L"ViewMax",
         };
 
         struct LangTable
@@ -107,6 +107,12 @@ namespace text
                 L"Neigung der Kippkamera",
                 L"Bild dreht mit dem Fahrzeug",
                 L"immer",
+                L"Kamerahöhe im Fahrzeug",
+                L"Entfernung für neuen Verkehr",
+                L"wie im Spiel",
+                L"hoch",
+                L"sehr hoch",
+                L"maximal",
             } },
             { L"en", {
                 L"PAUSED", L"Resume", L"Map & waypoints", L"Map", L"Quit level",
@@ -186,6 +192,12 @@ namespace text
                 L"Tilt angle",
                 L"Picture turns with vehicle",
                 L"always",
+                L"Camera height in vehicles",
+                L"Traffic spawn distance",
+                L"as in the game",
+                L"high",
+                L"very high",
+                L"maximum",
             } },
             { L"fr", {
                 L"PAUSE", L"Reprendre", L"Carte et repères", L"Carte", L"Quitter le niveau",
@@ -265,6 +277,12 @@ namespace text
                 L"Angle d'inclinaison",
                 L"L'image tourne avec le véhicule",
                 L"toujours",
+                L"Hauteur caméra en véhicule",
+                L"Distance d'apparition du trafic",
+                L"comme le jeu",
+                L"haute",
+                L"très haute",
+                L"maximale",
             } },
             { L"it", {
                 L"PAUSA", L"Riprendi", L"Mappa e segnaposti", L"Mappa", L"Esci dal livello",
@@ -344,6 +362,12 @@ namespace text
                 L"Angolo di inclinazione",
                 L"L'immagine ruota col veicolo",
                 L"sempre",
+                L"Altezza telecamera nei veicoli",
+                L"Distanza di comparsa del traffico",
+                L"come il gioco",
+                L"alta",
+                L"molto alta",
+                L"massima",
             } },
         };
         constexpr int kBuiltinCount = sizeof(kBuiltin) / sizeof(kBuiltin[0]);

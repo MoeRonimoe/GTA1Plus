@@ -164,6 +164,10 @@ void ModInit(HMODULE self)
         gta1::SetBeforeHudCallback(&tiltcam::Warp);
         if (!gta1::SetCameraOverride(&tiltcam::BeginFrame))
             LOG("Kippkamera: Spielcode passt nicht");
+        int vehicleHeight, vehicleZoom;
+        VehicleCameraView(g_cfg.vehicleView, vehicleHeight, vehicleZoom);
+        if (!gta1::SetViewOptions(g_cfg.trafficRange / 100.0f, vehicleHeight, vehicleZoom))
+            LOG("Sichtbereich und Fahrzeugkamera: Spielcode passt nicht");
         if (g_cfg.keepMultiplier)
             LOG("Multiplikator bei Verhaftung behalten: %s", gta1::EnableKeepMultiplier() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.allCharacters)

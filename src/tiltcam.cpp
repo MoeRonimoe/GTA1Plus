@@ -19,6 +19,9 @@ namespace tiltcam
         constexpr float kFocal = 2.0f;         // Brennweite der gedachten Kamera in Bildhöhen (größer = flacher)
         constexpr float kPivotLow = 0.17f;     // so weit rückt die Figur gekippt unter die Bildmitte (Bildhöhen)
         constexpr float kMaxShrink = 3.5f;
+        // Größter Bereich, den das Spiel vollständig zeichnet: bei schneller Fahrt nutzt es selbst eine halbe Breite
+        // von etwa 1160 Weltpixeln (ViewRect: (Höhe + 384) * 160 / zoom, zoom = focal * 320 / 800)
+        constexpr float kMaxHalfWidth = 1200.0f;
 
         // Abbildung eines Bildes: Ausgabepunkt -> Bodenpunkt relativ zur Figur (Pixel des ungekippten Spielbilds)
         struct View
@@ -31,6 +34,7 @@ namespace tiltcam
             float squash = 1;          // senkrechter Bildfaktor des Spiels
             int width = 0, height = 0;
             float shrink = 1;          // so viel kleiner hat das Spiel dieses Bild gezeichnet
+            float scale = 1;           // Bodenpixel je Ausgabepixel an der Figur (< 1: gegenüber dem Spiel vergrößert)
         };
 
         View g_next;                   // für das Bild, das gerade gezeichnet wird
@@ -68,15 +72,16 @@ namespace tiltcam
             const float lx = t / v.focal * (ox - v.pivotX);
             const float ly = t * (y * c - s) + v.focal * s;
             const float cr = std::cos(v.rot), sr = std::sin(v.rot);
-            gx = cr * lx - sr * ly;
-            gy = (sr * lx + cr * ly) * v.squash;
+            gx = (cr * lx - sr * ly) * v.scale;
+            gy = (sr * lx + cr * ly) * v.squash * v.scale;
             return true;
         }
 
         bool FromGround(const View& v, float gx, float gy, float& ox, float& oy)
         {
             const float cr = std::cos(v.rot), sr = std::sin(v.rot);
-            const float yy = gy / v.squash;
+            gx /= v.scale;
+            const float yy = gy / (v.squash * v.scale);
             const float lx = cr * gx + sr * yy;
             const float ly = -sr * gx + cr * yy;
             const float c = std::cos(v.tilt), s = std::sin(v.tilt);
@@ -141,37 +146,54 @@ namespace tiltcam
         v.pivotY = buf.height * (0.5f + kPivotLow * blend);
         v.squash = cam.squash;
 
-        // Welcher Bereich des ungekippten Bildes (relativ zur Figur) wird gebraucht? Rand der Ausgabe abtasten
-        float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
-        constexpr int kSteps = 12;
-        for (int i = 0; i <= kSteps; ++i)
-        {
-            const float fx = (v.width - 1) * i / (float)kSteps, fy = (v.height - 1) * i / (float)kSteps;
-            const float pts[4][2] = { { fx, 0 }, { fx, (float)v.height - 1 }, { 0, fy }, { (float)v.width - 1, fy } };
-            for (const auto& p : pts)
-            {
-                float gx, gy;
-                if (!ToGround(v, p[0], p[1], gx, gy))
-                    continue;
-                minX = std::min(minX, gx);
-                maxX = std::max(maxX, gx);
-                minY = std::min(minY, gy);
-                maxY = std::max(maxY, gy);
-            }
-        }
-        if (minX > maxX)
-            return;
-
-        // Bildmitte: vom Spiel (mit seiner Vorausschau) zur Mitte des gebrauchten Bereichs überblenden,
-        // Verkleinerung so, dass der Bereich um diese Mitte ganz ins Bild passt
+        // Bildmitte: vom Spiel (mit seiner Vorausschau) zur Mitte des gebrauchten Bereichs überblenden
         const float depth = cam.height + cam.playerZ;
         const float ppw = cam.focal / depth; // Bildpixel je Weltpixel in Höhe der Figur
         const float gameX = (cam.x - cam.playerX) * ppw, gameY = (cam.y - cam.playerY) * ppw * cam.squash;
-        const float dx = gameX + ((minX + maxX) * 0.5f - gameX) * blend;
-        const float dy = gameY + ((minY + maxY) * 0.5f - gameY) * blend;
-        const float needX = std::max(std::abs(minX - dx), std::abs(maxX - dx)) / (v.width * 0.5f - 2);
-        const float needY = std::max(std::abs(minY - dy), std::abs(maxY - dy)) / (v.height * 0.5f - 2);
-        const float shrink = std::min(std::max(1.0f, std::max(needX, needY) * 1.01f), kMaxShrink);
+        float need = 1, dx = 0, dy = 0;
+        // Welcher Bereich des ungekippten Bildes (relativ zur Figur) wird gebraucht? Rand der Ausgabe abtasten;
+        // need = nötige Verkleinerung, damit er um die Mitte (dx, dy) ganz ins Bild passt
+        auto measure = [&]() -> bool
+        {
+            float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
+            constexpr int kSteps = 12;
+            for (int i = 0; i <= kSteps; ++i)
+            {
+                const float fx = (v.width - 1) * i / (float)kSteps, fy = (v.height - 1) * i / (float)kSteps;
+                const float pts[4][2] = { { fx, 0 }, { fx, (float)v.height - 1 }, { 0, fy }, { (float)v.width - 1, fy } };
+                for (const auto& p : pts)
+                {
+                    float gx, gy;
+                    if (!ToGround(v, p[0], p[1], gx, gy))
+                        continue;
+                    minX = std::min(minX, gx);
+                    maxX = std::max(maxX, gx);
+                    minY = std::min(minY, gy);
+                    maxY = std::max(maxY, gy);
+                }
+            }
+            if (minX > maxX)
+                return false;
+            dx = gameX + ((minX + maxX) * 0.5f - gameX) * blend;
+            dy = gameY + ((minY + maxY) * 0.5f - gameY) * blend;
+            const float needX = std::max(std::abs(minX - dx), std::abs(maxX - dx)) / (v.width * 0.5f - 2);
+            const float needY = std::max(std::abs(minY - dy), std::abs(maxY - dy)) / (v.height * 0.5f - 2);
+            need = std::max(needX, needY) * 1.01f;
+            return true;
+        };
+        if (!measure())
+            return;
+        // Einen größeren Bereich zeichnet das Spiel nicht vollständig (z.B. mit weit herausgezoomter Fahrzeugkamera).
+        // Dann zeigt die gekippte Ansicht einen kleineren Ausschnitt statt leerer Ränder.
+        const float halfWidth = (cam.height + 384) * 160 / (cam.focal * 0.4f);
+        const float maxShrink = std::clamp(kMaxHalfWidth / halfWidth, 1.0f, kMaxShrink);
+        for (int i = 0; i < 3 && need > maxShrink; ++i)
+        {
+            v.scale *= maxShrink / need;
+            if (!measure())
+                return;
+        }
+        const float shrink = std::clamp(need, 1.0f, maxShrink);
 
         float used = 1;
         if (!gta1::OverrideRenderCamera(cam.playerX + dx / ppw, cam.playerY + dy / (ppw * cam.squash), shrink, used))
@@ -229,8 +251,8 @@ namespace tiltcam
             }
             // In jeder Zeile hängt die Quelle linear von x ab
             const float t = v.focal * c / d;
-            const float k = t / v.focal;
-            const float ly = t * (y * c - s) + v.focal * s;
+            const float k = t / v.focal * v.scale;
+            const float ly = (t * (y * c - s) + v.focal * s) * v.scale;
             const float lx0 = -k * v.pivotX;
             const float sx0 = psx + (cr * lx0 - sr * ly) * inv;
             const float sy0 = psy + (sr * lx0 + cr * ly) * v.squash * inv;

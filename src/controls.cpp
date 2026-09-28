@@ -30,9 +30,9 @@ namespace controls
         constexpr uint32_t kBrake = 0x00000080, kBrakeBits = 0x00006000; // 0..3 in Bit 13-14
         constexpr uint32_t kJump = 0x00000004, kJumpHeld = 0x00100000;
         constexpr uint32_t kFire = 0x00000008, kFireHeld = 0x00200000;
-        constexpr uint32_t kPrev = 0x00000010, kPrevHeld = 0x00040000;
-        constexpr uint32_t kNext = 0x00000020, kNextHeld = 0x00080000;
-        constexpr uint32_t kSpecial = 0x00000100, kSpecialHeld = 0x00020000;
+        constexpr uint32_t kWeaponNext = 0x00000010, kWeaponNextHeld = 0x00040000;
+        constexpr uint32_t kHorn = 0x00000020, kHornHeld = 0x00080000;         // im Fahrzeug Hupe, zu Fuß Pfiff
+        constexpr uint32_t kWeaponPrev = 0x00000100, kWeaponPrevHeld = 0x00020000;
         constexpr uint32_t kEnterExit = 0x00400000; // nur Druck-Ereignis
 
         struct Intent
@@ -43,7 +43,7 @@ namespace controls
             bool angleValid = false; // Blickrichtung zu Fuß setzen
             int angle = 0;
             int renderAngle = -1;    // Seitwärtslaufen: Blickrichtung nur fürs Zeichnen (angle = Laufrichtung)
-            bool fire = false, jump = false, next = false, prev = false, special = false, enterExit = false;
+            bool fire = false, jump = false, weaponNext = false, weaponPrev = false, horn = false, enterExit = false;
         };
 
         using XInputGetState_t = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
@@ -53,10 +53,12 @@ namespace controls
         WORD g_padPrev = 0;
 
         bool g_driving = false;
-        bool g_sentFire = false, g_sentJump = false, g_sentNext = false, g_sentPrev = false, g_sentSpecial = false;
+        bool g_sentFire = false, g_sentJump = false, g_sentWeaponNext = false, g_sentWeaponPrev = false, g_sentHorn = false;
 
         bool g_crosshair = false;
         float g_crossX = 0, g_crossY = 0;
+        int   g_wheel = 0;              // ausstehende Mausrad-Schritte: + nächste, - vorherige Waffe
+        bool  g_wheelPulse = false;     // eben einen Schritt gesendet, im nächsten Paket einmal loslassen
         bool  g_crossStick = false;     // Fadenkreuz vom rechten Stick: Punkt im Spielbild statt Mausposition
         DWORD g_mouseMoved = 0;
         // Zuletzt benutztes Gerät: Solange der Controller aktiv ist, zählt die (stehende) Maus weder fürs Zielen
@@ -604,6 +606,25 @@ namespace controls
             }
         }
 
+        // Waffenwechsel mit eigenen Tasten und dem Mausrad, zusätzlich zu den Tasten aus den Spieleinstellungen
+        // (dort Y/X unten links, bei WASD kaum erreichbar)
+        void GatherWeapons(Intent& in)
+        {
+            in.weaponPrev |= Key(g_cfg.prevWeaponKey);
+            in.weaponNext |= Key(g_cfg.nextWeaponKey);
+            if (g_wheelPulse)
+            {
+                g_wheelPulse = false;
+                return;
+            }
+            if (g_wheel != 0)
+            {
+                (g_wheel > 0 ? in.weaponNext : in.weaponPrev) = true;
+                g_wheel += g_wheel > 0 ? -1 : 1;
+                g_wheelPulse = true;
+            }
+        }
+
         void GatherPad(Intent& in, const XINPUT_STATE& s, bool onFoot)
         {
             const XINPUT_GAMEPAD& g = s.Gamepad;
@@ -622,9 +643,13 @@ namespace controls
             if (pressed & XINPUT_GAMEPAD_Y)
                 in.enterExit = true;
             in.jump |= (g.wButtons & XINPUT_GAMEPAD_A) != 0;
-            in.special |= (g.wButtons & XINPUT_GAMEPAD_X) != 0;
-            in.prev |= (g.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) != 0;
-            in.next |= (g.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) != 0;
+            // Quadrat/X: zu Fuß springen wie in späteren GTA-Teilen, im Fahrzeug hupen
+            if (onFoot)
+                in.jump |= (g.wButtons & XINPUT_GAMEPAD_X) != 0;
+            else
+                in.horn |= (g.wButtons & XINPUT_GAMEPAD_X) != 0;
+            in.weaponPrev |= (g.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) != 0;
+            in.weaponNext |= (g.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) != 0;
 
             if (onFoot)
             {
@@ -753,6 +778,8 @@ namespace controls
             GatherKeyboardMouse(in, onFoot);
             if (havePad)
                 GatherPad(in, pad, onFoot);
+            if (focus)
+                GatherWeapons(in);
             if (!focus)
             {
                 g_camTargetX = g_camTargetY = 0;
@@ -796,9 +823,9 @@ namespace controls
 
         packet = WriteHeld(packet, kFire, kFireHeld, !lying && (kb.fire || in.fire), g_sentFire);
         packet = WriteHeld(packet, kJump, kJumpHeld, !jumpForFire && jumpHeld, g_sentJump);
-        packet = WriteHeld(packet, kNext, kNextHeld, !lying && (kb.next || in.next), g_sentNext);
-        packet = WriteHeld(packet, kPrev, kPrevHeld, !lying && (kb.prev || in.prev), g_sentPrev);
-        packet = WriteHeld(packet, kSpecial, kSpecialHeld, !lying && (kb.special || in.special), g_sentSpecial);
+        packet = WriteHeld(packet, kWeaponNext, kWeaponNextHeld, !lying && (kb.weaponNext || in.weaponNext), g_sentWeaponNext);
+        packet = WriteHeld(packet, kWeaponPrev, kWeaponPrevHeld, !lying && (kb.weaponPrev || in.weaponPrev), g_sentWeaponPrev);
+        packet = WriteHeld(packet, kHorn, kHornHeld, !lying && (kb.horn || in.horn), g_sentHorn);
         if (lying)
             packet &= ~kEnterExit;
         else if (in.enterExit)
@@ -896,6 +923,10 @@ namespace controls
         case WM_RBUTTONDOWN: g_down[VK_RBUTTON] = !overlay::MenuActive(); break;
         case WM_RBUTTONUP:   g_down[VK_RBUTTON] = false; break;
         case WM_MOUSEMOVE:   break;
+        case WM_MOUSEWHEEL:
+            if (!overlay::MenuActive() && gta1::InGame())
+                g_wheel = std::clamp(g_wheel - GET_WHEEL_DELTA_WPARAM(msg.wParam) / WHEEL_DELTA, -3, 3);
+            return;
         default:
             return;
         }

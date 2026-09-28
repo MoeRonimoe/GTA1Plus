@@ -73,6 +73,9 @@ namespace gta1
     // Nur darin OverrideRenderCamera aufrufen: Mittelpunkt (Weltpixel) und Verkleinerung (>= 1) gelten bis nach
     // dem Zeichnen, dann stellt gta1 alles wieder her. used = tatsächliche Verkleinerung (ganzzahlige Kamerawerte)
     bool SetCameraOverride(void (*cb)());
+    // Sichtbereich der Spiellogik um diesen Faktor vergrößern (Verkehr entsteht und verschwindet weiter draußen)
+    // und feste Fahrzeugkamera aus Höhe und zoom (0 = wie im Spiel); auch während des Spiels änderbar
+    bool SetViewOptions(float viewRectScale, int vehicleHeight, int vehicleZoom);
     bool OverrideRenderCamera(float centerX, float centerY, float shrink, float& used);
     // Läuft, wenn die Welt fertig gezeichnet ist und bevor das Spiel sein HUD darüberlegt
     void SetBeforeHudCallback(void (*cb)());
@@ -133,7 +136,7 @@ namespace gta1
     {
         int steer;       // -7 .. 7
         int gas, brake;  // 0 .. 3
-        bool jump, fire, next, prev, special;
+        bool jump, fire, horn, weaponNext, weaponPrev;
     };
     KeyboardInput GetKeyboardInput();
 
