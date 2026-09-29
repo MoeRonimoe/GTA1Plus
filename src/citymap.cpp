@@ -202,6 +202,10 @@ bool CityMap::Load(const std::string& cmpPath)
         m_cityName = L"San Andreas";
     else if (lower == "miami.cmp")
         m_cityName = L"Vice City";
+    else if (lower == "uk.cmp")
+        m_cityName = L"London 1969";
+    else if (lower == "uke.cmp")
+        m_cityName = L"London 1961";
     else
         m_cityName.assign(file.begin(), file.end() - std::min<size_t>(4, file.size()));
 

@@ -1788,19 +1788,30 @@ namespace gta1
                 continue;
             }
             p += keyLen;
-            const int n = (int)(len - keyLen);
-            // Die Texte des R2P-Pakets sind UTF-8, die der Original-CD Windows-1252
+            // Die Texte des R2P-Pakets sind UTF-8, die der Original-CD Windows-1252. London (R2P) schreibt Sonderzeichen
+            // als 0x83 + (zweites UTF-8-Byte - 0x80), z.B. "bi\x83\x1Fchen" = "bißchen": zurück in UTF-8 (0xC3 ..)
+            std::string text(p, len - keyLen);
+            for (size_t k = 0; k + 1 < text.size(); ++k)
+            {
+                const unsigned char next = (unsigned char)text[k + 1];
+                if ((unsigned char)text[k] == 0x83 && next < 0x40)
+                {
+                    text[k] = (char)0xC3;
+                    text[k + 1] = (char)(next + 0x80);
+                    ++k;
+                }
+            }
             UINT cp = CP_UTF8;
-            int w = MultiByteToWideChar(cp, MB_ERR_INVALID_CHARS, p, n, nullptr, 0);
+            int w = MultiByteToWideChar(cp, MB_ERR_INVALID_CHARS, text.data(), (int)text.size(), nullptr, 0);
             if (w <= 0)
             {
                 cp = 1252;
-                w = MultiByteToWideChar(cp, 0, p, n, nullptr, 0);
+                w = MultiByteToWideChar(cp, 0, text.data(), (int)text.size(), nullptr, 0);
             }
             if (w <= 0)
                 return false;
             out.resize(w);
-            MultiByteToWideChar(cp, 0, p, n, &out[0], w);
+            MultiByteToWideChar(cp, 0, text.data(), (int)text.size(), &out[0], w);
             return true;
         }
         return false;
