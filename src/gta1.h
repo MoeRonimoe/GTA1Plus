@@ -101,7 +101,8 @@ namespace gta1
     bool EnableQuickRetry();       // nach "MISSION FEHLGESCHLAGEN" Skriptpausen bis zum Neuaufbau verkürzen
     bool EnableSteadyCamera();     // Kamera folgt enger statt zu schwimmen (Patch aus GTAforums: shl 5 -> shl 2)
 
-    // Ereignisse aus dem Missionsskript (Spiel-Thread): Ansage mit Textnummer, geschaffte Mission
+    // Ereignisse aus dem Missionsskript (Spiel-Thread): Ansage mit Textnummer, geschaffte Mission (bei Telefonmissionen,
+    // sobald das Skript die Telefongruppe wieder einschaltet - in San Andreas also am Ende einer ganzen Kette)
     enum class ScriptEvent { Brief, MissionEnd };
     bool SetScriptEventCallback(void (*cb)(ScriptEvent event, int value));
     // Eine Telefonmission läuft gerade (auch gescheitert, solange der neue Versuch aussteht)

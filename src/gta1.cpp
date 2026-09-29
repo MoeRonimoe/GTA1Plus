@@ -1204,17 +1204,20 @@ namespace gta1
         // Für einen neuen Versuch sichern wir beim Abheben die ganze Objekttabelle und stellen nach dem Fehlschlag
         // Zähler, umgewandelte Objekte und das Telefon wieder her.
         constexpr int32_t kObjCounter = 12;
-        constexpr DWORD   kRestoreTimeout = 900000;  // so lange wartet ein gescheiterter Missionsstand auf die Freigabe
+        constexpr DWORD   kGroupWindow = 5000;       // so lange nach dem Abheben gilt ein DISABLE als die eigene Telefongruppe
         struct PhoneGroup { int line = -1, count = 0; int32_t handles[8] = {}; };
+        // Eine Telefonmission vom Abheben, bis das Skript ihre Telefongruppe wieder einschaltet. Liberty City tut das
+        // nach jeder Mission, San Andreas erst am Ende einer Kette aus mehreren Missionen: dort meldet jeder Teil
+        // MISSION_END, und ein gescheiterter Teil führt direkt zum nächsten.
         struct MissionLog
         {
-            bool active = false, failed = false;
-            DWORD failTick = 0;
+            bool active = false, failed = false, succeeded = false;
+            DWORD startTick = 0;
             int phoneLine = -1;
             int32_t phoneHandle = -1;
             int slots = 0;                   // Anzahl gesicherter Objekte
             std::vector<uint8_t> start;      // Objekttabelle beim Abheben
-            std::vector<int> converted;      // von der Mission umgewandelte Objekte (bis zum Fehlschlag)
+            std::vector<int> groups;         // Telefongruppen (MPHONES/PHONE_TOGG), die das Skript beim Abheben abschaltet
             std::vector<int> paid;           // Zeilen, die in diesem Versuch schon Punkte ausgezahlt haben
         };
         PhoneGroup s_phones;
@@ -1254,6 +1257,7 @@ namespace gta1
                     continue;
                 s_mission = MissionLog();
                 s_mission.active = true;
+                s_mission.startTick = GetTickCount();
                 s_mission.phoneLine = s_phones.line + k;
                 s_mission.phoneHandle = s_phones.handles[k];
                 s_mission.slots = ObjectSlotCount();
@@ -1265,30 +1269,27 @@ namespace gta1
             }
         }
 
-        // Beim Fehlschlag: welche Objekte hat die Mission bis hierher umgewandelt?
-        void NoteConversions()
-        {
-            s_mission.converted.clear();
-            for (int i = 0; i < s_mission.slots; ++i)
-                if (SlotType(ObjectSlot(i)) != SlotType(&s_mission.start[i * addr::ScriptObjSize]))
-                    s_mission.converted.push_back(i);
-        }
-
         // Gibt das Skript nach dem Fehlschlag die Telefongruppe wieder frei (ENABLE auf MPHONES/PHONE_TOGG), steht
         // die gescheiterte Mission wieder zur Wahl, als wäre sie nie angenommen worden. Das geschieht genau dort,
         // bevor das Skript prüft, welche Missionen noch zu haben sind (Liberty City: COMPARE auf 548..551).
         // Die Aufräumbefehle davor sind je Mission verschieden (die dritte in Liberty City setzt erst Power-ups).
         void RestoreMission()
         {
-            if (ObjectSlotCount() != s_mission.slots || GetTickCount() - s_mission.failTick > kRestoreTimeout)
+            if (ObjectSlotCount() != s_mission.slots)
             {
-                LOG("Gemerkter Missionsstand verworfen (anderes Level oder zu alt)");
+                LOG("Gemerkter Missionsstand verworfen (anderes Level)");
                 s_mission = MissionLog();
                 return;
             }
             // Umgewandelte Objekte wieder in den Ausgangszustand (z.B. FUTURECAR mit Modell statt Auto-Handle)
-            for (int slot : s_mission.converted)
-                memcpy(ObjectSlot(slot), &s_mission.start[slot * addr::ScriptObjSize], addr::ScriptObjSize);
+            int converted = 0;
+            for (int i = 0; i < s_mission.slots; ++i)
+            {
+                if (SlotType(ObjectSlot(i)) == SlotType(&s_mission.start[i * addr::ScriptObjSize]))
+                    continue;
+                memcpy(ObjectSlot(i), &s_mission.start[i * addr::ScriptObjSize], addr::ScriptObjSize);
+                ++converted;
+            }
             // Zähler auf den Stand vor der Mission
             int counters = 0;
             for (int i = 0; i < s_mission.slots; ++i)
@@ -1312,7 +1313,7 @@ namespace gta1
                 paid->score = 0;
             }
             LOG("Neuer Versuch möglich: Telefon aus Zeile %d klingelt wieder, %d Objekte und %d Zähler zurückgesetzt",
-                s_mission.phoneLine, (int)s_mission.converted.size(), counters);
+                s_mission.phoneLine, converted, counters);
             s_mission = MissionLog();
         }
 
@@ -1350,7 +1351,7 @@ namespace gta1
                 return;
             const int32_t score = CurrentScore();
             const int prev = s_procLine[proc] - 1;
-            if (prev >= 0 && s_mission.active && !s_mission.failed)
+            if (prev >= 0 && s_mission.active)
             {
                 const ScriptLine* left = reinterpret_cast<const ScriptLine*>(A.ScriptLines + prev * sizeof(ScriptLine));
                 if (left->score > 0 && !IsTextCommand(left->command) && score - s_procScore[proc] >= left->score &&
@@ -1370,6 +1371,30 @@ namespace gta1
         bool s_quickRetry = false;
         void (*s_scriptEvent)(ScriptEvent event, int value) = nullptr;
 
+        // Objekt einer Telefongruppe (MPHONES/PHONE_TOGG) aus der Zeile <line>
+        bool IsPhoneGroup(int line)
+        {
+            const uint8_t* o = ScriptObject(line);
+            const int32_t type = o ? SlotType(o) : -1;
+            return type == kObjMPhones || type == kObjPhoneToggle;
+        }
+
+        // Die eigene Telefongruppe ist wieder frei: Mission bzw. Kette vorbei. Gab es einen Fehlschlag, klingelt das
+        // Telefon mit schnellem neuen Versuch wieder, sonst wird (nach einem geschafften Teil) automatisch gespeichert.
+        void EndMission()
+        {
+            if (s_mission.failed && s_quickRetry)
+            {
+                RestoreMission();
+                return;
+            }
+            const bool save = s_mission.succeeded;
+            LOG("Telefonmission vorbei (%s)", s_mission.failed ? "mit Fehlschlag" : save ? "geschafft" : "ohne Ergebnis");
+            s_mission = MissionLog();
+            if (save && s_scriptEvent)
+                s_scriptEvent(ScriptEvent::MissionEnd, 0);
+        }
+
         void __cdecl OnScriptCommand(uint32_t command, ScriptLine* line)
         {
             const int proc = *reinterpret_cast<int16_t*>(A.ScriptProc);
@@ -1384,9 +1409,6 @@ namespace gta1
                 case CmdBrief: case CmdSpeechBrief: case CmdMobileBrief: case CmdPBrief: case CmdPBriefTimed:
                 case CmdFrenzyBrief: case CmdKfBriefTimed: case CmdKfBriefGeneral:
                     s_scriptEvent(ScriptEvent::Brief, line->score);
-                    break;
-                case CmdMissionEnd:
-                    s_scriptEvent(ScriptEvent::MissionEnd, 0);
                     break;
                 default:
                     break;
@@ -1413,18 +1435,36 @@ namespace gta1
                 WatchPhones(line);
                 break;
             case CmdMissionEnd:
-                s_mission.active = false; // geschafft, nichts zurücksetzen
+                // Mitten in einer Telefonmission (Kette) erst speichern, wenn die Gruppe wieder frei ist
+                if (s_mission.active)
+                    s_mission.succeeded = true;
+                else if (s_scriptEvent)
+                    s_scriptEvent(ScriptEvent::MissionEnd, 0);
+                break;
+            case CmdMessageBrief:
+                if (line->score == kBriefMissionFailed && s_mission.active)
+                    s_mission.failed = true;
+                break;
+            case CmdDisable:
+                // Direkt nach dem Abheben schaltet das Skript seine Telefongruppe ab; ihr ENABLE beendet die Mission
+                if (s_mission.active && GetTickCount() - s_mission.startTick < kGroupWindow && IsPhoneGroup(line->obj) &&
+                    std::find(s_mission.groups.begin(), s_mission.groups.end(), line->obj) == s_mission.groups.end())
+                {
+                    s_mission.groups.push_back(line->obj);
+                    LOG("Telefongruppe aus Zeile %d gehört zur Mission, ihr Wiedereinschalten beendet sie", line->obj);
+                }
+                break;
+            case CmdEnable:
+                if (s_mission.active && IsPhoneGroup(line->obj) &&
+                    (s_mission.groups.empty() ||
+                     std::find(s_mission.groups.begin(), s_mission.groups.end(), line->obj) != s_mission.groups.end()))
+                    EndMission();
                 break;
             default:
                 break;
             }
             if (!s_quickRetry)
-            {
-                // Ohne schnellen neuen Versuch nur mitverfolgen, ob eine Telefonmission läuft (für das Speichern)
-                if (command == CmdMessageBrief && line->score == kBriefMissionFailed)
-                    s_mission.active = false;
                 return;
-            }
             TrackRewards(proc, line);
 
             DWORD& failedAt = s_failedAt[proc];
@@ -1436,20 +1476,7 @@ namespace gta1
                     ++s_failedCount;
                 }
                 failedAt = GetTickCount() | 1;
-                if (s_mission.active && !s_mission.failed)
-                {
-                    s_mission.failed = true;
-                    s_mission.failTick = GetTickCount();
-                    NoteConversions();
-                }
                 return;
-            }
-            if (command == CmdEnable && s_mission.active && s_mission.failed)
-            {
-                const uint8_t* o = ScriptObject(line->obj);
-                const int32_t type = o ? *reinterpret_cast<const int32_t*>(o) : -1;
-                if (type == kObjMPhones || type == kObjPhoneToggle)
-                    RestoreMission();
             }
             if (!failedAt)
                 return;
