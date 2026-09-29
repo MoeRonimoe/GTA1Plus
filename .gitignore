@@ -21,3 +21,6 @@
 /idb/
 *.exe
 *.dll
+
+# Weitergabe-Paket (tools\make-package.ps1)
+/dist/

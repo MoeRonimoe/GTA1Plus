@@ -71,6 +71,8 @@ Open `GTA1Plus.sln` in Visual Studio 2022 and build the **Release | x86** config
 - `Release\GTA1Plus\GTA1Plus.asi` is the mod. The colour chart from `assets\` is copied next to it.
 - `Release\Loader\dsound.dll` is the loader.
 
+`tools\make-package.ps1` then puts the files for players into `dist\GTA1Plus` (same layout as the game folder, with the player README from `package\README.txt`) and `dist\GTA1Plus.zip`.
+
 The game addresses are in `src/gta1.cpp`. Code comments are in German.
 
 ### Testing aids
