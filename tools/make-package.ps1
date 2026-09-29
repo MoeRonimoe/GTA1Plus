@@ -12,7 +12,8 @@ $files = @{
     "package\README.txt"                           = "README.txt"
 }
 
-if (Test-Path $pkg) { Remove-Item $pkg -Recurse -Force }
+# Nur die Dateien ersetzen: der Ordner selbst ist oft im Explorer geöffnet und lässt sich dann nicht löschen
+if (Test-Path $pkg) { Get-ChildItem $pkg -Recurse -File | Remove-Item -Force }
 New-Item -ItemType Directory -Force (Join-Path $pkg "scripts") | Out-Null
 foreach ($src in $files.Keys) {
     $from = Join-Path $root $src

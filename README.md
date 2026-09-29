@@ -14,7 +14,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **Twin-stick controls**: WASD movement and mouse aiming on foot, optional strafing (always face the crosshair), and WASD driving.
 - **Controllers**: Xbox (XInput) and PS4/PS5 or other DirectInput pads, in levels and in the main menu.
 - **Steerable camera**: look ahead with the mouse or the right stick.
-- **Steadier camera**: the well-known GTAforums hex patch, applied in memory. The camera follows the character more closely instead of drifting behind. Works in all supported versions.
+- **Steadier camera**: the hex patch shared by amilmand on GTAforums, applied in memory. The camera follows the character more closely instead of drifting behind. Works in all supported versions.
 - **Fixed camera height in vehicles** (optional): keeps the camera high while driving instead of zooming in and out with the speed.
 - **Traffic range** (optional): new traffic appears and old traffic disappears further outside the screen, so you have more time to react. At 200 % cars appear about 5 blocks outside the picture instead of 1.
 - **Tilted camera (prototype, off by default)**: a view in the style of *GTA Chinatown Wars*. The picture is tilted so you see further ahead, and in vehicles it turns with the driving direction. The mod transforms the finished game picture, so buildings keep their top-down look and the picture gets softer. Switch it on in the pause menu (GTA1Plus options → Camera) or with `[Camera] Tilt` in the INI. Needs 32-bit colour.
@@ -44,7 +44,7 @@ London has its own characters, so the portrait colours (made for the GTA1 charac
 2. Copy `GTA1Plus.asi` and `GTA1Plus_PlayerColors.png` into the `scripts` subfolder.
 3. Start the game. `GTA1Plus.ini` and `GTA1Plus_lang.ini` are created on the first start.
 
-The loader forwards DirectSound unchanged and loads every `scripts\*.asi`. It does not hook anything else, so it works alongside the CD-music replacement (`winmm.dll`) of the Ready2Play package. The Ultimate ASI Loader crashes together with that DLL.
+The loader forwards DirectSound unchanged and loads every `scripts\*.asi`. It does not hook anything else, so it works alongside the CD-music replacement (`winmm.dll`) of the Ready2Play package. The Ultimate ASI Loader by ThirteenAG crashes together with that DLL, which is why GTA1Plus brings its own loader.
 
 ## Controls
 

@@ -7,8 +7,6 @@ twin-stick and controller support and more to the original GTA and the
 London expansions. It does not change any game files: it is a plugin that
 is loaded into the running game.
 
-Source code and updates: https://github.com/MoeRonimoe/GTA1Plus
-
 
 -------------------------------------------------------------------------------
   SUPPORTED GAME VERSIONS
@@ -50,8 +48,9 @@ together with the CD music replacement (winmm.dll) of the Ready2Play package.
   - If your game folder already has a dsound.dll from another mod, back it up
     before you replace it.
   - If you already use another ASI loader that loads the scripts folder, you
-    only need the scripts folder. Note: the Ultimate ASI Loader crashes the
-    game together with the Ready2Play music replacement.
+    only need the scripts folder. Note: the Ultimate ASI Loader by
+    ThirteenAG crashes the game together with the Ready2Play music
+    replacement, which is why GTA1Plus brings its own loader.
 
 UNINSTALL: delete dsound.dll and the GTA1Plus files in the scripts folder.
 Your saves are in scripts\GTA1Plus_saves.
@@ -94,7 +93,8 @@ CONTROLS
 CAMERA
   - Look ahead with the mouse (towards the screen edge) or the right stick.
   - Steadier camera: follows the character more closely instead of drifting
-    behind (the well-known GTAforums patch, applied in memory).
+    behind (the hex patch shared by amilmand on GTAforums, applied in
+    memory).
   - Optional fixed camera height in vehicles, e.g. always zoomed out.
   - Optional larger traffic range: new cars appear further outside the
     screen, so you have more time to react.
@@ -173,6 +173,9 @@ Texts can be changed or translated in scripts\GTA1Plus_lang.ini.
 -------------------------------------------------------------------------------
 
   GTA1Plus by MoeRonimoe.
-  Steadier camera: hex patch shared on GTAforums, applied in memory.
+  Steadier camera: hex patch shared by amilmand on GTAforums, applied in
+  memory.
+  Ultimate ASI Loader by ThirteenAG: the ASI plugin format and loading from
+  the scripts folder follow its conventions.
   Grand Theft Auto (c) 1997 DMA Design / Rockstar Games. This mod is a fan
   project and not affiliated with Rockstar Games.
