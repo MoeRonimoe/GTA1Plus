@@ -351,6 +351,7 @@ namespace gta1
 
     static CRITICAL_SECTION s_mapLock;
     static std::string s_mapPath;
+    static std::string s_missionPath;   // Missionsskript des Levels (mission.ini, London: uk/missuk.ini)
     static volatile unsigned s_mapGen = 0;
     static volatile unsigned s_levelLoads = 0;
 
@@ -540,6 +541,18 @@ namespace gta1
         if (h != INVALID_HANDLE_VALUE && name)
         {
             const size_t len = strlen(name);
+            // Missionsskript: wird beim Levelstart vor der Karte gelesen
+            const char* file = std::max(strrchr(name, '\\'), strrchr(name, '/'));
+            file = file ? file + 1 : name;
+            if (len > 4 && _stricmp(name + len - 4, ".ini") == 0 && _strnicmp(file, "miss", 4) == 0)
+            {
+                char full[MAX_PATH];
+                if (!GetFullPathNameA(name, MAX_PATH, full, nullptr))
+                    strcpy_s(full, name);
+                EnterCriticalSection(&s_mapLock);
+                s_missionPath = full;
+                LeaveCriticalSection(&s_mapLock);
+            }
             if (len > 4 && _stricmp(name + len - 4, ".cmp") == 0)
             {
                 char full[MAX_PATH];
@@ -1096,6 +1109,27 @@ namespace gta1
     }
 
     unsigned MapGeneration() { return s_mapGen; }
+
+    std::string MissionFile()
+    {
+        EnterCriticalSection(&s_mapLock);
+        std::string p = s_missionPath;
+        LeaveCriticalSection(&s_mapLock);
+        return p;
+    }
+
+    bool ScriptObjectLines(std::vector<int>& lines)
+    {
+        lines.clear();
+        if (!s_supported || !A.ScriptObjSlot)
+            return false;
+        // Zeilennummer -> Platz in der Objekttabelle, unbenutzte Zeilen sind 0 (der erste Platz fällt dadurch weg)
+        const int16_t* map = reinterpret_cast<const int16_t*>(A.ScriptObjSlot);
+        for (int line = 0; line < 32768; ++line)
+            if (map[line] > 0 && map[line] < 2000)
+                lines.push_back(line);
+        return !lines.empty();
+    }
     unsigned LevelLoads() { return s_levelLoads; }
 
     // ---- Spielregeln ([Gameplay]) ----
@@ -1181,6 +1215,7 @@ namespace gta1
             int slots = 0;                   // Anzahl gesicherter Objekte
             std::vector<uint8_t> start;      // Objekttabelle beim Abheben
             std::vector<int> converted;      // von der Mission umgewandelte Objekte (bis zum Fehlschlag)
+            std::vector<int> paid;           // Zeilen, die in diesem Versuch schon Punkte ausgezahlt haben
         };
         PhoneGroup s_phones;
         MissionLog s_mission;
@@ -1269,9 +1304,61 @@ namespace gta1
             int32_t* phone = ObjectValue(s_mission.phoneLine);
             if (phone && *phone == -1)
                 *phone = s_mission.phoneHandle;
+            // Belohnungen, die der gescheiterte Versuch schon gezahlt hat, gibt es kein zweites Mal
+            for (int index : s_mission.paid)
+            {
+                ScriptLine* paid = reinterpret_cast<ScriptLine*>(A.ScriptLines + index * sizeof(ScriptLine));
+                LOG("Belohnung aus Zeile %d (%d Punkte) wird beim neuen Versuch nicht noch einmal gezahlt", index, paid->score);
+                paid->score = 0;
+            }
             LOG("Neuer Versuch möglich: Telefon aus Zeile %d klingelt wieder, %d Objekte und %d Zähler zurückgesetzt",
                 s_mission.phoneLine, (int)s_mission.converted.size(), counters);
             s_mission = MissionLog();
+        }
+
+        // Belohnungen mitten in einer Mission (z.B. STEAL mit 5000 Punkten, Liberty City Mission 3) sollen bei einem
+        // neuen Versuch nicht noch einmal fließen. Ob eine Zeile gezahlt hat, zeigt der Punktestand: er ist um mindestens
+        // ihren <score> gestiegen, wenn ihr Prozess zur nächsten Zeile weitergeht (der Multiplikator erhöht nur).
+        int     s_procLine[addr::ScriptProcs] = {};   // zuletzt ausgeführte Zeile je Prozess (+1, 0 = keine)
+        int32_t s_procScore[addr::ScriptProcs] = {};  // Punktestand, als der Prozess dort ankam
+
+        int32_t CurrentScore()
+        {
+            const int p = *reinterpret_cast<int*>(A.LocalPlayer);
+            return A.PlayerScore && p >= 0 && p <= 3 ? *reinterpret_cast<int32_t*>(A.PlayerScore + p * addr::PlayerStride) : 0;
+        }
+
+        // Befehle, deren <score> eine Textnummer ist
+        bool IsTextCommand(uint16_t c)
+        {
+            switch (c)
+            {
+            case CmdBrief: case CmdSpeechBrief: case CmdMobileBrief: case CmdMessageBrief: case CmdPBrief:
+            case CmdPBriefTimed: case CmdFrenzyBrief: case CmdKfBriefTimed: case CmdKfBriefGeneral:
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        void TrackRewards(int proc, const ScriptLine* line)
+        {
+            if (!A.ScriptLines || reinterpret_cast<uintptr_t>(line) < A.ScriptLines)
+                return;
+            const int index = (int)((reinterpret_cast<uintptr_t>(line) - A.ScriptLines) / sizeof(ScriptLine));
+            if (index >= 5000 || index + 1 == s_procLine[proc])
+                return;
+            const int32_t score = CurrentScore();
+            const int prev = s_procLine[proc] - 1;
+            if (prev >= 0 && s_mission.active && !s_mission.failed)
+            {
+                const ScriptLine* left = reinterpret_cast<const ScriptLine*>(A.ScriptLines + prev * sizeof(ScriptLine));
+                if (left->score > 0 && !IsTextCommand(left->command) && score - s_procScore[proc] >= left->score &&
+                    std::find(s_mission.paid.begin(), s_mission.paid.end(), prev) == s_mission.paid.end())
+                    s_mission.paid.push_back(prev);
+            }
+            s_procLine[proc] = index + 1;
+            s_procScore[proc] = score;
         }
 
         // Ende der Wartephase nach einem Fehlschlag; der gemerkte Missionsstand bleibt bis zur Freigabe erhalten
@@ -1338,6 +1425,7 @@ namespace gta1
                     s_mission.active = false;
                 return;
             }
+            TrackRewards(proc, line);
 
             DWORD& failedAt = s_failedAt[proc];
             if (command == CmdMessageBrief && line->score == kBriefMissionFailed)

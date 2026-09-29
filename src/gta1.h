@@ -169,4 +169,7 @@ namespace gta1
     std::string MapFile();         // zuletzt vom Spiel geöffnete .cmp (voller Pfad)
     unsigned MapGeneration();      // zählt hoch, sobald eine andere Karte geöffnet wird
     unsigned LevelLoads();         // zählt bei jedem Levelstart hoch (Karte wird geöffnet)
+    std::string MissionFile();     // zuletzt gelesenes Missionsskript (voller Pfad)
+    // Zeilennummern der Objekte aus dem Missionsskript des laufenden Levels (ohne die erste)
+    bool ScriptObjectLines(std::vector<int>& lines);
 }

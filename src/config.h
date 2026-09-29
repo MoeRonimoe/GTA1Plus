@@ -16,6 +16,7 @@ struct Config
     bool alwaysAim      = false; // Twin-Stick: immer zum Fadenkreuz schauen, seitwärts laufen
     bool wasdDriving    = true;  // Twin-Stick: auch im Auto mit WASD fahren
     bool portraitColors = true;  // Spielfigur passend zum Portrait einfärben
+    bool pois           = true;  // Lackierereien, Bombenläden und Autokräne auf der Karte
     bool hearts         = true;  // Lebensenergie als Herzen unter dem Punktestand
 
     // [Gameplay]

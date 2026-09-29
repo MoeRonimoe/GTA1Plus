@@ -111,6 +111,10 @@ namespace text
         ViewHigh,
         ViewHigher,
         ViewMax,
+        OptPois,
+        PoiSpray,
+        PoiBombShop,
+        PoiCrane,
         Count
     };
 

@@ -47,6 +47,9 @@
     <ClCompile Include="src\fire.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\pois.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\tiltcam.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -101,6 +104,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\fire.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\pois.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\tiltcam.h">

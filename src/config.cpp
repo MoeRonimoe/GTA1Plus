@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 15;
+static const int kConfigVersion = 16;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=15\r\n"
+    "Version=16\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -58,6 +58,8 @@ static const char kDefaultIni[] =
     "PortraitColors=1\r\n"
     "; Show the character's health as five hearts below the score\r\n"
     "Hearts=1\r\n"
+    "; Show paint shops, bomb shops and car cranes as icons on the map and minimap\r\n"
+    "POIs=1\r\n"
     "\r\n"
     "[Gameplay]\r\n"
     "; Do not halve the multiplier when you get busted\r\n"
@@ -188,6 +190,7 @@ namespace
         { L"Features", L"Controller",     Kind::Bool, &g_cfg.controller,     nullptr, nullptr },
         { L"Features", L"PortraitColors", Kind::Bool, &g_cfg.portraitColors, nullptr, nullptr },
         { L"Features", L"Hearts",         Kind::Bool, &g_cfg.hearts,         nullptr, nullptr },
+        { L"Features", L"POIs",           Kind::Bool, &g_cfg.pois,           nullptr, nullptr },
         { L"Gameplay", L"KeepMultiplier", Kind::Bool, &g_cfg.keepMultiplier, nullptr, nullptr },
         { L"Gameplay", L"QuickRetry",     Kind::Bool, &g_cfg.quickRetry,     nullptr, nullptr },
         { L"Gameplay", L"AllCharacters",  Kind::Bool, &g_cfg.allCharacters,  nullptr, nullptr },

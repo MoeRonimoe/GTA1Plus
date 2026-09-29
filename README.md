@@ -10,6 +10,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **In-game options**: the "GTA1Plus options" page of the pause menu changes the settings and writes them to `GTA1Plus.ini`. Settings marked with * take effect after a restart.
 - **GPS**: a route to the waypoint or mission target on the map and minimap, plus a direction arrow at the top of the screen. Routes prefer roads.
 - **Minimap**: a round minimap in a screen corner of your choice.
+- **Places on the map**: paint shops, bomb shops and car cranes are shown as icons on the map and minimap, with a legend. They are read from the level's mission script, so they also work in London.
 - **Twin-stick controls**: WASD movement and mouse aiming on foot, optional strafing (always face the crosshair), and WASD driving.
 - **Controllers**: Xbox (XInput) and PS4/PS5 or other DirectInput pads, in levels and in the main menu.
 - **Steerable camera**: look ahead with the mouse or the right stick.
@@ -21,7 +22,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **Put out fires**: when you are on fire, press jump to roll on the ground and put the flames out. In the original game burning is certain death.
 - **Gameplay options**:
   - Keep the multiplier when busted.
-  - Retry failed missions quickly.
+  - Retry failed missions quickly. Rewards that a failed attempt already paid out (e.g. for stealing the car halfway through a mission) are not paid again on the retry.
   - Unlock the female characters in non-English versions.
   - Colour the player to match the chosen portrait.
 - **Settings and languages**: everything can be switched on or off in `GTA1Plus.ini` or in the pause menu. Texts come in English, German, French and Italian (`GTA1Plus_lang.ini`).

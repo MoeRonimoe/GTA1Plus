@@ -9,6 +9,7 @@
 #include "log.h"
 #include "nav.h"
 #include "options.h"
+#include "pois.h"
 #include "saves.h"
 #include "briefings.h"
 #include "text.h"
@@ -402,11 +403,64 @@ namespace overlay
             }
         }
 
+        // Orte: Lackiererei grün mit Sprühdose, Bombenladen rot mit Bombe, Autokran gelb mit Kran
+        constexpr uint32_t kPoiColors[] = { 0x1F9D6B, 0xC62828, 0xE0A21A };
+
+        void FillRect(Canvas& c, float x0, float y0, float x1, float y1, uint32_t color)
+        {
+            const float pts[8] = { x0, y0, x1, y0, x1, y1, x0, y1 };
+            c.Polygon(pts, 4, color);
+        }
+
+        // Plakette mit Umriss und Zeichen; r = Radius, das Zeichen ist auf ein Raster von 20 Einheiten ausgelegt
+        void DrawPoiIcon(Canvas& c, float x, float y, float r, pois::Kind kind)
+        {
+            c.Circle(x, y, r + std::max(1.5f, r * 0.16f), 0x101418);
+            c.Circle(x, y, r, kPoiColors[(int)kind]);
+            const float u = r / 10.0f;
+            switch (kind)
+            {
+            case pois::Kind::Spray:
+                FillRect(c, x - 4.5f * u, y - 2.0f * u, x + 1.5f * u, y + 7.0f * u, 0xFFFFFF);   // Dose
+                FillRect(c, x - 3.5f * u, y - 4.5f * u, x + 0.5f * u, y - 2.0f * u, 0xC9CFD6);   // Kappe
+                FillRect(c, x + 0.5f * u, y - 4.2f * u, x + 2.5f * u, y - 3.0f * u, 0xC9CFD6);   // Düse
+                for (int i = 0; i < 3; ++i)                                                      // Nebel
+                    c.Circle(x + (4.5f + (i == 1) * 1.3f) * u, y + (-6.0f + i * 2.3f) * u, 0.9f * u + 0.4f, 0xFFFFFF);
+                break;
+            case pois::Kind::BombShop:
+                c.Circle(x - 1.0f * u, y + 1.5f * u, 5.0f * u, 0x14181D);                           // Kugel
+                c.Circle(x - 2.8f * u, y - 0.3f * u, 1.3f * u, 0x6C737C);                           // Glanz
+                c.Line(x + 2.3f * u, y - 2.2f * u, x + 4.8f * u, y - 5.2f * u, std::max(1.0f, 1.3f * u), 0xE8D9B0); // Lunte
+                c.Circle(x + 5.3f * u, y - 5.8f * u, 1.8f * u, 0xFFC21A);                           // Funke
+                c.Circle(x + 5.3f * u, y - 5.8f * u, 0.7f * u, 0xFFFFFF);
+                break;
+            case pois::Kind::Crane:
+            {
+                const float w = std::max(1.0f, 1.4f * u);
+                const uint32_t k = 0x14181D;
+                c.Line(x - 3.0f * u, y + 6.5f * u, x - 3.0f * u, y - 6.0f * u, w, k);            // Mast
+                c.Line(x - 5.5f * u, y - 6.0f * u, x + 6.0f * u, y - 6.0f * u, w, k);            // Ausleger
+                c.Line(x - 3.0f * u, y - 3.0f * u, x + 0.5f * u, y - 6.0f * u, w * 0.7f, k);     // Strebe
+                c.Line(x + 4.5f * u, y - 6.0f * u, x + 4.5f * u, y + 0.8f * u, w * 0.7f, k);     // Seil
+                c.Ring(x + 4.5f * u, y + 2.2f * u, 1.4f * u, w * 0.7f, k);                       // Haken
+                FillRect(c, x - 6.0f * u, y + 5.8f * u, x, y + 7.6f * u, k);                     // Fuß
+                break;
+            }
+            default:
+                break;
+            }
+        }
+
         // Route, Missionsziele und Wegpunkte für einen Kartenausschnitt; (ox, oy) = Bildschirmmitte des Ausschnitts
         void DrawNav(Canvas& c, float ox, float oy, float cx, float cy, float ppb, float markerR, bool numbers)
         {
             auto X = [&](float wx) { return ox + (wx - cx) * ppb; };
             auto Y = [&](float wy) { return oy + (wy - cy) * ppb; };
+
+            // Orte zuunterst, darüber Route und Ziele
+            if (g_cfg.pois)
+                for (const pois::Poi& p : pois::Current())
+                    DrawPoiIcon(c, X(p.x), Y(p.y), markerR * (numbers ? 1.75f : 1.35f), p.kind); // numbers: große Karte
 
             const auto& route = nav::Route();
             if (g_cfg.gps && route.size() >= 2)
@@ -1329,6 +1383,34 @@ namespace overlay
                     const int cw = c.TextWidth(buf, g_fonts.smallFont);
                     c.Blend(mapX, mapY + mapH - g_fonts.smallPx - m / 2, cw + m, g_fonts.smallPx + m / 2, 0x0B0E12, 170);
                     c.Text(mapX + m / 2, mapY + mapH - g_fonts.smallPx - m / 4, buf, g_fonts.smallFont, 0xE6E9ED, TA_LEFT | TA_TOP, false);
+                }
+
+                // Legende der Orte unten rechts
+                if (g_cfg.pois && !pois::Current().empty())
+                {
+                    bool present[(int)pois::Kind::Count] = {};
+                    for (const pois::Poi& p : pois::Current())
+                        present[(int)p.kind] = true;
+                    const text::Id names[] = { text::PoiSpray, text::PoiBombShop, text::PoiCrane };
+                    const float ir = g_fonts.smallPx * 0.55f;
+                    const int gap = m / 2, itemGap = m;
+                    int total = gap;
+                    for (int k = 0; k < (int)pois::Kind::Count; ++k)
+                        if (present[k])
+                            total += (int)(ir * 2) + 4 + c.TextWidth(text::Get(names[k]), g_fonts.smallFont) + itemGap;
+                    const int lh = g_fonts.smallPx + m / 2;
+                    int lx = mapX + mapW - total, ly = mapY + mapH - lh;
+                    c.Blend(lx, ly, total, lh, 0x0B0E12, 170);
+                    lx += gap;
+                    for (int k = 0; k < (int)pois::Kind::Count; ++k)
+                    {
+                        if (!present[k])
+                            continue;
+                        DrawPoiIcon(c, lx + ir, ly + lh * 0.5f, ir, (pois::Kind)k);
+                        lx += (int)(ir * 2) + 4;
+                        c.Text(lx, ly + (lh - g_fonts.smallPx) / 2 - 1, text::Get(names[k]), g_fonts.smallFont, 0xE6E9ED, TA_LEFT | TA_TOP, false);
+                        lx += c.TextWidth(text::Get(names[k]), g_fonts.smallFont) + itemGap;
+                    }
                 }
 
                 const float nx = mapX + mapW - m * 1.2f, ny = mapY + m * 1.3f, nr = m * 0.75f;

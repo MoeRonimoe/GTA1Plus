@@ -34,6 +34,7 @@ namespace options
             { Type::Bool, text::OptGpsArrow, &g_cfg.gpsArrow },
             { Type::Bool, text::OptWaypoints, &g_cfg.waypoints },
             { Type::Bool, text::OptHearts, &g_cfg.hearts },
+            { Type::Bool, text::OptPois, &g_cfg.pois },
             { Type::Choice, text::OptMapStyle, &g_cfg.mapStyle, false, 0, 1, 1, { text::StyleTextured, text::StyleSchematic } },
             { Type::Bool, text::OptPauseGame, &g_cfg.pauseGame },
             { Type::Bool, text::OptHint, &g_cfg.hint },
