@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 16;
+static const int kConfigVersion = 17;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=16\r\n"
+    "Version=17\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -79,6 +79,14 @@ static const char kDefaultIni[] =
     "; Save automatically after every completed mission (one save per character and level;\r\n"
     "; save and load by hand in the pause menu)\r\n"
     "Autosave=1\r\n"
+    "; Damage in percent of full health (five hearts = 100). In the original game every bullet kills at once\r\n"
+    "; and punches do no damage at all.\r\n"
+    "; Bullets that hit your character: 100 = deadly as in the original, 35 = the third pistol hit kills.\r\n"
+    "; Other characters still die from a single bullet, so missions and kill frenzies play as before\r\n"
+    "PistolDamage=35\r\n"
+    "MachineGunDamage=20\r\n"
+    "; A punch, for everyone who gets hit (you and others): 0 = no damage as in the original\r\n"
+    "PunchDamage=10\r\n"
     "\r\n"
     "[Camera]\r\n"
     "; Shift the camera with the mouse or right stick to see further ahead\r\n"
@@ -197,6 +205,9 @@ namespace
         { L"Gameplay", L"AllCharacters",  Kind::Bool, &g_cfg.allCharacters,  nullptr, nullptr },
         { L"Gameplay", L"Extinguish",     Kind::Bool, &g_cfg.extinguish,     nullptr, nullptr },
         { L"Gameplay", L"Autosave",       Kind::Bool, &g_cfg.autosave,       nullptr, nullptr },
+        { L"Gameplay", L"PistolDamage",     Kind::Int, &g_cfg.pistolDamage,     nullptr, nullptr },
+        { L"Gameplay", L"MachineGunDamage", Kind::Int, &g_cfg.machineGunDamage, nullptr, nullptr },
+        { L"Gameplay", L"PunchDamage",      Kind::Int, &g_cfg.punchDamage,      nullptr, nullptr },
         { L"Camera",   L"Enabled",        Kind::Bool, &g_cfg.camera,             nullptr, nullptr },
         { L"Camera",   L"MouseInVehicle", Kind::Bool, &g_cfg.cameraMouseVehicle, nullptr, nullptr },
         { L"Camera",   L"RangeOnFoot",    Kind::Int,  &g_cfg.cameraRangeFoot,    nullptr, nullptr },

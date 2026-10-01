@@ -168,6 +168,9 @@ void ModInit(HMODULE self)
         VehicleCameraView(g_cfg.vehicleView, vehicleHeight, vehicleZoom);
         if (!gta1::SetViewOptions(g_cfg.trafficRange / 100.0f, vehicleHeight, vehicleZoom))
             LOG("Sichtbereich und Fahrzeugkamera: Spielcode passt nicht");
+        gta1::SetDamage(g_cfg.pistolDamage, g_cfg.machineGunDamage, g_cfg.punchDamage);
+        LOG("Schaden statt sofortigem Tod (Pistole %d %%, Maschinenpistole %d %%, Faust %d %%): %s", g_cfg.pistolDamage,
+            g_cfg.machineGunDamage, g_cfg.punchDamage, gta1::EnableDamage() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.keepMultiplier)
             LOG("Multiplikator bei Verhaftung behalten: %s", gta1::EnableKeepMultiplier() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.allCharacters)

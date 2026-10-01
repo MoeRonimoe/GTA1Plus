@@ -61,6 +61,9 @@ namespace options
 
             { Type::Header, text::OptGroupGameplay },
             { Type::Bool, text::OptAutosave, &g_cfg.autosave },
+            { Type::Int, text::OptPistolDamage, &g_cfg.pistolDamage, false, 5, 100, 5 },
+            { Type::Int, text::OptMachineGunDamage, &g_cfg.machineGunDamage, false, 5, 100, 5 },
+            { Type::Int, text::OptPunchDamage, &g_cfg.punchDamage, false, 0, 100, 5 },
             { Type::Bool, text::OptExtinguish, &g_cfg.extinguish, true },
             { Type::Bool, text::OptQuickRetry, &g_cfg.quickRetry, true },
             { Type::Bool, text::OptKeepMultiplier, &g_cfg.keepMultiplier, true },

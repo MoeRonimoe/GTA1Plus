@@ -25,6 +25,9 @@ struct Config
     bool allCharacters  = true;  // Frauen im Hauptmenü auch in nicht-englischen Versionen wählbar
     bool extinguish     = true;  // brennend mit der Sprungtaste am Boden wälzen und löschen
     bool autosave       = true;  // nach jeder geschafften Mission automatisch speichern
+    int  pistolDamage     = 35;  // Prozent der Lebensenergie je Pistolenkugel auf die Spielfigur (100 = tödlich wie im Original)
+    int  machineGunDamage = 20;  // ebenso je Kugel aus der Maschinenpistole
+    int  punchDamage      = 10;  // Prozent je Faustschlag, für jede getroffene Figur (0 = kein Schaden wie im Original)
 
     // [Camera]
     bool camera              = true; // Kamera mit Maus/rechtem Stick verschieben

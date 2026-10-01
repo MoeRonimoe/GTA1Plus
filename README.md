@@ -20,6 +20,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **Tilted camera (prototype, off by default)**: a view in the style of *GTA Chinatown Wars*. The picture is tilted so you see further ahead, and in vehicles it turns with the driving direction. The mod transforms the finished game picture, so buildings keep their top-down look and the picture gets softer. Switch it on in the pause menu (GTA1Plus options → Camera) or with `[Camera] Tilt` in the INI. Needs 32-bit colour.
 - **Health hearts**: five hearts below the score.
 - **Put out fires**: when you are on fire, press jump to roll on the ground and put the flames out. In the original game burning is certain death.
+- **Damage instead of instant death**: in the original game every bullet kills at once and punches do no damage. With the mod a pistol or machine gun bullet costs your character part of the health (35 % and 20 % by default), and a punch hurts everyone who gets hit (10 %). Other characters still die from a single bullet, so missions and kill frenzies play as before. Adjust the three values in the pause menu (GTA1Plus options → Gameplay) or with `[Gameplay] PistolDamage`, `MachineGunDamage` and `PunchDamage` in the INI; 100 / 100 / 0 is the original behaviour.
 - **Gameplay options**:
   - Keep the multiplier when busted.
   - Retry failed missions quickly. Rewards that a failed attempt already paid out (e.g. for stealing the car halfway through a mission) are not paid again on the retry.

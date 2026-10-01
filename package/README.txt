@@ -106,6 +106,11 @@ GAMEPLAY
   - Health shown as five hearts below the score.
   - Put out fires: when you burn, press jump to roll on the ground.
     In the original game burning is certain death.
+  - Damage instead of instant death: a pistol or machine gun bullet costs
+    your character part of the health (35 % and 20 %) instead of killing at
+    once, and punches now hurt (10 %, for you and for others). Other
+    characters still die from one bullet. Adjustable in the pause menu
+    (GTA1Plus options, Gameplay); 100 / 100 / 0 is the original game.
   - Quick retry: after "MISSION FAILED" the phone of the mission rings again
     right away. Rewards already paid in the failed attempt are not paid again.
   - Busted: the multiplier is not halved.

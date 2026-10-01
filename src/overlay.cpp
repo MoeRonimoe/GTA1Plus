@@ -736,6 +736,7 @@ namespace overlay
             int vehicleHeight, vehicleZoom;
             VehicleCameraView(g_cfg.vehicleView, vehicleHeight, vehicleZoom);
             gta1::SetViewOptions(g_cfg.trafficRange / 100.0f, vehicleHeight, vehicleZoom);
+            gta1::SetDamage(g_cfg.pistolDamage, g_cfg.machineGunDamage, g_cfg.punchDamage);
             if (options::NeedsRestart(i))
                 ShowStatus(text::Get(text::OptRestart));
         }

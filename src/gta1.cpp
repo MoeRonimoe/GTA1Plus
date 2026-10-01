@@ -20,7 +20,11 @@ namespace gta1
         constexpr int       PedAnim       = 0x17;     // int16 Animationsbild (0x88 steht, 0xAF..0xB2 fällt, 0xE9..0xED liegt)
         constexpr int       PedHealth     = 0x44;
         constexpr int       PedFlames     = 0x52;
-        constexpr int       PedPose       = 0x66;     // int32 Zustand: 2 zu Fuß, 0x15 getroffen/stirbt, 0x17 tot, 0x18 im Wasser
+        constexpr int       PedWeapon     = 0x59;     // int32 Waffe: 0 Faust, 1 Pistole, 2 Maschinenpistole, 3 Raketen, 4 Flammen
+        constexpr int       PedPose       = 0x66;     // int32 Zustand: 2 zu Fuß, 5 erschossen, 0x15 getroffen/stirbt, 0x17 tot, 0x18 im Wasser
+        constexpr int       PedTarget     = 0x7C;     // int16 Figur, die ein Passant gerade angreift
+        constexpr int       PedCount      = 600;      // Obergrenze der Figurentabelle (die Spielfigur liegt um 300)
+        constexpr int       BulletOwner   = 0x1E;     // int16 Figur, die das Geschoss abgefeuert hat
         constexpr int       PedAngleOfs   = 0x99;
         constexpr int       ObjectSize    = 130;      // Objekt-Plätze: +0 Handle, +0x0A Typ, +0x0C belegt, +0x14 Besitzer
         constexpr int       ObjectCount   = 0xDAC;
@@ -111,6 +115,17 @@ namespace gta1
         // Zeiger und Zeilenlänge nach jedem Seitenwechsel hier ab (1.0.0.1: 0x42F890)
         uintptr_t DrawBits = 0, DrawPitch = 0, DrawBytes = 0, DrawWidth = 0, DrawHeight = 0;
 
+        // Treffer. Kugel trifft Figur (edi = Figur, esi = Geschoss): das Spiel prüft "stirbt schon?" (Animation >= 0x89)
+        // und lässt sie sonst tot umfallen, ohne die Lebensenergie anzufassen; BulletHitSkip ist das Ziel dieses jge.
+        // Faustschlag: das Opfer bekommt Animation 0xAF (zweite Stelle: Gegenschlag, der Angreifer fällt).
+        // Passant greift sein Ziel (Figur +0x7C) an: es bekommt Animation 0x2B.
+        uintptr_t BulletHit = 0, BulletHitSkip = 0;
+        bool      BulletHitMovEcx = false;  // London: die Prüfung beginnt mit "mov ecx,89h"
+        uintptr_t PunchHit[2] = {};
+        uint8_t   PunchReg[2] = {};         // Register mit dem Opfer: 5 ebp, 6 esi, 7 edi
+        uintptr_t NpcHit = 0;
+        uint8_t   NpcHitReg = 0;            // Register mit dem Angreifer
+
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
         uintptr_t TextBuffer = 0;     // char*: "[Schlüssel]Text\0..." bis "[]"
         uintptr_t MglPrimary = 0;     // IDirectDrawSurface* (Primary von MGL)
@@ -167,6 +182,9 @@ namespace gta1
         a.PlayerScore = 0x6576B8; a.PlayerMultiplier = 0x6576BC; a.PlayerJailCard = 0x6576BE;
         a.PlayerLives = 0x65774C; a.PlayerAmmo = 0x657718; a.PlayerArmor = 0x65775C;
         a.DrawBits = 0x737034; a.DrawPitch = 0x5F3AB4; a.DrawBytes = 0x5F3AB8; a.DrawWidth = 0x5F5560; a.DrawHeight = 0x5F5564;
+        a.BulletHit = 0x425065; a.BulletHitSkip = 0x425108;
+        a.PunchHit[0] = 0x44ED70; a.PunchReg[0] = 5; a.PunchHit[1] = 0x44EE01; a.PunchReg[1] = 7;
+        a.NpcHit = 0x44C0B1; a.NpcHitReg = 7;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
         a.IatGetProcAddress = 0x787474; a.IatPeekMessageA = 0x78754C;
@@ -236,6 +254,9 @@ namespace gta1
         a.LocalPlayer = 0x80D5B0; a.NumPlayers = 0x80D5AC;
         a.PlayerCtrl = 0x80CFF5; a.PlayerObject = 0x80CFF9; a.RunState = 0x572ACC;
         a.DrawBits = 0x570BC4; a.DrawPitch = 0x5605F4; a.DrawBytes = 0x5605F8; a.DrawWidth = 0x5620A0; a.DrawHeight = 0x5620A4; // 0x41F730
+        a.BulletHit = 0x4B3271; a.BulletHitSkip = 0x4B3318; a.BulletHitMovEcx = true;
+        a.PunchHit[0] = 0x4772ED; a.PunchReg[0] = 7; a.PunchHit[1] = 0x477353; a.PunchReg[1] = 6;
+        a.NpcHit = 0x473AD9; a.NpcHitReg = 6;
         a.TextReady = 0x8378A0; a.TextBuffer = 0x8378CC;   // aus GetText 0x4A6CB0
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
         a.IatGetProcAddress = 0x858738; a.IatPeekMessageA = 0x8587F8;
@@ -292,6 +313,9 @@ namespace gta1
         a.LocalPlayer = 0x80F1B8; a.NumPlayers = 0x80F1B4;
         a.PlayerCtrl = 0x80EBFD; a.PlayerObject = 0x80EC01; a.RunState = 0x5746D4;
         a.DrawBits = 0x5727CC; a.DrawPitch = 0x5621FC; a.DrawBytes = 0x562200; a.DrawWidth = 0x563CA8; a.DrawHeight = 0x563CAC; // 0x41F9C0
+        a.BulletHit = 0x4B3F73; a.BulletHitSkip = 0x4B401A; a.BulletHitMovEcx = true;
+        a.PunchHit[0] = 0x477B7D; a.PunchReg[0] = 7; a.PunchHit[1] = 0x477BE3; a.PunchReg[1] = 6;
+        a.NpcHit = 0x47432D; a.NpcHitReg = 6;
         a.TextReady = 0x8394B0; a.TextBuffer = 0x8394DC;
         a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
         a.IatGetProcAddress = 0x859738; a.IatPeekMessageA = 0x8597F8;
@@ -806,7 +830,12 @@ namespace gta1
     int PlayerHealth()
     {
         const uint8_t* ped = PlayerPedStruct();
-        return ped ? std::clamp<int>(static_cast<int8_t>(ped[addr::PedHealth]), 0, 100) : -1;
+        if (!ped)
+            return -1;
+        // Ein tödlicher Schuss lässt die Lebensenergie stehen und setzt nur den Zustand
+        if (*reinterpret_cast<const int32_t*>(ped + addr::PedPose) == 5)
+            return 0;
+        return std::clamp<int>(static_cast<int8_t>(ped[addr::PedHealth]), 0, 100);
     }
 
     static int16_t& PedFlames(uint8_t* ped) { return *reinterpret_cast<int16_t*>(ped + addr::PedFlames); }
@@ -865,6 +894,164 @@ namespace gta1
         }
     }
 
+    // ---- Schaden statt sofortigem Tod ----
+
+    namespace
+    {
+        int s_pistolDamage = 100, s_machineGunDamage = 100, s_punchDamage = 0;
+        uint8_t s_bulletSkip = 0;   // vom Kugel-Hook gesetzt: Treffer hat nur Lebensenergie gekostet
+
+        void HurtPed(uint8_t* ped, int percent)
+        {
+            const int health = static_cast<int8_t>(ped[addr::PedHealth]);
+            if (health > 0 && percent > 0)
+                ped[addr::PedHealth] = static_cast<uint8_t>(std::max(0, health - percent)); // 0 behandelt das Spiel als Tod
+        }
+
+        void __cdecl OnPunchHit(uint8_t* victim)
+        {
+            HurtPed(victim, s_punchDamage);
+        }
+
+        void __cdecl OnNpcHit(const uint8_t* attacker)
+        {
+            const int target = *reinterpret_cast<const int16_t*>(attacker + addr::PedTarget);
+            if (target >= 0 && target < addr::PedCount)
+                HurtPed(reinterpret_cast<uint8_t*>(A.PedStruct + target * addr::PedStride), s_punchDamage);
+        }
+
+        // Nur die Spielfigur hält mehrere Kugeln aus; andere Figuren sterben wie im Original am ersten Treffer,
+        // sonst würden Missionen und Amokläufe deutlich schwerer
+        void __cdecl OnBulletHit(uint8_t* victim, const uint8_t* bullet)
+        {
+            s_bulletSkip = 0;
+            if (victim != PlayerPedStruct())
+                return;
+            const int owner = *reinterpret_cast<const int16_t*>(bullet + addr::BulletOwner);
+            int weapon = 1;
+            if (owner >= 0 && owner < addr::PedCount)
+                weapon = *reinterpret_cast<const int32_t*>(A.PedStruct + owner * addr::PedStride + addr::PedWeapon);
+            const int damage = weapon == 2 ? s_machineGunDamage : s_pistolDamage;
+            const int health = static_cast<int8_t>(victim[addr::PedHealth]);
+            if (damage >= 100 || health - damage <= 0)
+                return; // dieser Treffer tötet: das Spiel macht weiter wie immer
+            victim[addr::PedHealth] = static_cast<uint8_t>(health - damage);
+            s_bulletSkip = 1;
+        }
+
+        // Kleine Sprungstücke zur Laufzeit, damit dieselben Hooks zu den verschieden übersetzten Spielversionen passen
+        struct Emitter
+        {
+            uint8_t* p;
+            void Byte(uint8_t b) { *p++ = b; }
+            void Bytes(const void* src, size_t n) { memcpy(p, src, n); p += n; }
+            void Dword(uint32_t v) { Bytes(&v, 4); }
+            void Rel32(uintptr_t target) { Dword(static_cast<uint32_t>(target - (reinterpret_cast<uintptr_t>(p) + 4))); }
+        };
+
+        uint8_t* AllocStub(size_t size)
+        {
+            static uint8_t* s_page = nullptr;
+            static size_t s_used = 0;
+            if (!s_page)
+                s_page = static_cast<uint8_t*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+            if (!s_page || s_used + size > 4096)
+                return nullptr;
+            uint8_t* p = s_page + s_used;
+            s_used += size;
+            return p;
+        }
+
+        bool PatchJump(uintptr_t site, uint8_t opcode, const uint8_t* stub, size_t len)
+        {
+            uint8_t patch[16];
+            memset(patch, 0x90, sizeof(patch));
+            patch[0] = opcode;
+            const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(stub) - (site + 5));
+            memcpy(patch + 1, &rel, 4);
+            return hooks::WriteMemory(reinterpret_cast<void*>(site), patch, len);
+        }
+
+        // Befehl an site (len Byte, ohne relative Operanden) durch "call Stück" ersetzen: dort läuft erst der Befehl,
+        // dann handler(Register reg); alle Register und Flags bleiben erhalten
+        bool HookAfterInstruction(uintptr_t site, size_t len, uint8_t reg, void* handler)
+        {
+            uint8_t* stub = AllocStub(len + 16);
+            if (!stub || len < 5 || len > 16)
+                return false;
+            Emitter e{ stub };
+            e.Bytes(reinterpret_cast<const void*>(site), len);
+            e.Byte(0x9C);                       // pushfd
+            e.Byte(0x60);                       // pushad
+            e.Byte(0x50 + reg);                 // push reg
+            e.Byte(0xE8); e.Rel32(reinterpret_cast<uintptr_t>(handler));
+            e.Byte(0x83); e.Byte(0xC4); e.Byte(0x04);
+            e.Byte(0x61);                       // popad
+            e.Byte(0x9D);                       // popfd
+            e.Byte(0xC3);                       // ret
+            return PatchJump(site, 0xE8, stub, len);
+        }
+
+        bool HookBulletHit()
+        {
+            static const uint8_t kCmp[] = { 0x66, 0x81, 0x7F, 0x17, 0x89, 0x00, 0x0F, 0x8D };        // cmp word [edi+17h],89h / jge
+            static const uint8_t kMov[] = { 0xB9, 0x89, 0x00, 0x00, 0x00, 0x66, 0x39, 0x4F, 0x17 };  // mov ecx,89h / cmp [edi+17h],cx
+            const uint8_t* site = reinterpret_cast<const uint8_t*>(A.BulletHit);
+            const size_t len = A.BulletHitMovEcx ? 5 : 6;
+            if (memcmp(site, A.BulletHitMovEcx ? kMov : kCmp, A.BulletHitMovEcx ? sizeof(kMov) : sizeof(kCmp)) != 0)
+                return false;
+            uint8_t* stub = AllocStub(48);
+            if (!stub)
+                return false;
+            Emitter e{ stub };
+            e.Byte(0x9C); e.Byte(0x60);
+            e.Byte(0x56); e.Byte(0x57);         // push esi (Geschoss), push edi (Figur)
+            e.Byte(0xE8); e.Rel32(reinterpret_cast<uintptr_t>(&OnBulletHit));
+            e.Byte(0x83); e.Byte(0xC4); e.Byte(0x08);
+            e.Byte(0x61); e.Byte(0x9D);
+            if (A.BulletHitMovEcx)
+                e.Bytes(site, 5);               // mov ecx,89h gilt für beide Wege
+            e.Byte(0x80); e.Byte(0x3D); e.Dword(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&s_bulletSkip))); e.Byte(0x00);
+            e.Byte(0x0F); e.Byte(0x85); e.Rel32(A.BulletHitSkip);   // jne: Treffer überstanden
+            if (!A.BulletHitMovEcx)
+                e.Bytes(site, 6);               // cmp word [edi+17h],89h setzt die Flags für das jge danach
+            e.Byte(0xE9); e.Rel32(A.BulletHit + len);
+            return PatchJump(A.BulletHit, 0xE9, stub, len);
+        }
+    }
+
+    bool EnableDamage()
+    {
+        static bool s_done = false, s_ok = false;
+        if (s_done)
+            return s_ok;
+        s_done = true;
+        if (!s_supported || !A.BulletHit || !A.BulletHitSkip || !A.PunchHit[0] || !A.PunchHit[1] || !A.NpcHit || !A.PlayerPedId)
+            return false;
+        // Erst alles prüfen, dann einhängen: entweder alle Stellen oder keine
+        for (int i = 0; i < 2; ++i)
+        {
+            const uint8_t expect[] = { 0x66, 0xC7, static_cast<uint8_t>(0x40 + A.PunchReg[i]), 0x17, 0xAF, 0x00 }; // mov word [reg+17h],0AFh
+            if (memcmp(reinterpret_cast<const void*>(A.PunchHit[i]), expect, sizeof(expect)) != 0)
+                return false;
+        }
+        const uint8_t* npc = reinterpret_cast<const uint8_t*>(A.NpcHit);      // mov word [..+Ped+17h],2Bh
+        if (npc[0] != 0x66 || npc[1] != 0xC7 || npc[2] != 0x84 || npc[8] != 0x2B || npc[9] != 0x00)
+            return false;
+        s_ok = HookBulletHit() &&
+               HookAfterInstruction(A.PunchHit[0], 6, A.PunchReg[0], reinterpret_cast<void*>(&OnPunchHit)) &&
+               HookAfterInstruction(A.PunchHit[1], 6, A.PunchReg[1], reinterpret_cast<void*>(&OnPunchHit)) &&
+               HookAfterInstruction(A.NpcHit, 10, A.NpcHitReg, reinterpret_cast<void*>(&OnNpcHit));
+        return s_ok;
+    }
+
+    void SetDamage(int pistol, int machineGun, int punch)
+    {
+        s_pistolDamage = std::clamp(pistol, 1, 100);
+        s_machineGunDamage = std::clamp(machineGun, 1, 100);
+        s_punchDamage = std::clamp(punch, 0, 100);
+    }
+
     bool EnableBurnPause()
     {
         // cmp word ptr [esi+52h],-1 / je ... (Sprungweite je Version verschieden)
@@ -887,7 +1074,7 @@ namespace gta1
     {
         const uint8_t* ped = PlayerPedStruct();
         const int32_t pose = ped ? *reinterpret_cast<const int32_t*>(ped + addr::PedPose) : 0;
-        return !ped || static_cast<int8_t>(ped[addr::PedHealth]) <= 0 || pose == 0x15 || pose == 0x17;
+        return !ped || static_cast<int8_t>(ped[addr::PedHealth]) <= 0 || pose == 5 || pose == 0x15 || pose == 0x17;
     }
 
     bool GetPlayerPedAngle(int& angle)

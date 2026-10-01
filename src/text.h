@@ -115,6 +115,9 @@ namespace text
         PoiSpray,
         PoiBombShop,
         PoiCrane,
+        OptPistolDamage,
+        OptMachineGunDamage,
+        OptPunchDamage,
         Count
     };
 

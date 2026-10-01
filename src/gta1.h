@@ -157,6 +157,11 @@ namespace gta1
     bool IgnitePlayer();
     // Spielfigur tot oder im Sterben
     bool IsPlayerDead();
+    // Schaden statt sofortigem Tod, in Prozent der vollen Lebensenergie: Kugeln aus Pistole und Maschinenpistole
+    // treffen so nur die Spielfigur (100 = tödlich wie im Original), ein Faustschlag jede getroffene Figur
+    // (0 = kein Schaden wie im Original). EnableDamage einmal beim Start, SetDamage jederzeit
+    bool EnableDamage();
+    void SetDamage(int pistol, int machineGun, int punch);
     // Brennschaden für die Spielfigur aussetzen (Flammen bleiben sichtbar); EnableBurnPause einmal beim Start
     bool EnableBurnPause();
     void SetPlayerBurnPaused(bool paused);
