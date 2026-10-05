@@ -71,6 +71,7 @@ namespace options
             { Type::Int, text::OptMachineGunDamage, &g_cfg.machineGunDamage, false, 5, 100, 5 },
             { Type::Int, text::OptPunchDamage, &g_cfg.punchDamage, false, 0, 100, 5 },
             { Type::Bool, text::OptExtinguish, &g_cfg.extinguish, true },
+            { Type::Bool, text::OptNoTreeCollision, &g_cfg.noTreeCollision },
             { Type::Bool, text::OptQuickRetry, &g_cfg.quickRetry, true },
             { Type::Bool, text::OptKeepMultiplier, &g_cfg.keepMultiplier, true },
             { Type::Bool, text::OptAllCharacters, &g_cfg.allCharacters, true },

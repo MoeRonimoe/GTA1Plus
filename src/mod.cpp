@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <cstdio>
 #include <string>
 
 #include "briefings.h"
@@ -110,6 +111,7 @@ namespace
         ApplyPlayerColor();
         CheckDebugRequests();
         saves::Tick();
+        gta1::SetTreeCollision(g_cfg.noTreeCollision);   // im Optionsmenü umschaltbar
     }
 
     // Aus dem Missionsskript: Ansagen für die Briefings, geschaffte Missionen für das Autosave
@@ -227,6 +229,8 @@ void ModInit(HMODULE self)
         gta1::SetDamage(g_cfg.pistolDamage, g_cfg.machineGunDamage, g_cfg.punchDamage);
         LOG("Schaden statt sofortigem Tod (Pistole %d %%, Maschinenpistole %d %%, Faust %d %%): %s", g_cfg.pistolDamage,
             g_cfg.machineGunDamage, g_cfg.punchDamage, gta1::EnableDamage() ? "aktiv" : "Spielcode passt nicht");
+        if (g_cfg.noTreeCollision)
+            LOG("Unter Bäumen und Laternen durchfahren: %s", gta1::SetTreeCollision(true) ? "aktiv" : "für diese Version nicht verfügbar");
         if (g_cfg.keepMultiplier)
             LOG("Multiplikator bei Verhaftung behalten: %s", gta1::EnableKeepMultiplier() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.allCharacters)

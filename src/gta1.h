@@ -119,6 +119,9 @@ namespace gta1
 
     // Spielregeln ([Gameplay]); false, wenn der Spielcode nicht wie erwartet aussieht
     bool EnableKeepMultiplier();   // Verhaftung halbiert den Multiplikator nicht mehr
+    // Bäume, Laternen und Pfosten halten Fahrzeuge nicht mehr auf. Einschalten wirkt sofort, Ausschalten ab dem
+    // nächsten Levelstart. Liefert false, wenn die Spielversion es nicht kann.
+    bool SetTreeCollision(bool remove);
     bool EnableAllCharacters();    // Hauptmenü: Frauen auch in nicht-englischen Sprachversionen wählbar
     bool EnableQuickRetry();       // nach "MISSION FEHLGESCHLAGEN" Skriptpausen bis zum Neuaufbau verkürzen
     bool EnableSteadyCamera();     // Kamera folgt enger statt zu schwimmen (Patch aus GTAforums: shl 5 -> shl 2)

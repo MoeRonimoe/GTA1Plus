@@ -22,6 +22,7 @@ struct Config
 
     // [Gameplay]
     bool keepMultiplier = true;  // Multiplikator bei Verhaftung nicht halbieren
+    bool noTreeCollision = true; // Bäume, Büsche, Laternen und Pfosten halten nichts mehr auf
     bool quickRetry     = true;  // nach gescheiterter Mission ohne lange Wartezeit neu versuchen
     bool allCharacters  = true;  // Frauen im Hauptmenü auch in nicht-englischen Versionen wählbar
     bool extinguish     = true;  // brennend mit der Sprungtaste am Boden wälzen und löschen

@@ -128,6 +128,9 @@ GAMEPLAY
     once, and punches now hurt (10 %, for you and for others). Other
     characters still die from one bullet. Adjustable in the pause menu
     (GTA1Plus options, Gameplay); 100 / 100 / 0 is the original game.
+  - Drive under trees and lamp posts: as in GTA2, tree trunks, lamp posts
+    and traffic lights no longer stop your vehicle. Trees and lamps are
+    lifted a little for that, so tree tops look slightly bigger.
   - Quick retry: after "MISSION FAILED" the phone of the mission rings again
     right away. Rewards already paid in the failed attempt are not paid again.
   - Busted: the multiplier is not halved.

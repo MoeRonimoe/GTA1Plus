@@ -38,6 +38,7 @@ namespace gta1
         int BulletOwner = 0x1E;     // Geschoss: int16 Figur, die es abgefeuert hat
         // Objekt-Plätze: +0 Handle, Typ, belegt, Besitzer, Art des Besitzers (2 = Fußgänger), nächstes aktives Objekt
         int ObjectSize = 130, ObjType = 0x0A, ObjUsed = 0x0C, ObjOwner = 0x14, ObjOwnerKind = 0x18, ObjNext = 0x22;
+        int ObjPos = 0x2A;            // x, y, z des Objekts (je int32, 22 Nachkommabits = 1 Block)
         int PlayerStride  = 417;    // Spieler-Struktur
         int ScriptObjSize = 29;     // Objekte aus mission.ini: +0 Typ, +4 Wert/Handle
         int LineSize = 22, LineFields = 2;  // Skriptzeile: Befehl (uint16), ab LineFields fünf int32
@@ -99,6 +100,11 @@ namespace gta1
         uintptr_t ObjectDelete = 0;   // void __cdecl(int16 handle), wie beim Ablauf eines Objekts
         uintptr_t Objects = 0;        // Objekt-Plätze
         uintptr_t ActiveObjects = 0;  // Liste, die das Entfernen durchsucht
+        // Objektarten des Levels: Zeiger auf eine Tabelle mit je einem Zeiger auf object_info aus der Style-Datei
+        // (Breite, Höhe, Tiefe als 16.16, ab +0x0C Sprite, Gewicht, aux, +0x12 Status, +0x13 Anzahl Bruchstücke);
+        // die Anzahl der Arten steht 0x0C davor. Die Nummern der Arten sind in allen Städten dieselben.
+        uintptr_t ObjInfo = 0;
+        bool      London = false;     // London-Erweiterung: eigene Grafik für einige Objektarten
 
         uintptr_t LocalPlayer = 0;    // int
         uintptr_t NumPlayers = 0;     // int, 1 = Einzelspieler
@@ -206,6 +212,7 @@ namespace gta1
         // das Handle in Ped+0x52; solange es gesetzt ist, zieht 0x451AFE jeden Frame 1 Lebenspunkt ab.
         // Endet das Objekt, löst 0x41D200 es von der Figur (Ped+0x52 = -1).
         a.ObjectCreate = 0x41BAA0; a.ObjectDelete = 0x41D380; a.Objects = 0x50F5F8; a.ActiveObjects = 0x57E750;
+        a.ObjInfo = 0x4C9E8C;         // gefüllt in 0x404020
         a.LocalPlayer = 0x657C50; a.NumPlayers = 0x657C4C; a.PlayerPedId = 0x6575CA;
         a.PlayerCtrl = 0x657695; a.PlayerObject = 0x657699; a.RunState = 0x5F3A90;
         a.MultHalve = 0x464649;   // in der Strafe bei Verhaftung (0x464570)
@@ -259,6 +266,7 @@ namespace gta1
     {
         Addresses a;
         a.name = "GTA_London.exe (London 1969)";
+        a.London = true;
         a.timestamp = 0x36E95F23;
         a.HudDraw = 0x4AE290; a.HudCallJmp = 0x40262B; // einziger Weg zum HUD: Thunk, angesprungen aus 0x4424E3
         a.GetPlayerPos = 0x4828F0;
@@ -281,6 +289,7 @@ namespace gta1
         a.SteadyCamera[0] = 0x451581;
         // Objekte wie in 1.0.0.1 (130 Byte); Anzünden in 0x465FEF, Sprite der Figuren in 0x467FE0
         a.ObjectCreate = 0x40222F; a.ObjectDelete = 0x401924; a.Objects = 0x75CDC0; a.ActiveObjects = 0x7CBF18;
+        a.ObjInfo = 0x7E22B8;         // 0x467910
         a.PedSprite = 0x467FE0;
         a.BurnDamage = 0x47A760;  // Brennschaden: cmp [esi+52h],-1 / je / Lebensenergie - 1 (anders geschrieben)
         a.PedFire = 0x402AEF; a.PedFireCall = 0x47A71D;
@@ -327,6 +336,7 @@ namespace gta1
     {
         Addresses a;
         a.name = "GTA_London_1961.exe (London 1961)";
+        a.London = true;
         a.timestamp = 0x3773D5BB;
         a.HudDraw = 0x4AEE20; a.HudCallJmp = 0x402671;
         a.GetPlayerPos = 0x483190;
@@ -344,6 +354,7 @@ namespace gta1
         a.Camera = 0x80EB48; a.ViewRect = 0x450F80; a.ViewRectCall = 0x450F47;
         a.SteadyCamera[0] = 0x451941;
         a.ObjectCreate = 0x402275; a.ObjectDelete = 0x401924; a.Objects = 0x75E9C8; a.ActiveObjects = 0x7CDB20;
+        a.ObjInfo = 0x7E3EC0;
         a.PedSprite = 0x4687F0;
         a.BurnDamage = 0x47AFF0;
         a.PedFire = 0x402B3F; a.PedFireCall = 0x47AFAD;
@@ -398,7 +409,7 @@ namespace gta1
         l.PedStride = 256; l.PedAnim = 0x18; l.PedCanFire = 0x46; l.PedHealth = 0x49; l.PedFlames = 0x58;
         l.PedWeapon = 0x60; l.PedFireWait = 0x64; l.PedPose = 0x70; l.PedPos = 0x90; l.PedAngleOfs = 0xA8;
         l.PedTarget = 0x86;
-        l.ObjectSize = 136; l.ObjNext = 0x24;
+        l.ObjectSize = 136; l.ObjNext = 0x24; l.ObjPos = 0x2C;
         l.PlayerStride = 444; l.ScriptObjSize = 32; l.LineSize = 24; l.LineFields = 4; l.TriggerSize = 32;
         a.HudDraw = 0x483390; a.HudCallJmp = 0x430D94; a.HudCallCall = 0x430D71;
         a.GetPlayerPos = 0x462D50;
@@ -414,6 +425,7 @@ namespace gta1
         a.PedSprite = 0x44F100;
         // Objekte zu 136 Byte; Flammen wie in 1.0.0.1 (Liste der aktiven Objekte in 0x44EA30)
         a.ObjectCreate = 0x44D3D0; a.ObjectDelete = 0x44EB90; a.Objects = 0x6B40D0; a.ActiveObjects = 0x728430;
+        a.ObjInfo = 0x728444;         // 0x44ED60
         a.BurnDamage = 0x45D088;
         // Kameraführung 0x43B910, Kamera wie in 1.0.0.1 aufgebaut (Sichtbereich wieder 0x14 davor)
         a.Camera = 0x74F160; a.CameraGet = 0x4644E0; a.CameraGetCall = 0x43BB33;
@@ -689,8 +701,18 @@ namespace gta1
         // der Verkehr auch außerhalb der gekippten Ansicht
     }
 
+    static bool s_noTreeCollision = false;
+    static unsigned s_treeLevel = ~0u;
+    static void RemoveTreeCollision();
+
     static void __cdecl RenderHook()
     {
+        // Erstes Bild eines Levels: die Objekte der Karte stehen jetzt alle
+        if (s_noTreeCollision && s_treeLevel != s_levelLoads)
+        {
+            s_treeLevel = s_levelLoads;
+            RemoveTreeCollision();
+        }
         if (s_preRender)
             s_preRender();
         reinterpret_cast<void(__cdecl*)()>(A.RenderFrame)();
@@ -1080,6 +1102,81 @@ namespace gta1
             o = *reinterpret_cast<uint8_t* const*>(o + L.ObjNext);
         }
         return false;
+    }
+
+    // Bäume und Laternen halten Fahrzeuge nicht mehr auf (wie in GTA2). Das Spiel prüft Fahrzeug gegen Objekt mit
+    // den Positionen beider samt Höhe: liegt das Objekt gut einen halben Block über dem Fahrzeug (gemessen: ab 0,49
+    // Block frei, bei 0,44 noch nicht), fährt es darunter durch. Sichtbare Bäume und Laternen werden deshalb beim
+    // Levelstart angehoben - die Krone wirkt dadurch etwas größer und verschiebt sich wie ein Dach mit der Kamera.
+    // Der Status der Objektart ("ohne Belang") und ihre Maße ändern für Fahrzeuge nichts.
+    // Stämme und Masten, die aus Kacheln gebaut sind (Palmen, Laternen, Ampeln; in Liberty City steht zusätzlich
+    // unter jedem Baum einer), sichert das Spiel mit einem unsichtbaren Pfosten. Diese Objekte werden entfernt.
+    // Die Objekte entstehen bei jedem Levelstart neu aus der Karte, es bleibt also nichts zurück.
+    constexpr int kInvisiblePole = 68;   // 8 x 8 Pixel, 64 hoch, unsichtbar (Status 3)
+    constexpr int kRaisePixels = 48;     // drei Viertel Block: Luft auch für höhere Fahrzeuge
+
+    static bool IsRaisedObject(int type)
+    {
+        switch (type)
+        {
+        case 7: case 9:   // Laternen
+        case 16:          // Holzpfosten
+        case 26:          // Baum
+            return true;
+        case 5: case 69:  // London: Kugellampe und Leuchte am Zebrastreifen (sonst Büsche, die bleiben stehen)
+            return A.London;
+        default:
+            return false;
+        }
+    }
+
+    static void RemoveTreeCollision()
+    {
+        if (!A.ObjInfo || !A.Objects || !A.ObjectDelete)
+            return;
+        const uint8_t* const* infos = *reinterpret_cast<const uint8_t* const* const*>(A.ObjInfo);
+        const int count = *reinterpret_cast<const int*>(A.ObjInfo - 0x0C);
+        if (!infos || count <= 69 || count > 256)
+            return;
+        // Nur entfernen, wenn die Art wirklich der unsichtbare Pfosten ist (andere Style-Datei, Umbauten)
+        const uint8_t* pole = infos[kInvisiblePole];
+        int32_t dims[2] = {};
+        if (pole)
+            memcpy(dims, pole, sizeof(dims));
+        const bool removePoles = pole && pole[0x12] == 3 && dims[0] == (8 << 16) && dims[1] == (8 << 16);
+
+        std::vector<int16_t> poles;
+        int raised = 0;
+        for (int i = 0; i < addr::ObjectCount; ++i)
+        {
+            uint8_t* o = reinterpret_cast<uint8_t*>(A.Objects + i * L.ObjectSize);
+            if (*reinterpret_cast<const int16_t*>(o) != i || *reinterpret_cast<const int16_t*>(o + L.ObjUsed) == 0)
+                continue;
+            const int type = *reinterpret_cast<const int16_t*>(o + L.ObjType);
+            if (type == kInvisiblePole && removePoles)
+                poles.push_back((int16_t)i);
+            else if (IsRaisedObject(type))
+            {
+                int32_t& z = *reinterpret_cast<int32_t*>(o + L.ObjPos + 8);   // 1 Pixel = 65536, kleiner = höher
+                if (z > (kRaisePixels << 16))
+                {
+                    z -= kRaisePixels << 16;
+                    ++raised;
+                }
+            }
+        }
+        // Feste Objekte der Karte stehen in keiner der Listen, nur im Raster der Blöcke; das Entfernen des Spiels
+        // nimmt sie dort heraus und gibt den Platz frei (Listen fasst es nur für Status 5, 6, 7 und 9 an)
+        for (const int16_t handle : poles)
+            reinterpret_cast<void(__cdecl*)(int)>(A.ObjectDelete)(handle);
+        LOG("Bäume und Laternen ohne Zusammenstoß: %d angehoben, %d unsichtbare Pfosten entfernt", raised, (int)poles.size());
+    }
+
+    bool SetTreeCollision(bool remove)
+    {
+        const bool can = s_supported && A.ObjInfo && A.Objects && A.ObjectDelete && A.RenderCall;
+        s_noTreeCollision = remove && can;
+        return can;
     }
 
     bool ExtinguishPlayer()

@@ -129,6 +129,7 @@ namespace text
         ProgUnavailable,
         OptHudScale,
         HudScaleAuto,
+        OptNoTreeCollision,
         Count
     };
 

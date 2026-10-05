@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 20;
+static const int kConfigVersion = 21;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=20\r\n"
+    "Version=21\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -69,6 +69,10 @@ static const char kDefaultIni[] =
     "; Do not halve the multiplier when you get busted\r\n"
     "; (in the original game, dying and failed missions do not change it)\r\n"
     "KeepMultiplier=1\r\n"
+    "; Trees, lamp posts and other thin posts no longer stop vehicles: you drive under them, as in GTA2.\r\n"
+    "; Trees and lamps are lifted a little for that, so tree tops look slightly bigger and shift with the\r\n"
+    "; camera like roofs. Bushes, benches, hydrants and the like stay solid\r\n"
+    "NoTreeCollision=1\r\n"
     "; Make the four women (Ulrika, Katie, Mikki, Divine) selectable in the main menu - the game locks them\r\n"
     "; in every language version except English\r\n"
     "AllCharacters=1\r\n"
@@ -221,6 +225,7 @@ namespace
         { L"Features", L"Hearts",         Kind::Bool, &g_cfg.hearts,         nullptr, nullptr },
         { L"Features", L"POIs",           Kind::Bool, &g_cfg.pois,           nullptr, nullptr },
         { L"Gameplay", L"KeepMultiplier", Kind::Bool, &g_cfg.keepMultiplier, nullptr, nullptr },
+        { L"Gameplay", L"NoTreeCollision", Kind::Bool, &g_cfg.noTreeCollision, nullptr, nullptr },
         { L"Gameplay", L"QuickRetry",     Kind::Bool, &g_cfg.quickRetry,     nullptr, nullptr },
         { L"Gameplay", L"AllCharacters",  Kind::Bool, &g_cfg.allCharacters,  nullptr, nullptr },
         { L"Gameplay", L"Extinguish",     Kind::Bool, &g_cfg.extinguish,     nullptr, nullptr },
