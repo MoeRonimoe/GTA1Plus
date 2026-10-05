@@ -53,6 +53,9 @@
     <ClCompile Include="src\rumble.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\hudscale.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\tiltcam.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -113,6 +116,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\rumble.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\hudscale.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\tiltcam.h">

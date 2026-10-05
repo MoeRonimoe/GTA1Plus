@@ -129,6 +129,15 @@ namespace gta1
         // Zeichenpuffer: das Spiel schreibt Welt und HUD direkt in den Speicher der aktiven MGL-Seite und legt
         // Zeiger und Zeilenlänge nach jedem Seitenwechsel hier ab (1.0.0.1: 0x42F890)
         uintptr_t DrawBits = 0, DrawPitch = 0, DrawBytes = 0, DrawWidth = 0, DrawHeight = 0;
+        bool      TiltCamera = true;  // Kippkamera mit dieser Version erprobt
+
+        // HUD in ein eigenes Bild umleiten (nur wo nötig, 0 = geht nicht). Die Zeichenroutinen holen sich die Zeilen
+        // aus einer Tabelle von Zeilenanfängen und kennen Bildmaße und Bildzeiger noch einmal für sich:
+        // DrawSetRows(bits, pitch, height) füllt die Tabelle, DrawSetTarget(width, height, bits) setzt das Übrige.
+        // Wo etwas hingehört, rechnet das HUD aus dem Sichtfenster des Spielers, das das Spiel je Bild aus dessen
+        // Kamera hierher kopiert: Breite, Höhe, Bildmitte und der Maßstab, mit dem Weltpunkte ins Bild fallen.
+        uintptr_t DrawSetRows = 0, DrawSetTarget = 0;
+        uintptr_t ViewWidth = 0, ViewHeight = 0, ViewCenterX = 0, ViewCenterY = 0, ViewZoom = 0;
 
         // Treffer. Kugel trifft Figur (edi = Figur, esi = Geschoss): das Spiel prüft "stirbt schon?" (Animation >= 0x89)
         // und lässt sie sonst tot umfallen, ohne die Lebensenergie anzufassen; BulletHitSkip ist das Ziel dieses jge.
@@ -442,6 +451,10 @@ namespace gta1
         memcpy(a.ExplodeProlog, prolog, sizeof(prolog));
         a.TextReady = 0x775550; a.TextBuffer = 0x775578;   // aus GetText 0x47D9A0
         a.MglPrimary = 0x4B5004; a.MglPageCount = 0x4B5000;
+        a.DrawBits = 0x511904; a.DrawPitch = 0x503218; a.DrawBytes = 0x50321C; a.DrawWidth = 0x504CC0; a.DrawHeight = 0x504CC4; // 0x414B62
+        a.TiltCamera = false;
+        a.DrawSetRows = 0x497BFA; a.DrawSetTarget = 0x486830;
+        a.ViewWidth = 0x5C0C00; a.ViewHeight = 0x5BFAB0; a.ViewCenterX = 0x5BFBE4; a.ViewCenterY = 0x5BFBE8; a.ViewZoom = 0x5C1C10; // 0x43B780
         a.IatGetProcAddress = 0x4A70DC; a.IatPeekMessageA = 0x4A71CC;
         a.LoadGetProcAddress[0] = 0x48D2D3;
         a.DDCreateCall = 0x48D397; a.DDCreateCell = 0x787320;
@@ -516,6 +529,7 @@ namespace gta1
     static int s_fireAngle = -1;
     static void (*s_cameraFilter)(const CameraView*, float&, float&) = nullptr;
     static void (*s_beforeHud)() = nullptr;
+    static void (*s_hudDrawer)(void (*drawHud)()) = nullptr;
     static void (*s_cameraOverride)() = nullptr;
     static bool s_inViewRect = false;
     static float s_viewRectScale = 1.0f;   // Sichtbereich der Spiellogik (Verkehr entsteht knapp außerhalb)
@@ -726,13 +740,18 @@ namespace gta1
         *angle = walk;
     }
 
+    static void DrawGameHud() { reinterpret_cast<void(__cdecl*)()>(A.HudDraw)(); }
+
     static void __cdecl HudHook()
     {
         s_lastHud = GetTickCount();
         ++s_hudCount;
         if (s_beforeHud)
             s_beforeHud(); // Weltbild ist fertig, das HUD kommt erst noch
-        reinterpret_cast<void(__cdecl*)()>(A.HudDraw)();
+        if (s_hudDrawer)
+            s_hudDrawer(&DrawGameHud);
+        else
+            DrawGameHud();
         if (s_hudCallback)
             s_hudCallback();
     }
@@ -1524,6 +1543,65 @@ namespace gta1
     }
 
     void SetBeforeHudCallback(void (*cb)()) { s_beforeHud = cb; }
+    void SetHudDrawer(void (*draw)(void (*drawHud)())) { s_hudDrawer = draw; }
+    bool TiltCameraAvailable() { return s_supported && A.TiltCamera && A.DrawBits; }
+
+    bool CanRedirectHud()
+    {
+        return s_supported && A.DrawBits && A.DrawSetRows && A.DrawSetTarget && A.ViewWidth && A.ViewHeight && A.ViewCenterX &&
+               A.ViewCenterY && A.ViewZoom;
+    }
+
+    // Was BeginHudLayer verstellt hat
+    static struct
+    {
+        bool active = false;
+        uint8_t* bits;
+        int width, height, viewWidth, viewHeight, centerX, centerY, zoom;
+    } s_hudLayer;
+
+    static void SetDrawTarget(uint8_t* bits, int pitch, int width, int height)
+    {
+        reinterpret_cast<void(__cdecl*)(uint8_t*, int, int)>(A.DrawSetRows)(bits, pitch, height);
+        reinterpret_cast<void(__cdecl*)(int, int, uint8_t*)>(A.DrawSetTarget)(width, height, bits);
+        *reinterpret_cast<uint8_t**>(A.DrawBits) = bits;
+        *reinterpret_cast<int*>(A.DrawWidth) = width;
+        *reinterpret_cast<int*>(A.DrawHeight) = height;
+    }
+
+    bool BeginHudLayer(uint8_t* bits, int width, int height, int factor)
+    {
+        DrawBuffer real;
+        if (!CanRedirectHud() || s_hudLayer.active || factor < 2 || !bits || !GetDrawBuffer(real))
+            return false;
+        int& viewW = *reinterpret_cast<int*>(A.ViewWidth);
+        int& viewH = *reinterpret_cast<int*>(A.ViewHeight);
+        int& centerX = *reinterpret_cast<int*>(A.ViewCenterX);
+        int& centerY = *reinterpret_cast<int*>(A.ViewCenterY);
+        int& zoom = *reinterpret_cast<int*>(A.ViewZoom);
+        s_hudLayer = { true, real.bits, real.width, real.height, viewW, viewH, centerX, centerY, zoom };
+
+        SetDrawTarget(bits, real.pitch, width, height);
+        viewW = (viewW + factor - 1) / factor;
+        viewH = (viewH + factor - 1) / factor;
+        centerX /= factor;
+        centerY /= factor;
+        zoom /= factor; // Weltpunkte (z.B. Pfeile über Zielen) rücken im kleinen Bild entsprechend zur Mitte
+        return true;
+    }
+
+    void EndHudLayer()
+    {
+        if (!s_hudLayer.active)
+            return;
+        s_hudLayer.active = false;
+        SetDrawTarget(s_hudLayer.bits, *reinterpret_cast<int*>(A.DrawPitch), s_hudLayer.width, s_hudLayer.height);
+        *reinterpret_cast<int*>(A.ViewWidth) = s_hudLayer.viewWidth;
+        *reinterpret_cast<int*>(A.ViewHeight) = s_hudLayer.viewHeight;
+        *reinterpret_cast<int*>(A.ViewCenterX) = s_hudLayer.centerX;
+        *reinterpret_cast<int*>(A.ViewCenterY) = s_hudLayer.centerY;
+        *reinterpret_cast<int*>(A.ViewZoom) = s_hudLayer.zoom;
+    }
 
     bool GetDrawBuffer(DrawBuffer& out)
     {

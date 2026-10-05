@@ -41,12 +41,14 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 
 London has its own characters, so the portrait colours (made for the GTA1 characters) stay off there. Unknown executables start normally without the mod's features. The DOS version (e.g. in DOSBox) can't load ASI plugins.
 
-The Classics release is a separate build with a different data layout; GTA1Plus knows the layout of each version. It was tested with the Ultimate ASI Loader as `ddraw.dll` and its built-in window mode, as shipped with ThirteenAG's widescreen fix. For that setup the mod does two more things, both of which can be switched off under `[Display]` in the INI:
+The Classics release is a separate build with a different data layout; GTA1Plus knows the layout of each version. It was tested with the Ultimate ASI Loader as `ddraw.dll` and its built-in window mode, as shipped with ThirteenAG's widescreen fix. For that setup the mod does three more things, all of which can be switched off under `[Display]` in the INI:
 
 - **Steady picture** (`FrameBuffer`): there the game draws every eighth picture straight into the page that is on screen, so a half-drawn picture can show up for a moment (flicker). GTA1Plus lets the game draw every picture in normal memory and hands it to the screen in one piece. Reading the picture back is fast that way, so the mod's displays are blended in full quality as well.
 - **Full-size main menu** (`ScaleMenu`): the game draws the main menu and the other screens outside the levels 640×480 pixels small into the top left corner. GTA1Plus enlarges them to the screen height. Whole factors stay pixel-sharp (3× at 2560×1440); with other factors the pixel edges are smoothed.
 
-Both only take effect where they are needed (picture memory that is slow to read, a menu drawn smaller than the screen); in the other versions they do nothing. The tilted camera stays off in the Classics release.
+- **Readable HUD** (`HudScale`, also "HUD size" in the pause menu under GTA1Plus options → Display): the game draws its own displays – score, lives, multiplier, weapon and ammo, phone messages, area names, the mission arrow – in a fixed pixel size, so they get tiny at high resolutions. GTA1Plus lets the game draw them into a smaller picture and puts them into the frame enlarged by a whole factor (pixel-sharp, see-through parts stay see-through). "Automatic" picks the factor from the screen height so that they are about as large as on the 640×480 screen they were made for: 2× from 810 lines, 3× from 1350 (e.g. 2560×1440), 4× from 1890. 1× is the game's own size. The mod's hearts grow with them. Needs `FrameBuffer`.
+
+These only take effect where they are needed (picture memory that is slow to read, a menu drawn smaller than the screen, a HUD drawn in single pixels); in the other versions they do nothing. The tilted camera stays off in the Classics release.
 
 ## Installation
 

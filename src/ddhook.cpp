@@ -77,6 +77,7 @@ namespace ddhook
         Page        s_pages[kMaxPages];
         int         s_pageCount = 0;
         bool        s_allocFailed = false;
+        bool        s_slowMemory = false;      // aus dem Bildspeicher der Surfaces zu lesen ist langsam (gemessen)
         int         s_bufW = 0, s_bufH = 0, s_bufPitch = 0, s_bufBytes = 0;
         PixelFormat s_bufFmt;
         DWORD       s_drawThread = 0;          // Thread, der die Surfaces angelegt hat und hineinzeichnet
@@ -572,7 +573,8 @@ namespace ddhook
         {
             DropBuffers();
             s_drawThread = GetCurrentThreadId();
-            if (!gta1::Supported() || (!g_cfg.frameBuffer && !g_cfg.scaleMenu))
+            s_slowMemory = false;
+            if (!gta1::Supported())
                 return;
 
             SurfaceView v;
@@ -580,6 +582,7 @@ namespace ddhook
                 return;
             const double us = v.bits && v.pitch > 0 ? ReadMicroseconds(v) : 0.0;
             primary->Unlock(nullptr);
+            s_slowMemory = us > kSlowReadUs;
             if (!v.bits || v.pitch <= 0 || v.width <= 0 || v.height <= 0)
                 return;
 
@@ -922,6 +925,16 @@ namespace ddhook
             return false;
         }
         return true;
+    }
+
+    bool FastToRead(const uint8_t* bits)
+    {
+        if (!s_slowMemory)
+            return true;
+        for (int i = 0; i < s_pageCount; ++i)
+            if (s_pages[i].bits == bits)
+                return true;
+        return false;
     }
 
     void OnPump()

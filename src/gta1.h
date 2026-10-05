@@ -97,6 +97,16 @@ namespace gta1
         int pitch, width, height, bytesPerPixel;
     };
     bool GetDrawBuffer(DrawBuffer& out);
+    bool TiltCameraAvailable();    // Kippkamera mit dieser Spielversion erprobt
+
+    // Umschließt das HUD-Zeichnen des Spiels: draw bekommt die Funktion, die das HUD zeichnet
+    void SetHudDrawer(void (*draw)(void (*drawHud)()));
+    // HUD in ein eigenes, um "factor" kleineres Bild zeichnen lassen (zum Vergrößern): zwischen Begin und End
+    // zeichnet das Spiel nach "bits" (Zeilenlänge wie seine eigene Seite, width x height Pixel) und rechnet alle
+    // Positionen für dieses kleinere Bild aus. Geht nur, wo die nötigen Stellen des Spiels bekannt sind.
+    bool CanRedirectHud();
+    bool BeginHudLayer(uint8_t* bits, int width, int height, int factor);
+    void EndHudLayer();
 
     // Im Hauptmenü gewähltes Portrait (0 Ulrika .. 7 Kivlov) bzw. -1
     int PlayerCharacter();

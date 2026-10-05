@@ -1,16 +1,18 @@
 #include "options.h"
 #include "config.h"
+#include "hudscale.h"
 #include "log.h"
 #include "text.h"
 
 #include <algorithm>
 #include <cwchar>
+#include <vector>
 
 namespace options
 {
     namespace
     {
-        enum class Type { Header, Bool, Int, Degrees, Choice, Language };
+        enum class Type { Header, Bool, Int, Degrees, Choice, Language, HudScale };
 
         struct Option
         {
@@ -20,6 +22,7 @@ namespace options
             bool restart;                   // wirkt erst nach Neustart
             int minValue, maxValue, step;   // Int/Degrees: Bereich und Schrittweite (Prozent bzw. Grad)
             text::Id choices[4];            // Choice: Beschriftung je Wert (0..maxValue)
+            bool (*available)();            // nullptr = immer; sonst nur anbieten, wenn die Spielversion es kann
         };
 
         const wchar_t* const kLanguages[] = { L"auto", L"de", L"en", L"fr", L"it" };
@@ -34,6 +37,7 @@ namespace options
             { Type::Bool, text::OptGpsArrow, &g_cfg.gpsArrow },
             { Type::Bool, text::OptWaypoints, &g_cfg.waypoints },
             { Type::Bool, text::OptHearts, &g_cfg.hearts },
+            { Type::HudScale, text::OptHudScale, &g_cfg.hudScale, false, 0, 4, 1, {}, &hudscale::Available },
             { Type::Bool, text::OptPois, &g_cfg.pois },
             { Type::Choice, text::OptMapStyle, &g_cfg.mapStyle, false, 0, 1, 1, { text::StyleTextured, text::StyleSchematic } },
             { Type::Bool, text::OptPauseGame, &g_cfg.pauseGame },
@@ -75,7 +79,24 @@ namespace options
             { Type::Language, text::OptLanguage, g_cfg.language, true },
             { Type::Bool, text::OptShowInfo, &g_cfg.showInfo },
         };
-        constexpr int kCount = sizeof(kOptions) / sizeof(kOptions[0]);
+        constexpr int kAll = sizeof(kOptions) / sizeof(kOptions[0]);
+
+        // Die Einträge, die es in dieser Spielversion gibt, in der Reihenfolge der Seite
+        const std::vector<const Option*>& Shown()
+        {
+            static std::vector<const Option*> list;
+            if (list.empty())
+                for (int i = 0; i < kAll; ++i)
+                    if (!kOptions[i].available || kOptions[i].available())
+                        list.push_back(&kOptions[i]);
+            return list;
+        }
+
+        const Option* At(int i)
+        {
+            const auto& list = Shown();
+            return i >= 0 && i < (int)list.size() ? list[i] : nullptr;
+        }
 
         int LanguageIndex()
         {
@@ -86,16 +107,16 @@ namespace options
         }
     }
 
-    int Count() { return kCount; }
-    bool IsHeader(int i) { return i >= 0 && i < kCount && kOptions[i].type == Type::Header; }
-    const wchar_t* Label(int i) { return i >= 0 && i < kCount ? text::Get(kOptions[i].label) : L""; }
-    bool NeedsRestart(int i) { return i >= 0 && i < kCount && kOptions[i].restart; }
+    int Count() { return (int)Shown().size(); }
+    bool IsHeader(int i) { return At(i) && At(i)->type == Type::Header; }
+    const wchar_t* Label(int i) { return At(i) ? text::Get(At(i)->label) : L""; }
+    bool NeedsRestart(int i) { return At(i) && At(i)->restart; }
 
     std::wstring Value(int i)
     {
-        if (i < 0 || i >= kCount)
+        if (!At(i))
             return L"";
-        const Option& o = kOptions[i];
+        const Option& o = *At(i);
         wchar_t buf[64] = L"";
         switch (o.type)
         {
@@ -114,6 +135,12 @@ namespace options
             const int k = LanguageIndex();
             return k == 0 ? text::Get(text::LanguageAuto) : kLanguages[k];
         }
+        case Type::HudScale:
+            if (*static_cast<int*>(o.value) == 0)
+                swprintf_s(buf, text::Get(text::HudScaleAuto), hudscale::AutoFactor());
+            else
+                swprintf_s(buf, L"%d\u00D7", *static_cast<int*>(o.value));
+            return buf;
         default:
             return L"";
         }
@@ -121,9 +148,9 @@ namespace options
 
     bool Change(int i, int dir)
     {
-        if (i < 0 || i >= kCount || dir == 0)
+        if (!At(i) || dir == 0)
             return false;
-        const Option& o = kOptions[i];
+        const Option& o = *At(i);
         switch (o.type)
         {
         case Type::Bool:
@@ -143,6 +170,7 @@ namespace options
             break;
         }
         case Type::Choice:
+        case Type::HudScale:
         {
             int& v = *static_cast<int*>(o.value);
             v = (v + dir + o.maxValue + 1) % (o.maxValue + 1);

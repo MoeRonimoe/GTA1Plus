@@ -57,10 +57,12 @@ ROCKSTAR CLASSICS RELEASE (2002): the game is WINO\Grand Theft Auto.exe.
 If that folder already has the Ultimate ASI Loader (ddraw.dll, for example
 from the widescreen fix), only copy the two files from "scripts" into
 WINO\scripts; dsound.dll is not needed there. This is the tested setup.
-In that setup the mod also removes the flicker of half-drawn pictures and
+In that setup the mod also removes the flicker of half-drawn pictures,
 enlarges the main menu, which the game draws small into the top left corner,
-to the screen height. Both can be switched off in GTA1Plus.ini under
-[Display] (FrameBuffer and ScaleMenu).
+to the screen height, and enlarges the game's own displays (score, lives,
+weapon, phone messages), which get tiny at high resolutions. All three can
+be changed in GTA1Plus.ini under [Display] (FrameBuffer, ScaleMenu,
+HudScale); the HUD size is also in the pause menu under "GTA1Plus options".
 
 UNINSTALL: delete dsound.dll and the GTA1Plus files in the scripts folder.
 Your saves are in scripts\GTA1Plus_saves.

@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 19;
+static const int kConfigVersion = 20;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=19\r\n"
+    "Version=20\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -161,13 +161,20 @@ static const char kDefaultIni[] =
     "PauseGame=1\r\n"
     "\r\n"
     "[Display]\r\n"
-    "; Both settings only matter where the game runs at a high resolution in the window mode of the ASI\r\n"
+    "; These settings only matter where the game runs at a high resolution in the window mode of the ASI\r\n"
     "; loader (Rockstar Classics release with the widescreen fix); everywhere else they do nothing.\r\n"
     "; Finish every picture in normal memory and hand it to the screen in one piece: no half-drawn\r\n"
     "; pictures (flicker), and the mod's displays are blended in full quality\r\n"
     "FrameBuffer=1\r\n"
     "; Enlarge the main menu to the screen height instead of the small picture in the top left corner\r\n"
     "ScaleMenu=1\r\n"
+    "; Size of the game's own displays (score, lives, weapon, phone messages, area names, arrows) and of\r\n"
+    "; the mod's hearts. The game draws them in a fixed pixel size, so they get tiny at high resolutions.\r\n"
+    "; 0 = automatic: about as large as on the 640x480 screen they were made for (twice the size from\r\n"
+    "; 810 lines of screen height, three times from 1350, four times from 1890),\r\n"
+    "; 1 = as the game draws them, 2 to 4 = enlarged by that factor. Also in the pause menu (HUD size).\r\n"
+    "; Needs FrameBuffer=1\r\n"
+    "HudScale=0\r\n"
     "\r\n"
     "[Heading]\r\n"
     "; Heading arrow on the player marker\r\n"
@@ -255,6 +262,7 @@ namespace
         { L"Map",      L"PauseGame",      Kind::Bool, &g_cfg.pauseGame,      L"Overlay", L"PauseGame" },
         { L"Display",  L"FrameBuffer",    Kind::Bool, &g_cfg.frameBuffer,    nullptr, nullptr },
         { L"Display",  L"ScaleMenu",      Kind::Bool, &g_cfg.scaleMenu,      nullptr, nullptr },
+        { L"Display",  L"HudScale",       Kind::Int,  &g_cfg.hudScale,       nullptr, nullptr },
         { L"Heading",  L"Show",           Kind::Bool, &g_cfg.showHeading,    L"Heading", L"Show" },
         { L"Heading",  L"Offset",         Kind::Int,  &g_cfg.headingOffset,  L"Heading", L"Offset" },
         { L"Heading",  L"CounterClockwise", Kind::Bool, &g_cfg.headingCcw,   L"Heading", L"CounterClockwise" },
@@ -357,6 +365,7 @@ void LoadConfig(const wchar_t* ini)
     g_cfg.vehicleView = std::clamp(g_cfg.vehicleView, 0, 3);
     g_cfg.trafficRange = std::clamp(g_cfg.trafficRange, 100, 250);
     g_cfg.vibration = std::clamp(g_cfg.vibration, 0, 100);
+    g_cfg.hudScale = std::clamp(g_cfg.hudScale, 0, 4);
 
     // Neue oder veraltete INI: kommentierte Vorlage schreiben und die aktuellen Werte übernehmen
     if (!exists || version < kConfigVersion)

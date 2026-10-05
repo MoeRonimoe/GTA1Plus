@@ -24,6 +24,10 @@ namespace ddhook
     // Aus der Nachrichtenschleife des Spiels: hält die Hooks am Leben und zeigt das vergrößerte Hauptmenü
     void OnPump();
 
+    // Lässt sich aus diesem Bildspeicher (Zeichenpuffer des Spiels) zügig lesen? Nein, wenn er im Grafikspeicher
+    // liegt und nicht über den Zwischenpuffer läuft.
+    bool FastToRead(const uint8_t* bits);
+
     // Zeichnet das Overlay und flippt selbst (für das Menü, falls das Spiel gerade nicht präsentiert)
     bool PresentOverlay();
 

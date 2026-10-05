@@ -68,6 +68,7 @@ struct Config
     // [Display]
     bool frameBuffer    = true;  // Bilder im Arbeitsspeicher fertigstellen, wo der Bildspeicher langsam zu lesen ist
     bool scaleMenu      = true;  // Hauptmenü vergrößern, wo das Spiel es klein in eine Ecke zeichnet
+    int  hudScale       = 0;     // HUD des Spiels vergrößern: 0 automatisch nach Bildhöhe, 1 wie im Spiel, 2..4 Faktor
 
     // [Heading]
     bool showHeading    = true;  // Blickrichtung am Spielermarker

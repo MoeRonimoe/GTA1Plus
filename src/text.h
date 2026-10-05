@@ -127,6 +127,8 @@ namespace text
         ProgLives,
         ProgMultiplier,
         ProgUnavailable,
+        OptHudScale,
+        HudScaleAuto,
         Count
     };
 

@@ -9,6 +9,7 @@
 #include "fire.h"
 #include "gta1.h"
 #include "hooks.h"
+#include "hudscale.h"
 #include "log.h"
 #include "overlay.h"
 #include "rumble.h"
@@ -237,6 +238,7 @@ void ModInit(HMODULE self)
         controls::Init(); // auch für die Maus im Pausemenü
         rumble::Init();
         fire::Init();
+        hudscale::Init();
         // Immer einhängen: Steuerung und Controller lassen sich im Optionsmenü während des Spiels umschalten
         gta1::SetInputFilter(&controls::ProcessPacket);
         if (g_cfg.cameraSteady)

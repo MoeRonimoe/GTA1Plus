@@ -6,6 +6,7 @@
 #include "ddhook.h"
 #include "fire.h"
 #include "gta1.h"
+#include "hudscale.h"
 #include "log.h"
 #include "nav.h"
 #include "options.h"
@@ -1698,7 +1699,7 @@ namespace overlay
             const int x = (g_cfg.minimapCorner & 1) ? W - m - S : m;
             int y = (g_cfg.minimapCorner & 2) ? m : H - m - S;
             if (g_cfg.minimapCorner == 3 && g_cfg.hearts) // oben rechts: unter Punktestand und Herzen
-                y = std::max(y, (int)(kHeartTop + kHeartSize) + 8);
+                y = std::max(y, (int)((kHeartTop + kHeartSize) * hudscale::Factor()) + 8);
             const float R = S * 0.5f, cx = x + R, cy = y + R;
             const float ppb = S / 30.0f;
 
@@ -1806,28 +1807,32 @@ namespace overlay
         void DrawHearts(SurfaceView& v, int health, bool burning)
         {
             Canvas& c = g_canvas;
-            const float right = v.width - 3.0f, cy = kHeartTop + kHeartSize * 0.5f;
-            const int bx = (int)(right - kHeartCount * kHeartStep) - 3, by = (int)kHeartTop - 3;
-            const int bw = (int)(kHeartCount * kHeartStep) + 7, bh = (int)kHeartSize + 7;
+            // Maße in Pixeln des Spiel-HUD; wird das vergrößert, wachsen die Herzen mit
+            const float k = (float)hudscale::Factor();
+            const float size = kHeartSize * k, step = kHeartStep * k, top = kHeartTop * k;
+            const float right = v.width - 3.0f * k, cy = top + size * 0.5f;
+            const int pad = (int)(3 * k);
+            const int bx = (int)(right - kHeartCount * step) - pad, by = (int)top - pad;
+            const int bw = (int)(kHeartCount * step) + 2 * pad + 1, bh = (int)size + 2 * pad + 1;
             // Brennend flackern die vollen Herzen orange
             const uint32_t fill = burning && (GetTickCount() / 120) % 2 == 0 ? 0xFF8A1E : 0xE8262E;
 
             c.BeginLayer(bx, by, bw, bh);
             for (int i = 0; i < kHeartCount; ++i)
             {
-                const float cx = right - (kHeartCount - i - 0.5f) * kHeartStep;
-                DrawHeart(c, cx + 1.0f, cy + 1.5f, kHeartSize + 2.4f, 0x000000, 90);
-                DrawHeart(c, cx, cy, kHeartSize + 2.4f, 0x000000, 190);
-                DrawHeart(c, cx, cy, kHeartSize, 0x4A1216, 235);
+                const float cx = right - (kHeartCount - i - 0.5f) * step;
+                DrawHeart(c, cx + 1.0f * k, cy + 1.5f * k, size + 2.4f * k, 0x000000, 90);
+                DrawHeart(c, cx, cy, size + 2.4f * k, 0x000000, 190);
+                DrawHeart(c, cx, cy, size, 0x4A1216, 235);
                 const float part = std::clamp((health - i * 20) / 20.0f, 0.0f, 1.0f);
                 if (part <= 0)
                     continue;
-                const float left = cx - kHeartSize * 0.5f;
-                c.SetClipRect((int)std::floor(left), by, (int)std::ceil(kHeartSize * part), bh);
-                DrawHeart(c, cx, cy, kHeartSize, fill, 255);
+                const float left = cx - size * 0.5f;
+                c.SetClipRect((int)std::floor(left), by, (int)std::ceil(size * part), bh);
+                DrawHeart(c, cx, cy, size, fill, 255);
                 c.ClearClip();
                 if (part > 0.5f)
-                    c.Circle(cx - kHeartSize * 0.2f, cy - kHeartSize * 0.17f, 1.4f, 0xFFFFFF, 170);
+                    c.Circle(cx - size * 0.2f, cy - size * 0.17f, 1.4f * k, 0xFFFFFF, 170);
             }
             c.Composite(v, bx, by, bw, bh);
         }

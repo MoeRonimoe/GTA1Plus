@@ -116,7 +116,7 @@ namespace tiltcam
 
         gta1::CameraView cam;
         gta1::DrawBuffer buf;
-        if (!g_cfg.tilt || !gta1::GetCameraView(cam) || !gta1::GetDrawBuffer(buf))
+        if (!g_cfg.tilt || !gta1::TiltCameraAvailable() || !gta1::GetCameraView(cam) || !gta1::GetDrawBuffer(buf))
         {
             g_ramp = 0;
             g_rot = 0;
