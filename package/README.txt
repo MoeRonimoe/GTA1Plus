@@ -64,6 +64,8 @@ PAUSE MENU (Esc)
   - City map with your position, mission targets and your own waypoints.
     Paint shops, bomb shops and car cranes are marked with icons.
   - Briefings: read the last phone and pager messages of the level again.
+  - Progress: score against the level's target, missions passed, secrets
+    found, lives and multiplier on one page.
   - Save game / Load game (see below).
   - GTA1Plus options: change the mod's settings while you play.
   - Quit level.
@@ -88,6 +90,9 @@ CONTROLS
     Optionally drive with WASD too.
   - Controllers: Xbox pads (XInput) and PS4/PS5 or other DirectInput pads,
     in levels and in the main menu.
+  - Controller vibration for your shots, hits, crashes and explosions
+    nearby, with adjustable strength (Xbox pads, PS4 pads over USB or
+    Bluetooth).
   - Weapon switching with Q/E or the mouse wheel.
 
 CAMERA

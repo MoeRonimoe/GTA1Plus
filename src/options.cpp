@@ -44,6 +44,7 @@ namespace options
             { Type::Bool, text::OptAlwaysAim, &g_cfg.alwaysAim },
             { Type::Bool, text::OptWasdDriving, &g_cfg.wasdDriving },
             { Type::Bool, text::OptController, &g_cfg.controller },
+            { Type::Int, text::OptRumble, &g_cfg.vibration, false, 0, 100, 10 },
 
             { Type::Header, text::OptGroupCamera },
             { Type::Bool, text::OptCamera, &g_cfg.camera, true },

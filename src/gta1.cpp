@@ -18,9 +18,11 @@ namespace gta1
         constexpr int       PedStride     = 235;
         constexpr int       PedId         = 0x00;
         constexpr int       PedAnim       = 0x17;     // int16 Animationsbild (0x88 steht, 0xAF..0xB2 fällt, 0xE9..0xED liegt)
+        constexpr int       PedCanFire    = 0x41;     // byte: darf schießen
         constexpr int       PedHealth     = 0x44;
         constexpr int       PedFlames     = 0x52;
         constexpr int       PedWeapon     = 0x59;     // int32 Waffe: 0 Faust, 1 Pistole, 2 Maschinenpistole, 3 Raketen, 4 Flammen
+        constexpr int       PedFireWait   = 0x5D;     // int16 Schritte bis zum nächsten Schuss
         constexpr int       PedPose       = 0x66;     // int32 Zustand: 2 zu Fuß, 5 erschossen, 0x15 getroffen/stirbt, 0x17 tot, 0x18 im Wasser
         constexpr int       PedTarget     = 0x7C;     // int16 Figur, die ein Passant gerade angreift
         constexpr int       PedCount      = 600;      // Obergrenze der Figurentabelle (die Spielfigur liegt um 300)
@@ -126,6 +128,15 @@ namespace gta1
         uintptr_t NpcHit = 0;
         uint8_t   NpcHitReg = 0;            // Register mit dem Angreifer
 
+        // Fortschritt, wie ihn die Pausenanzeige des Spiels abwechselnd einblendet (1.0.0.1: 0x473470 ff.): Zielpunktzahl,
+        // Zahl der Missionen und Geheimnisse sowie je ein Zähler aus dem Missionsskript (Platz in ScriptObjects, -1 =
+        // keiner), der vom Startwert (+8) herunterzählt (+4)
+        uintptr_t TargetScore = 0, MissionsTotal = 0, MissionsCounter = 0, SecretsTotal = 0, SecretsCounter = 0;
+        uintptr_t CarDamage = 0;      // byte je Fahrzeug: Schaden 0..100 (bei 100 explodiert es)
+        int       CarStride = 664;
+        uintptr_t Explode = 0;        // __cdecl(x, y, z, Auslöser): Explosion erzeugen, alle Explosionen laufen hier durch
+        uintptr_t ExplodeThunk = 0;   // London: jmp Explode
+
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
         uintptr_t TextBuffer = 0;     // char*: "[Schlüssel]Text\0..." bis "[]"
         uintptr_t MglPrimary = 0;     // IDirectDrawSurface* (Primary von MGL)
@@ -185,6 +196,10 @@ namespace gta1
         a.BulletHit = 0x425065; a.BulletHitSkip = 0x425108;
         a.PunchHit[0] = 0x44ED70; a.PunchReg[0] = 5; a.PunchHit[1] = 0x44EE01; a.PunchReg[1] = 7;
         a.NpcHit = 0x44C0B1; a.NpcHitReg = 7;
+        a.TargetScore = 0x736A20; a.MissionsTotal = 0x736A10; a.MissionsCounter = 0x6FB930;
+        a.SecretsTotal = 0x6FB934; a.SecretsCounter = 0x7169C0;
+        a.CarDamage = 0x73B077;   // 0x497220
+        a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
         a.IatGetProcAddress = 0x787474; a.IatPeekMessageA = 0x78754C;
@@ -257,6 +272,10 @@ namespace gta1
         a.BulletHit = 0x4B3271; a.BulletHitSkip = 0x4B3318; a.BulletHitMovEcx = true;
         a.PunchHit[0] = 0x4772ED; a.PunchReg[0] = 7; a.PunchHit[1] = 0x477353; a.PunchReg[1] = 6;
         a.NpcHit = 0x473AD9; a.NpcHitReg = 6;
+        a.TargetScore = 0x736A18; a.MissionsTotal = 0x736A08; a.MissionsCounter = 0x6FB928;   // 0x452A70 ff.
+        a.SecretsTotal = 0x6FB92C; a.SecretsCounter = 0x7169B8;
+        a.CarDamage = 0x5105D7;   // 0x4112A0
+        a.Explode = 0x433F50; a.ExplodeThunk = 0x40105F;
         a.TextReady = 0x8378A0; a.TextBuffer = 0x8378CC;   // aus GetText 0x4A6CB0
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
         a.IatGetProcAddress = 0x858738; a.IatPeekMessageA = 0x8587F8;
@@ -316,6 +335,10 @@ namespace gta1
         a.BulletHit = 0x4B3F73; a.BulletHitSkip = 0x4B401A; a.BulletHitMovEcx = true;
         a.PunchHit[0] = 0x477B7D; a.PunchReg[0] = 7; a.PunchHit[1] = 0x477BE3; a.PunchReg[1] = 6;
         a.NpcHit = 0x47432D; a.NpcHitReg = 6;
+        a.TargetScore = 0x738620; a.MissionsTotal = 0x738610; a.MissionsCounter = 0x6FD530;   // 0x452E30 ff.
+        a.SecretsTotal = 0x6FD534; a.SecretsCounter = 0x7185C0;
+        a.CarDamage = 0x511A63; a.CarStride = 668;   // 0x4114E0: die Fahrzeuge sind hier 4 Byte größer
+        a.Explode = 0x434230; a.ExplodeThunk = 0x40105F;
         a.TextReady = 0x8394B0; a.TextBuffer = 0x8394DC;
         a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
         a.IatGetProcAddress = 0x859738; a.IatPeekMessageA = 0x8597F8;
@@ -523,13 +546,35 @@ namespace gta1
         EnlargeViewRectForLogic();
     }
 
+    // Schüsse der Spielfigur für die Controller-Vibration: das Spiel feuert, wenn die Figur eine Waffe trägt,
+    // schießen darf und die Wartezeit der Waffe abgelaufen ist (auch im Amoklauf, wo die Munition nicht abnimmt)
+    static unsigned s_shots = 0;
+    static int s_shotWeapon = 0;
+
+    static void NoteShot(const uint8_t* ped)
+    {
+        const int32_t weapon = *reinterpret_cast<const int32_t*>(ped + addr::PedWeapon);
+        if (weapon >= 1 && weapon <= 4 && ped[addr::PedCanFire] &&
+            *reinterpret_cast<const int16_t*>(ped + addr::PedFireWait) <= 0)
+        {
+            ++s_shots;
+            s_shotWeapon = weapon;
+        }
+    }
+
     // Beim Seitwärtslaufen zeigt der Spieler während der Simulation in Laufrichtung;
     // nur für den Schuss wird er kurz zum Fadenkreuz gedreht
     static void __cdecl PedFireHook(uint8_t* ped)
     {
         const auto fire = reinterpret_cast<void(__cdecl*)(uint8_t*)>(A.PedFire);
-        const int player = s_fireAngle >= 0 ? PlayerPed() : -1;
+        const int player = PlayerPed();
         if (player < 0 || ped != reinterpret_cast<uint8_t*>(A.PedStruct + player * addr::PedStride))
+        {
+            fire(ped);
+            return;
+        }
+        NoteShot(ped);
+        if (s_fireAngle < 0)
         {
             fire(ped);
             return;
@@ -1050,6 +1095,108 @@ namespace gta1
         s_pistolDamage = std::clamp(pistol, 1, 100);
         s_machineGunDamage = std::clamp(machineGun, 1, 100);
         s_punchDamage = std::clamp(punch, 0, 100);
+    }
+
+    // ---- Controller-Vibration: Explosionen und Zustand der Spielfigur ----
+
+    namespace
+    {
+        using Explode_t = int32_t(__cdecl*)(int32_t, int32_t, int32_t, int32_t);
+        Explode_t s_explode = nullptr;
+        void (*s_explosionCb)(float, float) = nullptr;
+
+        int32_t __cdecl ExplodeHook(int32_t x, int32_t y, int32_t z, int32_t owner)
+        {
+            if (s_explosionCb)
+                s_explosionCb(x / 4194304.0f, y / 4194304.0f);
+            return s_explode(x, y, z, owner);
+        }
+    }
+
+    bool SetExplosionCallback(void (*cb)(float x, float y))
+    {
+        s_explosionCb = cb;
+        static bool s_tried = false;
+        if (s_tried || !s_supported || !A.Explode)
+            return s_explode != nullptr;
+        s_tried = true;
+        if (A.ExplodeThunk)
+        {
+            // London: alle Aufrufe laufen über einen Sprung-Thunk
+            s_explode = reinterpret_cast<Explode_t>(A.Explode);
+            if (!Redirect(A.ExplodeThunk, 0xE9, A.Explode, reinterpret_cast<void*>(&ExplodeHook)))
+                s_explode = nullptr;
+            return s_explode != nullptr;
+        }
+        // 1.0.0.1: 22 Aufrufer, deshalb den Anfang der Funktion (sub esp,4 / xor ecx,ecx) in ein Sprungstück auslagern
+        static const uint8_t kProlog[] = { 0x83, 0xEC, 0x04, 0x33, 0xC9 };
+        uint8_t* stub = hooks::BytesMatch(A.Explode, kProlog, sizeof(kProlog)) ? AllocStub(16) : nullptr;
+        if (!stub)
+            return false;
+        Emitter e{ stub };
+        e.Bytes(kProlog, sizeof(kProlog));
+        e.Byte(0xE9); e.Rel32(A.Explode + sizeof(kProlog));
+        s_explode = reinterpret_cast<Explode_t>(stub);
+        if (!PatchJump(A.Explode, 0xE9, reinterpret_cast<const uint8_t*>(&ExplodeHook), sizeof(kProlog)))
+            s_explode = nullptr;
+        return s_explode != nullptr;
+    }
+
+    bool GetFeedback(Feedback& out)
+    {
+        out = Feedback();
+        Player p;
+        if (!PlayerPedStruct() || !GetPlayer(p))
+            return false;
+        out.x = p.x;
+        out.y = p.y;
+        out.onFoot = p.ctrlType == 2;
+        out.health = IsPlayerDead() ? 0 : PlayerHealth();
+        out.shots = s_shots;
+        out.weapon = s_shotWeapon;
+        if (p.ctrlType == 0 && A.CarDamage)
+        {
+            const int idx = *reinterpret_cast<int*>(A.LocalPlayer);
+            const int car = *reinterpret_cast<int*>(A.PlayerObject + idx * addr::PlayerStride) & 0xFFFF;
+            if (car < 400)
+            {
+                out.car = car;
+                out.carDamage = *reinterpret_cast<uint8_t*>(A.CarDamage + car * A.CarStride);
+            }
+        }
+        return true;
+    }
+
+    // Fortschritt: dieselben Zahlen, die das Spiel in seiner eigenen Pausenanzeige der Reihe nach einblendet
+    bool GetProgress(Progress& out)
+    {
+        out = Progress();
+        if (!InGame() || !A.TargetScore || !A.ScriptObjects || !A.PlayerScore)
+            return false;
+        const int player = *reinterpret_cast<int*>(A.LocalPlayer);
+        if (player < 0 || player > 3)
+            return false;
+        // -1 = das Level führt diese Zahl nicht
+        const auto total = [](uintptr_t at) { return std::max(0, *reinterpret_cast<int32_t*>(at)); };
+        // Erreicht = Startwert minus Stand des Zählers
+        const auto done = [](uintptr_t at) {
+            const int32_t slot = *reinterpret_cast<int32_t*>(at);
+            if (slot < 0 || slot >= 2000)
+                return 0;
+            int32_t value[2];
+            memcpy(value, reinterpret_cast<const uint8_t*>(A.ScriptObjects + slot * addr::ScriptObjSize + 4), sizeof(value));
+            return std::max(0, value[1] - value[0]);
+        };
+        const uintptr_t po = player * addr::PlayerStride;
+        out.score = *reinterpret_cast<int32_t*>(A.PlayerScore + po);
+        out.target = total(A.TargetScore);
+        out.missionsTotal = total(A.MissionsTotal);
+        out.missionsDone = done(A.MissionsCounter);
+        out.secretsTotal = total(A.SecretsTotal);
+        out.secretsFound = done(A.SecretsCounter);
+        out.lives = *reinterpret_cast<uint8_t*>(A.PlayerLives + po);
+        out.multiplier = *reinterpret_cast<int16_t*>(A.PlayerMultiplier + po);
+        return true;
     }
 
     bool EnableBurnPause()

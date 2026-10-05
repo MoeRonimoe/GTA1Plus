@@ -7,12 +7,14 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **Pause menu with city map**: opens with Esc. It shows your position, mission targets and your own waypoints, and supports mouse and controller.
 - **Save and load**: one save per level and character, taken between missions (not while a phone mission is running). It stores the mission progress, score, multiplier, lives, weapons and your position. The game saves automatically after every completed mission. When you start a level that has a save, the mod offers to load it. Saves are kept in `scripts\GTA1Plus_saves`. Buildings destroyed by missions come back after loading.
 - **Briefings**: the last phone and pager messages of the current level, to read again in the pause menu.
+- **Progress**: one page in the pause menu with the figures the game otherwise only flips through one at a time on its own pause screen – score against the level's target, missions passed, secrets found – plus lives and multiplier.
 - **In-game options**: the "GTA1Plus options" page of the pause menu changes the settings and writes them to `GTA1Plus.ini`. Settings marked with * take effect after a restart.
 - **GPS**: a route to the waypoint or mission target on the map and minimap, plus a direction arrow at the top of the screen. Routes prefer roads.
 - **Minimap**: a round minimap in a screen corner of your choice.
 - **Places on the map**: paint shops, bomb shops and car cranes are shown as icons on the map and minimap, with a legend. They are read from the level's mission script, so they also work in London.
 - **Twin-stick controls**: WASD movement and mouse aiming on foot, optional strafing (always face the crosshair), and WASD driving.
 - **Controllers**: Xbox (XInput) and PS4/PS5 or other DirectInput pads, in levels and in the main menu.
+- **Controller vibration**: for your own shots (strongest for the rocket launcher), hits you take, damage to your vehicle and explosions nearby. Adjustable strength, 0 switches it off (GTA1Plus options → Controls or `[Features] Vibration`). Works with Xbox pads and with PS4 pads over USB or Bluetooth; PS5 pads are implemented but untested. It only runs while you are actually playing with the controller.
 - **Steerable camera**: look ahead with the mouse or the right stick.
 - **Steadier camera**: the hex patch shared by amilmand on GTAforums, applied in memory. The camera follows the character more closely instead of drifting behind. Works in all supported versions.
 - **Fixed camera height in vehicles** (optional): keeps the camera high while driving instead of zooming in and out with the speed.
@@ -83,5 +85,6 @@ Create an empty file next to the ASI:
 - `GTA1Plus.shot` saves the next frame as `GTA1Plus_shot.bmp`.
 - `GTA1Plus.burn` sets the player on fire.
 - `GTA1Plus.douse` puts the fire out.
+- `GTA1Plus.rumble` makes the controller vibrate at full strength for one second.
 
-Set `ShowInfo=1` in the INI to show debug information.
+Set `ShowInfo=1` in the INI to show debug information; it also logs the vibration events (shots, hits, vehicle damage, explosions).

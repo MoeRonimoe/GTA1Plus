@@ -162,6 +162,31 @@ namespace gta1
     // (0 = kein Schaden wie im Original). EnableDamage einmal beim Start, SetDamage jederzeit
     bool EnableDamage();
     void SetDamage(int pistol, int machineGun, int punch);
+    // Für die Controller-Vibration: was sich an der Spielfigur von Schritt zu Schritt ändert
+    struct Feedback
+    {
+        bool onFoot = false;
+        int health = 0;                 // Lebensenergie der Figur 0..100, 0 = tot
+        unsigned shots = 0;             // zählt jeden eigenen Schuss
+        int weapon = 0;                 // Waffe des letzten Schusses: 1 Pistole, 2 Maschinenpistole, 3 Raketen, 4 Flammen
+        int car = -1;                   // Nummer des gesteuerten Fahrzeugs, -1 = keins
+        int carDamage = 0;              // sein Schaden 0..100
+        float x = 0, y = 0;             // Blockkoordinaten
+    };
+    bool GetFeedback(Feedback& out);
+    // Jede Explosion im Level melden (Spiel-Thread, mitten im Spielschritt); false, wenn der Spielcode nicht passt
+    bool SetExplosionCallback(void (*cb)(float x, float y));
+
+    // Fortschritt im laufenden Level: die Zahlen aus der Pausenanzeige des Spiels
+    struct Progress
+    {
+        int score = 0, target = 0;      // Ziel: mit so vielen Punkten ist das Level geschafft
+        int missionsDone = 0, missionsTotal = 0;
+        int secretsFound = 0, secretsTotal = 0;
+        int lives = 0, multiplier = 0;
+    };
+    bool GetProgress(Progress& out);
+
     // Brennschaden für die Spielfigur aussetzen (Flammen bleiben sichtbar); EnableBurnPause einmal beim Start
     bool EnableBurnPause();
     void SetPlayerBurnPaused(bool paused);

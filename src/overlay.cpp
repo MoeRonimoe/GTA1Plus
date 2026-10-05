@@ -27,8 +27,8 @@ namespace overlay
     namespace
     {
         enum class Menu { Closed, Requested, Open };
-        enum class Page { List, Map, Confirm, Options, Briefings };
-        enum class Item { Resume, Map, Briefings, Save, Load, Options, Quit };
+        enum class Page { List, Map, Confirm, Options, Briefings, Progress };
+        enum class Item { Resume, Map, Briefings, Progress, Save, Load, Options, Quit };
         enum class Confirm { Quit, Load, StartLoad };
 
         struct Entry
@@ -216,6 +216,7 @@ namespace overlay
                 { Item::Resume, text::Get(text::Resume), true },
                 { Item::Map, text::Get(g_cfg.waypoints ? text::MapAndWaypoints : text::Map), true },
                 { Item::Briefings, text::Get(text::MenuBriefings), true },
+                { Item::Progress, text::Get(text::MenuProgress), true },
                 { Item::Save, text::Get(text::MenuSave), single && saves::Available() },
                 { Item::Load, text::Get(text::MenuLoad), single && saves::HasSave() },
                 { Item::Options, text::Get(text::MenuOptions), true },
@@ -698,6 +699,9 @@ namespace overlay
                 g_page = Page::Briefings;
                 g_briefScroll = 0;
                 break;
+            case Item::Progress:
+                g_page = Page::Progress;
+                break;
             case Item::Save:
                 if (!saves::CanSave())
                     ShowStatus(text::Get(text::SaveBlocked), true);
@@ -960,6 +964,10 @@ namespace overlay
             case Page::Confirm: HandleConfirmKey(vk, repeat); break;
             case Page::Options: HandleOptionsKey(vk, repeat); break;
             case Page::Briefings: HandleBriefingsKey(vk, repeat); break;
+            case Page::Progress:
+                if (!repeat && (vk == VK_ESCAPE || vk == VK_BACK || vk == VK_RETURN))
+                    g_page = Page::List;
+                break;
             }
             g_dirty = true;
         }
@@ -992,7 +1000,7 @@ namespace overlay
 
             // Optionen: Zeile unter der Maus
             const Panel P = MakePanel(L);
-            const bool panelPage = g_page == Page::Options || g_page == Page::Briefings;
+            const bool panelPage = g_page == Page::Options || g_page == Page::Briefings || g_page == Page::Progress;
             int optHover = -1;
             if (g_page == Page::Options && L.InMap(mx, my))
             {
@@ -1104,6 +1112,8 @@ namespace overlay
                     g_dirty = true;
                     break;
                 }
+                if (g_page == Page::Progress)
+                    break;
                 const int zoom = std::min(std::max(g_zoom + steps, 0), kZoomCount - 1);
                 if (zoom == g_zoom || !g_map.Loaded() || (g_page != Page::Map && !L.InMap(mx, my)))
                     break;
@@ -1256,6 +1266,70 @@ namespace overlay
             ScrollBar(c, P.x + P.w - m / 3 - 3, top, visible * lh, g_briefScroll, visible, (int)lines.size());
         }
 
+        // 1234567 -> "1.234.567", Trennzeichen nach Sprache
+        std::wstring Grouped(int value)
+        {
+            const wchar_t* lang = text::Language();
+            const wchar_t sep = wcscmp(lang, L"en") == 0 ? L',' : wcscmp(lang, L"fr") == 0 ? L' ' : L'.';
+            std::wstring digits = std::to_wstring(value < 0 ? -(long long)value : (long long)value);
+            for (int i = (int)digits.size() - 3; i > 0; i -= 3)
+                digits.insert((size_t)i, 1, sep);
+            return value < 0 ? L"-" + digits : digits;
+        }
+
+        // Fortschritt im Level: die Zahlen, die das Spiel in seiner eigenen Pausenanzeige einzeln durchblättert
+        void RenderProgress(Canvas& c, const Layout& L)
+        {
+            const Panel P = MakePanel(L);
+            const int m = L.m;
+            PanelFrame(c, P, m, text::Get(text::MenuProgress));
+            gta1::Progress pr;
+            if (!gta1::GetProgress(pr))
+            {
+                c.Text(P.x + P.w / 2, P.y + P.h / 2 - g_fonts.smallPx, text::Get(text::ProgUnavailable), g_fonts.smallFont, 0xB0B6BE, TA_CENTER | TA_TOP, false);
+                return;
+            }
+
+            const int s = g_fonts.smallPx;
+            const int barH = std::max(4, s / 4), gap = std::max(6, s * 3 / 5), textGap = std::max(5, s * 2 / 5);
+            const int x0 = P.x + m + m / 2, x1 = P.x + P.w - m - m / 2, w = x1 - x0;
+            int y = P.rowsY + gap;
+            wchar_t buf[96];
+            // Zeile mit Bezeichnung links, Stand rechts und Balken darunter
+            const auto row = [&](text::Id label, const wchar_t* value, int done, int total, uint32_t color) {
+                c.Text(x0, y, text::Get(label), g_fonts.smallFont, 0xC9CFD6, TA_LEFT | TA_TOP, false);
+                c.Text(x1, y, value, g_fonts.smallFont, 0xFFFFFF, TA_RIGHT | TA_TOP, false);
+                y += s + textGap;
+                c.Fill(x0, y, w, barH, 0x2A3038);
+                const float fill = total > 0 ? std::min(1.0f, std::max(0.0f, done / (float)total)) : 0.0f;
+                if (const int fw = (int)(w * fill + 0.5f))
+                    c.Fill(x0, y, fw, barH, color);
+                y += barH + gap;
+            };
+
+            if (pr.target > 0)
+                swprintf_s(buf, L"%s / %s", Grouped(pr.score).c_str(), Grouped(pr.target).c_str());
+            else
+                wcscpy_s(buf, Grouped(pr.score).c_str());
+            row(text::ProgScore, buf, pr.score, pr.target, kAccent);
+            if (pr.missionsTotal > 0)
+            {
+                swprintf_s(buf, L"%d / %d", pr.missionsDone, pr.missionsTotal);
+                row(text::ProgMissions, buf, pr.missionsDone, pr.missionsTotal, 0x5AA9FF);
+            }
+            if (pr.secretsTotal > 0)
+            {
+                swprintf_s(buf, L"%d / %d", pr.secretsFound, pr.secretsTotal);
+                row(text::ProgSecrets, buf, pr.secretsFound, pr.secretsTotal, 0x4CC36B);
+            }
+
+            // Leben und Multiplikator nebeneinander
+            swprintf_s(buf, L"%s  %d", text::Get(text::ProgLives), pr.lives);
+            c.Text(x0, y, buf, g_fonts.smallFont, 0xC9CFD6, TA_LEFT | TA_TOP, false);
+            swprintf_s(buf, L"%s  x%d", text::Get(text::ProgMultiplier), pr.multiplier);
+            c.Text(x0 + w / 2, y, buf, g_fonts.smallFont, 0xC9CFD6, TA_LEFT | TA_TOP, false);
+        }
+
         void RenderMenu(Canvas& c)
         {
             const int W = c.Width(), H = c.Height();
@@ -1324,13 +1398,15 @@ namespace overlay
 
             // Rechts: Optionen, Briefings oder die Karte
             const bool mapActive = g_page == Page::Map;
-            const bool panelPage = g_page == Page::Options || g_page == Page::Briefings;
+            const bool panelPage = g_page == Page::Options || g_page == Page::Briefings || g_page == Page::Progress;
             if (!panelPage)
                 c.Fill(mapX - 2, mapY - 2, mapW + 4, mapH + 4, mapActive ? kAccent : 0x4A515B);
             if (g_page == Page::Options)
                 RenderOptions(c, L);
             else if (g_page == Page::Briefings)
                 RenderBriefings(c, L);
+            else if (g_page == Page::Progress)
+                RenderProgress(c, L);
             else if (g_map.Loaded())
             {
                 const float ppb = kZoom[g_zoom];
@@ -1469,6 +1545,8 @@ namespace overlay
                 wcscpy_s(buf, text::Get(text::HelpOptions));
             else if (g_page == Page::Briefings)
                 wcscpy_s(buf, text::Get(text::HelpBriefings));
+            else if (g_page == Page::Progress)
+                wcscpy_s(buf, text::Get(text::HelpProgress));
             else
                 wcscpy_s(buf, text::Get(text::HelpConfirm));
             c.Text(W / 2, H - m / 2 - g_fonts.smallPx - 2, buf, g_fonts.smallFont, 0xD5DAE0, TA_CENTER | TA_TOP);

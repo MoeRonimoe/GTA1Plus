@@ -96,6 +96,7 @@
     <ClInclude Include="src\camera.h" />
     <ClInclude Include="src\fire.h" />
     <ClInclude Include="src\pois.h" />
+    <ClInclude Include="src\rumble.h" />
     <ClInclude Include="src\tiltcam.h" />
     <ClInclude Include="src\options.h" />
     <ClInclude Include="src\briefings.h" />
@@ -119,6 +120,7 @@
     <ClCompile Include="src\camera.cpp" />
     <ClCompile Include="src\fire.cpp" />
     <ClCompile Include="src\pois.cpp" />
+    <ClCompile Include="src\rumble.cpp" />
     <ClCompile Include="src\tiltcam.cpp" />
     <ClCompile Include="src\options.cpp" />
     <ClCompile Include="src\briefings.cpp" />

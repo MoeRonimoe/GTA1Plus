@@ -13,6 +13,7 @@ struct Config
     bool waypoints      = true;  // eigene Wegpunkte
     bool twinStick      = true;  // zu Fuß mit WASD laufen und mit der Maus zielen
     bool controller     = true;  // XInput- und DirectInput-Controller
+    int  vibration      = 70;    // Stärke der Controller-Vibration in Prozent, 0 = aus
     bool alwaysAim      = false; // Twin-Stick: immer zum Fadenkreuz schauen, seitwärts laufen
     bool wasdDriving    = true;  // Twin-Stick: auch im Auto mit WASD fahren
     bool portraitColors = true;  // Spielfigur passend zum Portrait einfärben

@@ -6,6 +6,7 @@
 #include "hooks.h"
 #include "log.h"
 #include "overlay.h"
+#include "rumble.h"
 #include "tiltcam.h"
 
 #include <windows.h>
@@ -48,6 +49,7 @@ namespace controls
 
         using XInputGetState_t = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
         XInputGetState_t g_xinput = nullptr;
+        rumble::XInputSetState_t g_xinputSet = nullptr;
         bool g_padConnected = false;
         DWORD g_padRetry = 0;
         WORD g_padPrev = 0;
@@ -178,6 +180,7 @@ namespace controls
                 g_di.dev->Unacquire();
                 g_di.dev->Release();
                 g_di.dev = nullptr;
+                rumble::UseHid(nullptr, 0, 0, nullptr);
                 LOG("Controller getrennt: %ls", g_di.name);
             }
             InterlockedExchange(&g_di.found, 0);
@@ -213,6 +216,13 @@ namespace controls
             g_di.dev = dev;
             LOG("Controller verbunden (DirectInput): %ls, VID %04X PID %04X%s", g_di.name, g_di.vid, g_di.pid,
                 g_di.triggers ? ", analoge Trigger" : "");
+            // Für die Vibration: Pfad des HID-Geräts hinter dem DirectInput-Gerät
+            DIPROPGUIDANDPATH path = {};
+            path.diph.dwSize = sizeof(path);
+            path.diph.dwHeaderSize = sizeof(DIPROPHEADER);
+            path.diph.dwHow = DIPH_DEVICE;
+            if (SUCCEEDED(dev->GetProperty(DIPROP_GUIDANDPATH, &path.diph)))
+                rumble::UseHid(path.wszPath, g_di.vid, g_di.pid, g_di.name);
             return true;
         }
 
@@ -288,7 +298,10 @@ namespace controls
                 g_padRetry = now;
                 const bool ok = g_xinput(0, &s) == ERROR_SUCCESS;
                 if (ok != g_padConnected)
+                {
                     LOG("Controller %s (XInput)", ok ? "verbunden" : "getrennt");
+                    rumble::UseXInput(ok ? g_xinputSet : nullptr);
+                }
                 g_padConnected = ok;
                 if (ok)
                     return true;
@@ -309,6 +322,7 @@ namespace controls
                 if (HMODULE m = LoadLibraryW(dll))
                 {
                     g_xinput = reinterpret_cast<XInputGetState_t>(GetProcAddress(m, "XInputGetState"));
+                    g_xinputSet = reinterpret_cast<rumble::XInputSetState_t>(GetProcAddress(m, "XInputSetState"));
                     if (g_xinput)
                     {
                         LOG("XInput geladen: %ls", dll);
@@ -355,6 +369,7 @@ namespace controls
                 return;
             g_frontPoll = now;
             EnsurePadInit();
+            rumble::Tick(false, 0); // außerhalb der Levels steht das Pad still
             XINPUT_STATE s = {};
             HWND wnd = GameHasFocus() ? GameWindow() : nullptr;
             if (!wnd || !PollPad(s))
@@ -767,6 +782,8 @@ namespace controls
 
         XINPUT_STATE pad = {};
         const bool havePad = focus && PollPad(pad);
+        // Vibration nur, solange wirklich mit dem Controller gespielt wird
+        rumble::Tick(havePad && g_padActive && gta1::InGame() && !menu && gta1::RunState() == 1, g_cfg.vibration);
         if (havePad)
             PadMenu(pad, menu);
 

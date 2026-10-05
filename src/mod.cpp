@@ -11,6 +11,7 @@
 #include "hooks.h"
 #include "log.h"
 #include "overlay.h"
+#include "rumble.h"
 #include "saves.h"
 #include "text.h"
 #include "tiltcam.h"
@@ -73,7 +74,7 @@ namespace
     }
 
     // Debug: <asi>.burn anlegen -> Spielfigur anzünden, <asi>.douse -> löschen (zum Testen im Spiel)
-    std::wstring g_burnRequest, g_douseRequest;
+    std::wstring g_burnRequest, g_douseRequest, g_rumbleRequest;
     DWORD g_debugCheck = 0;
 
     void CheckDebugRequests()
@@ -91,6 +92,12 @@ namespace
         {
             DeleteFileW(g_douseRequest.c_str());
             LOG("Debug: Spielfigur löschen: %s", gta1::ExtinguishPlayer() ? "ok" : "brennt nicht");
+        }
+        // <asi>.rumble: Controller eine Sekunde lang vibrieren lassen
+        if (GetFileAttributesW(g_rumbleRequest.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            DeleteFileW(g_rumbleRequest.c_str());
+            rumble::Test(1000);
         }
     }
 
@@ -134,6 +141,7 @@ void ModInit(HMODULE self)
     LoadConfig(SiblingPath(self, L".ini").c_str());
     g_burnRequest = SiblingPath(self, L".burn");
     g_douseRequest = SiblingPath(self, L".douse");
+    g_rumbleRequest = SiblingPath(self, L".rumble");
     if (g_cfg.log)
         logx::Open(SiblingPath(self, L".log").c_str());
 
@@ -180,6 +188,7 @@ void ModInit(HMODULE self)
         saves::Init(SiblingPath(self, L"").c_str());
         LOG("Briefings und Spielstände: %s", gta1::SetScriptEventCallback(&OnScriptEvent) ? "aktiv" : "Spielcode passt nicht");
         controls::Init(); // auch für die Maus im Pausemenü
+        rumble::Init();
         fire::Init();
         // Immer einhängen: Steuerung und Controller lassen sich im Optionsmenü während des Spiels umschalten
         gta1::SetInputFilter(&controls::ProcessPacket);

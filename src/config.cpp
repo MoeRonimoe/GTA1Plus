@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 17;
+static const int kConfigVersion = 18;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=17\r\n"
+    "Version=18\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -55,6 +55,9 @@ static const char kDefaultIni[] =
     "; L1/R1 switch weapon, Circle/B fire (horn in a vehicle), Options/Start pause menu, Share/Back map.\r\n"
     "; The controller also works in the main menu\r\n"
     "Controller=1\r\n"
+    "; Controller vibration for your own shots, hits you take, crashes and nearby explosions: strength in\r\n"
+    "; percent, 0 = off. Works with Xbox pads and with PS4/PS5 pads (USB or Bluetooth)\r\n"
+    "Vibration=70\r\n"
     "; Color the character to match the portrait picked in the main menu (colors under [PlayerColors])\r\n"
     "PortraitColors=1\r\n"
     "; Show the character's health as five hearts below the score\r\n"
@@ -197,6 +200,7 @@ namespace
         { L"Features", L"AlwaysAim",      Kind::Bool, &g_cfg.alwaysAim,      nullptr, nullptr },
         { L"Features", L"WASDDriving",    Kind::Bool, &g_cfg.wasdDriving,    nullptr, nullptr },
         { L"Features", L"Controller",     Kind::Bool, &g_cfg.controller,     nullptr, nullptr },
+        { L"Features", L"Vibration",      Kind::Int,  &g_cfg.vibration,      nullptr, nullptr },
         { L"Features", L"PortraitColors", Kind::Bool, &g_cfg.portraitColors, nullptr, nullptr },
         { L"Features", L"Hearts",         Kind::Bool, &g_cfg.hearts,         nullptr, nullptr },
         { L"Features", L"POIs",           Kind::Bool, &g_cfg.pois,           nullptr, nullptr },
@@ -341,6 +345,7 @@ void LoadConfig(const wchar_t* ini)
     g_cfg.tiltAngle = std::clamp(g_cfg.tiltAngle, 0, 45);
     g_cfg.vehicleView = std::clamp(g_cfg.vehicleView, 0, 3);
     g_cfg.trafficRange = std::clamp(g_cfg.trafficRange, 100, 250);
+    g_cfg.vibration = std::clamp(g_cfg.vibration, 0, 100);
 
     // Neue oder veraltete INI: kommentierte Vorlage schreiben und die aktuellen Werte übernehmen
     if (!exists || version < kConfigVersion)

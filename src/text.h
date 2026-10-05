@@ -118,6 +118,15 @@ namespace text
         OptPistolDamage,
         OptMachineGunDamage,
         OptPunchDamage,
+        OptRumble,
+        MenuProgress,
+        HelpProgress,
+        ProgScore,
+        ProgMissions,
+        ProgSecrets,
+        ProgLives,
+        ProgMultiplier,
+        ProgUnavailable,
         Count
     };
 
