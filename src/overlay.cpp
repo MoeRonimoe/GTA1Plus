@@ -153,7 +153,8 @@ namespace overlay
             const int footerH = g_fonts.smallPx + l.m;
             l.top = l.m + headerH;
             l.areaH = H - l.top - footerH - l.m / 2;
-            l.listW = std::min(std::max(W * 24 / 100, 170), 330);
+            // Bei hohen Auflösungen wächst die Schrift mit der Bildhöhe, die Spalte darf dann breiter werden
+            l.listW = std::min(std::max(W * 24 / 100, 170), std::max(330, H * 55 / 100));
             l.rowH = g_fonts.normalPx * 2 + 4;
             l.listY = l.top + l.m / 2;
             l.mapX = l.m + l.listW + l.m / 2;
@@ -574,11 +575,13 @@ namespace overlay
                 g_menu = Menu::Closed;
                 return;
             }
+            // Position zuerst: das Hintergrundbild braucht bei hohen Auflösungen so lange, dass das Spiel danach
+            // als "nicht im Level" gälte (kein HUD in den letzten 500 ms)
+            gta1::Player p;
+            g_havePlayer = gta1::GetPlayer(p);
             CaptureBackground(v);
             EnsureMap();
 
-            gta1::Player p;
-            g_havePlayer = gta1::GetPlayer(p);
             if (g_havePlayer)
             {
                 g_player = p;

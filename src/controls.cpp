@@ -173,6 +173,35 @@ namespace controls
             return found;
         }
 
+        // Eigenes unsichtbares Fenster für DirectInput: SetCooperativeLevel hängt sich in die Fensterprozedur des
+        // angegebenen Fensters. Am Spielfenster geriet das mit anderen, die dasselbe tun (Fenstermodus im ASI-Loader
+        // der Classics-Ausgabe), kurz nach dem Start in eine Endlosschleife. Mit den echten user32-Funktionen
+        // angelegt, damit Wrapper wie cnc-ddraw es nicht für ein Fenster des Spiels halten.
+        HWND InputWindow()
+        {
+            static HWND s_wnd = nullptr;
+            static bool s_tried = false;
+            if (s_tried)
+                return s_wnd;
+            s_tried = true;
+            const HMODULE user32 = GetModuleHandleW(L"user32.dll");
+            const auto registerClass = reinterpret_cast<ATOM(WINAPI*)(const WNDCLASSW*)>(hooks::FindExport(user32, "RegisterClassW"));
+            const auto createWindow = reinterpret_cast<HWND(WINAPI*)(DWORD, LPCWSTR, LPCWSTR, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, LPVOID)>(
+                hooks::FindExport(user32, "CreateWindowExW"));
+            const auto defProc = reinterpret_cast<WNDPROC>(hooks::FindExport(user32, "DefWindowProcW"));
+            if (!registerClass || !createWindow || !defProc)
+                return nullptr;
+            WNDCLASSW wc = {};
+            wc.lpfnWndProc = defProc;
+            wc.hInstance = GetModuleHandleW(nullptr);
+            wc.lpszClassName = L"GTA1PlusInput";
+            registerClass(&wc);
+            s_wnd = createWindow(0, wc.lpszClassName, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, wc.hInstance, nullptr);
+            if (!s_wnd)
+                LOG("Fenster für DirectInput ließ sich nicht anlegen (Fehler %u)", GetLastError());
+            return s_wnd;
+        }
+
         void DiRelease()
         {
             if (g_di.dev)
@@ -188,7 +217,8 @@ namespace controls
 
         bool DiOpen()
         {
-            HWND wnd = GameWindow();
+            // Erst wenn das Spiel sein Fenster hat; DirectInput bekommt aber ein eigenes
+            HWND wnd = GameWindow() ? InputWindow() : nullptr;
             if (!wnd || (!g_di.di && FAILED(g_di.create(GetModuleHandleW(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8W,
                                                          reinterpret_cast<void**>(&g_di.di), nullptr))))
                 return false;
