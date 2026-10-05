@@ -4,6 +4,22 @@
 #include <cmath>
 #include <vector>
 
+bool Canvas::s_slowReadback = false;
+
+namespace
+{
+    constexpr int kMaxSlowReads = 800;   // so viele Pixel darf eine Ebene höchstens zurücklesen, wenn Lesen langsam ist
+    constexpr uint32_t kSnapAlpha = 64;  // sonst: ab dieser Deckung deckend, darunter weggelassen
+
+    // Auf eine Ebene mischen: Farbe wie gehabt (ergibt die vormultiplizierte Farbe), Deckung im obersten Byte
+    inline uint32_t BlendLayer(uint32_t dst, uint32_t rgb, int a)
+    {
+        const uint32_t da = dst >> 24;
+        const uint32_t na = da + ((255 - da) * a + 127) / 255;
+        return (na << 24) | BlendRgb(dst & 0xFFFFFF, rgb, a);
+    }
+}
+
 Canvas::~Canvas()
 {
     if (m_dc)
@@ -11,6 +27,12 @@ Canvas::~Canvas()
         SelectObject(m_dc, m_oldBmp);
         DeleteObject(m_bmp);
         DeleteDC(m_dc);
+    }
+    if (m_maskDc)
+    {
+        SelectObject(m_maskDc, m_maskOld);
+        DeleteObject(m_maskBmp);
+        DeleteDC(m_maskDc);
     }
 }
 
@@ -65,6 +87,8 @@ void Canvas::Fill(int x, int y, int w, int h, uint32_t rgb)
 {
     if (!Clip(x, y, w, h))
         return;
+    if (m_layer)
+        rgb |= 0xFF000000;
     for (int j = 0; j < h; ++j)
         std::fill_n(Row(y + j) + x, w, rgb);
 }
@@ -76,8 +100,12 @@ void Canvas::Blend(int x, int y, int w, int h, uint32_t rgb, int alpha)
     for (int j = 0; j < h; ++j)
     {
         uint32_t* p = Row(y + j) + x;
-        for (int i = 0; i < w; ++i)
-            p[i] = BlendRgb(p[i], rgb, alpha);
+        if (m_layer)
+            for (int i = 0; i < w; ++i)
+                p[i] = BlendLayer(p[i], rgb, alpha);
+        else
+            for (int i = 0; i < w; ++i)
+                p[i] = BlendRgb(p[i], rgb, alpha);
     }
 }
 
@@ -105,7 +133,10 @@ void Canvas::BlendPixel(int x, int y, uint32_t rgb, int alpha)
             alpha = (int)(alpha * edge);
     }
     uint32_t& p = Row(y)[x];
-    p = alpha >= 255 ? rgb : BlendRgb(p, rgb, alpha);
+    if (m_layer)
+        p = alpha >= 255 ? (rgb | 0xFF000000) : BlendLayer(p, rgb, alpha);
+    else
+        p = alpha >= 255 ? rgb : BlendRgb(p, rgb, alpha);
 }
 
 // Dicke Linie mit runden Enden; jedes Pixel wird genau einmal gemischt
@@ -255,8 +286,105 @@ static COLORREF ToColorRef(uint32_t rgb)
     return RGB((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
 }
 
+bool Canvas::EnsureMask(int w, int h)
+{
+    if (!m_maskDc)
+    {
+        m_maskDc = CreateCompatibleDC(nullptr);
+        if (!m_maskDc)
+            return false;
+        SetBkMode(m_maskDc, TRANSPARENT);
+        SetTextColor(m_maskDc, RGB(255, 255, 255));
+        SetTextAlign(m_maskDc, TA_LEFT | TA_TOP);
+    }
+    if (m_maskPx && w <= m_maskW && h <= m_maskH)
+        return true;
+    if (m_maskBmp)
+    {
+        SelectObject(m_maskDc, m_maskOld);
+        DeleteObject(m_maskBmp);
+        m_maskBmp = nullptr;
+        m_maskPx = nullptr;
+    }
+    m_maskW = std::max(w, m_maskW);
+    m_maskH = std::max(h, m_maskH);
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
+    bi.bmiHeader.biWidth = m_maskW;
+    bi.bmiHeader.biHeight = -m_maskH;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    void* bits = nullptr;
+    m_maskBmp = CreateDIBSection(m_maskDc, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (!m_maskBmp)
+    {
+        m_maskW = m_maskH = 0;
+        return false;
+    }
+    m_maskOld = SelectObject(m_maskDc, m_maskBmp);
+    m_maskPx = static_cast<uint32_t*>(bits);
+    return true;
+}
+
+// Maske (weiß auf schwarz gezeichneter Text) als Deckung in die Ebene mischen
+void Canvas::BlendMask(int left, int top, int w, int h, uint32_t rgb)
+{
+    for (int j = 0; j < h; ++j)
+    {
+        const int y = top + j;
+        if (y < 0 || y >= m_h)
+            continue;
+        const uint32_t* mask = m_maskPx + (size_t)j * m_maskW;
+        uint32_t* row = Row(y);
+        for (int i = 0; i < w; ++i)
+        {
+            const int cov = (mask[i] >> 8) & 0xFF;
+            const int x = left + i;
+            if (cov && x >= 0 && x < m_w)
+                row[x] = cov >= 255 ? (rgb | 0xFF000000) : BlendLayer(row[x], rgb, cov);
+        }
+    }
+}
+
+// Text in einer Ebene: GDI zeichnet ihn in eine eigene Maske, daraus wird die Deckung
+void Canvas::TextLayer(int x, int y, const wchar_t* s, HFONT font, uint32_t rgb, UINT align, bool shadow)
+{
+    const int len = lstrlenW(s);
+    if (!len || !EnsureMask(1, 1))
+        return;
+    HGDIOBJ old = SelectObject(m_maskDc, font);
+    SIZE sz = {};
+    GetTextExtentPoint32W(m_maskDc, s, len, &sz);
+    constexpr int pad = 2;
+    const int w = sz.cx + 2 * pad + sz.cy / 2, h = sz.cy + 2 * pad;   // etwas Luft für überhängende Zeichen
+    SelectObject(m_maskDc, old);
+    if (!EnsureMask(w, h))
+        return;
+    old = SelectObject(m_maskDc, font);
+    for (int j = 0; j < h; ++j)
+        std::fill_n(m_maskPx + (size_t)j * m_maskW, w, 0u);
+    TextOutW(m_maskDc, pad, pad, s, len);
+    GdiFlush();
+    SelectObject(m_maskDc, old);
+
+    int left = x - pad;
+    if ((align & TA_CENTER) == TA_CENTER)
+        left = x - sz.cx / 2 - pad;
+    else if (align & TA_RIGHT)
+        left = x - sz.cx - pad;
+    if (shadow)
+        BlendMask(left + 1, y - pad + 1, w, h, 0x000000);
+    BlendMask(left, y - pad, w, h, rgb);
+}
+
 void Canvas::Text(int x, int y, const wchar_t* s, HFONT font, uint32_t rgb, UINT align, bool shadow)
 {
+    if (m_layer)
+    {
+        TextLayer(x, y, s, font, rgb, align, shadow);
+        return;
+    }
     const HGDIOBJ old = SelectObject(m_dc, font);
     SetTextAlign(m_dc, align);
     const int len = lstrlenW(s);
@@ -289,6 +417,89 @@ void Canvas::ReadFrom(const SurfaceView& v, int x, int y, int w, int h)
     const int bpp = v.fmt.BytesPerPixel();
     for (int j = 0; j < h; ++j)
         ConvertFromSurface(v.fmt, v.Row(y + j) + x * bpp, Row(y + j) + x, w);
+}
+
+void Canvas::BeginLayer(int x, int y, int w, int h)
+{
+    m_layer = true;
+    if (!Clip(x, y, w, h))
+        return;
+    for (int j = 0; j < h; ++j)
+        std::fill_n(Row(y + j) + x, w, 0u);
+}
+
+void Canvas::Composite(const SurfaceView& v, int x, int y, int w, int h)
+{
+    m_layer = false;
+    if (x + w > v.width) w = v.width - x;
+    if (y + h > v.height) h = v.height - y;
+    if (!Clip(x, y, w, h))
+        return;
+    const int bpp = v.fmt.BytesPerPixel();
+
+    // Halbdurchsichtige Pixel brauchen den Hintergrund. Ist das Lesen langsam, sind nur wenige erlaubt (weiche
+    // Kanten von Formen); Ebenen mit großen halbdurchsichtigen Flächen werden stattdessen deckend gezeichnet.
+    bool snap = false;
+    if (s_slowReadback)
+    {
+        int translucent = 0;
+        for (int j = 0; j < h && translucent <= kMaxSlowReads; ++j)
+        {
+            const uint32_t* row = Row(y + j) + x;
+            for (int i = 0; i < w; ++i)
+                translucent += (row[i] >> 24) - 1u < 254u;
+        }
+        snap = translucent > kMaxSlowReads;
+    }
+
+    for (int j = 0; j < h; ++j)
+    {
+        uint32_t* row = Row(y + j) + x;
+        uint8_t* dst = v.Row(y + j) + x * bpp;
+        int i = 0;
+        while (i < w)
+        {
+            uint32_t a = row[i] >> 24;
+            if (a == 0 || (snap && a < kSnapAlpha))
+            {
+                ++i;
+                continue;
+            }
+            if (a == 255 || snap)
+            {
+                // deckende Pixel am Stück schreiben
+                int k = i;
+                for (; k < w; ++k)
+                {
+                    a = row[k] >> 24;
+                    if (a == 255)
+                        row[k] &= 0xFFFFFF;
+                    else if (snap && a >= kSnapAlpha)
+                    {
+                        // vormultiplizierte Farbe zurückrechnen
+                        const uint32_t c = row[k];
+                        const uint32_t r = std::min(255u, ((c >> 16) & 0xFF) * 255 / a), g = std::min(255u, ((c >> 8) & 0xFF) * 255 / a),
+                                       b = std::min(255u, (c & 0xFF) * 255 / a);
+                        row[k] = (r << 16) | (g << 8) | b;
+                    }
+                    else
+                        break;
+                }
+                ConvertToSurface(v.fmt, row + i, dst + i * bpp, k - i);
+                i = k;
+                continue;
+            }
+            uint32_t bg = 0;
+            ConvertFromSurface(v.fmt, dst + i * bpp, &bg, 1);
+            const uint32_t c = row[i], ia = 255 - a;
+            const uint32_t r = std::min(255u, (((bg >> 16) & 0xFF) * ia + 127) / 255 + ((c >> 16) & 0xFF));
+            const uint32_t g = std::min(255u, (((bg >> 8) & 0xFF) * ia + 127) / 255 + ((c >> 8) & 0xFF));
+            const uint32_t b = std::min(255u, ((bg & 0xFF) * ia + 127) / 255 + (c & 0xFF));
+            const uint32_t out = (r << 16) | (g << 8) | b;
+            ConvertToSurface(v.fmt, &out, dst + i * bpp, 1);
+            ++i;
+        }
+    }
 }
 
 void Canvas::WriteTo(const SurfaceView& v, int x, int y, int w, int h)

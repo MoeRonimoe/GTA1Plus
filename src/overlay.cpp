@@ -540,15 +540,69 @@ namespace overlay
             pass(tmp.data(), img.data(), h, w, 1, w); // vertikal
         }
 
+        // Lesen aus der Surface messen: liegt das Bild im Grafikspeicher (z.B. Fenstermodus des ASI-Loaders der
+        // Classics-Ausgabe), ist Lesen dort einige hundert Mal langsamer als Schreiben. Dann holt das Overlay
+        // möglichst nichts mehr aus dem Bild zurück.
+        bool g_slowRead = false;
+        int g_readW = 0, g_readH = 0;
+
+        void MeasureReadback(const SurfaceView& v)
+        {
+            if (v.width == g_readW && v.height == g_readH)
+                return;
+            g_readW = v.width;
+            g_readH = v.height;
+            static uint32_t probe[1024];
+            const int n = std::min(1024, v.width);
+            LARGE_INTEGER f, t0, t1;
+            QueryPerformanceFrequency(&f);
+            QueryPerformanceCounter(&t0);
+            for (int k = 0; k < 4; ++k)
+                ConvertFromSurface(v.fmt, v.Row(v.height / 2 + k), probe, n);
+            QueryPerformanceCounter(&t1);
+            const double us = (t1.QuadPart - t0.QuadPart) * 1e6 / f.QuadPart;
+            g_slowRead = us > 150.0;   // normaler Arbeitsspeicher braucht dafür wenige Mikrosekunden
+            Canvas::SetSlowReadback(g_slowRead);
+            LOG("Bildspeicher %dx%d: Lesen von %d Pixeln dauert %.0f µs%s", v.width, v.height, 4 * n, us,
+                g_slowRead ? " - langsam, das Overlay liest nichts mehr zurück" : "");
+        }
+
         void CaptureBackground(const SurfaceView& v)
         {
             const int w = v.width, h = v.height;
             g_original.resize((size_t)w * h);
-            for (int y = 0; y < h; ++y)
-                ConvertFromSurface(v.fmt, v.Row(y), &g_original[(size_t)y * w], w);
+            // Bei langsamem Lesen nur ein Raster holen (höchstens etwa 150000 Pixel) und vergrößern; das Bild
+            // wird ohnehin weichgezeichnet
+            int step = 1;
+            while (g_slowRead && (w / step) * (h / step) > 150000)
+                ++step;
+            if (step == 1)
+            {
+                for (int y = 0; y < h; ++y)
+                    ConvertFromSurface(v.fmt, v.Row(y), &g_original[(size_t)y * w], w);
+            }
+            else
+            {
+                const int bpp = v.fmt.BytesPerPixel();
+                const int sw = (w + step - 1) / step, sh = (h + step - 1) / step;
+                std::vector<uint32_t> grid((size_t)sw * sh);
+                for (int j = 0; j < sh; ++j)
+                {
+                    const uint8_t* row = v.Row(std::min(h - 1, j * step + step / 2));
+                    for (int i = 0; i < sw; ++i)
+                        ConvertFromSurface(v.fmt, row + std::min(w - 1, i * step + step / 2) * bpp, &grid[(size_t)j * sw + i], 1);
+                }
+                for (int y = 0; y < h; ++y)
+                {
+                    const uint32_t* from = &grid[(size_t)(y / step) * sw];
+                    uint32_t* to = &g_original[(size_t)y * w];
+                    for (int x = 0; x < w; ++x)
+                        to[x] = from[x / step];
+                }
+            }
 
             g_background = g_original;
-            BoxBlur(g_background, w, h, std::max(2, h / 160));
+            BoxBlur(g_background, w, h, std::max(2, h / 160) + (step > 1 ? step : 0));
             for (uint32_t& c : g_background)
             {
                 const uint32_t r = ((c >> 16) & 0xFF) * 90 >> 8, g = ((c >> 8) & 0xFF) * 90 >> 8, b = (c & 0xFF) * 90 >> 8;
@@ -557,6 +611,10 @@ namespace overlay
             g_bgW = w;
             g_bgH = h;
         }
+
+        // So lange ohne Seitenwechsel gilt das Spiel als "präsentiert nicht" (eigene Pause mit F6). Großzügig, denn
+        // selbst durch die Seiten zu blättern, während das Spiel nur langsam ist, zeigt halbfertige Bilder.
+        constexpr DWORD kNoFlipTime = 500;
 
         void UpdateNav()
         {
@@ -624,7 +682,7 @@ namespace overlay
             LOG("Menü geschlossen");
 
             // Präsentiert das Spiel gerade nicht selbst (z.B. F6-Pause), das ursprüngliche Bild zurückholen
-            if (wasOpen && GetTickCount() - ddhook::LastGameFlipTick() > 100)
+            if (wasOpen && GetTickCount() - ddhook::LastGameFlipTick() > kNoFlipTime)
             {
                 g_restore = true;
                 ddhook::PresentOverlay();
@@ -1152,10 +1210,10 @@ namespace overlay
             const float s = std::max(12.0f, v.height / 32.0f);
             const float x = g_mouseX, y = g_mouseY;
             const int bx = (int)x - 4, by = (int)y - 4, bw = (int)(s * 0.8f) + 10, bh = (int)(s * 1.1f) + 10;
-            c.ReadFrom(v, bx, by, bw, bh);
+            c.BeginLayer(bx, by, bw, bh);
             c.Triangle(x - 1.5f, y - 3.0f, x - 1.5f, y + s + 3.0f, x + s * 0.72f + 3.0f, y + s * 0.72f + 1.0f, 0x101418, 220);
             c.Triangle(x, y, x, y + s, x + s * 0.72f, y + s * 0.72f, 0xFFFFFF);
-            c.WriteTo(v, bx, by, bw, bh);
+            c.Composite(v, bx, by, bw, bh);
         }
 
         void PanelFrame(Canvas& c, const Panel& P, int m, const wchar_t* title)
@@ -1618,11 +1676,11 @@ namespace overlay
             const int bw = c.TextWidth(line, g_fonts.smallFont) + 2 * padX;
             const int bh = g_fonts.smallPx + 2 * padY + 2;
             const int x = (v.width - bw) / 2, y = v.height * 17 / 100;
-            c.ReadFrom(v, x, y, bw, bh);
+            c.BeginLayer(x, y, bw, bh);
             c.Blend(x, y, bw, bh, 0x0B0E12, 190);
             c.Fill(x, y, 3, bh, kAccent);
             c.Text(x + padX, y + padY, line, g_fonts.smallFont, 0xFFFFFF, TA_LEFT | TA_TOP, false);
-            c.WriteTo(v, x, y, bw, bh);
+            c.Composite(v, x, y, bw, bh);
         }
 
         void DrawMinimap(SurfaceView& v, const gta1::Player& p)
@@ -1642,7 +1700,7 @@ namespace overlay
             const float R = S * 0.5f, cx = x + R, cy = y + R;
             const float ppb = S / 30.0f;
 
-            c.ReadFrom(v, x - 2, y - 2, S + 4, S + 4);
+            c.BeginLayer(x - 2, y - 2, S + 4, S + 4);
             g_miniBuf.resize((size_t)S * S);
             g_map.Render(g_miniBuf.data(), S, S, S, p.x, p.y, ppb, g_style);
             for (int j = 0; j < S; ++j)
@@ -1680,7 +1738,7 @@ namespace overlay
             const float nr = std::max(6.0f, g_fonts.smallPx * 0.7f);
             c.Circle(cx, y + nr * 0.5f, nr, 0x1B1F24, 230);
             c.Text((int)cx, (int)(y + nr * 0.5f - g_fonts.smallPx * 0.55f), L"N", g_fonts.smallFont, 0xFFFFFF, TA_CENTER | TA_TOP, false);
-            c.WriteTo(v, x - 2, y - 2, S + 4, S + 4);
+            c.Composite(v, x - 2, y - 2, S + 4, S + 4);
         }
 
         // Blauer Pfeil oben in der Mitte, zeigt auf den nächsten Abbiegepunkt der Route
@@ -1700,7 +1758,7 @@ namespace overlay
             const float cx = W * 0.5f, cy = H * 0.02f + s * 1.05f;
             const int bx = (int)(cx - s * 2.2f), by = (int)(cy - s * 1.25f), bw = (int)(s * 4.4f), bh = (int)(s * 2.5f + g_fonts.smallPx + 4);
 
-            c.ReadFrom(v, bx, by, bw, bh);
+            c.BeginLayer(bx, by, bw, bh);
             DrawArrowShape(c, cx + 2, cy + 2, s * 1.18f, a, 0x000000, 80);
             DrawArrowShape(c, cx, cy, s * 1.18f, a, 0xFFFFFF, 240);
             DrawArrowShape(c, cx, cy, s, a, kGpsBlue, 255);
@@ -1708,7 +1766,7 @@ namespace overlay
             wchar_t buf[32];
             swprintf_s(buf, L"%d m", (int)(nav::RemainingBlocks() * kMetersPerBlock + 0.5f));
             c.Text((int)cx, (int)(cy + s * 1.15f), buf, g_fonts.smallFont, 0xFFFFFF, TA_CENTER | TA_TOP, true);
-            c.WriteTo(v, bx, by, bw, bh);
+            c.Composite(v, bx, by, bw, bh);
         }
 
         // Herzform (Parametergleichung), Mittelpunkt 0/0, etwa 1 breit
@@ -1752,7 +1810,7 @@ namespace overlay
             // Brennend flackern die vollen Herzen orange
             const uint32_t fill = burning && (GetTickCount() / 120) % 2 == 0 ? 0xFF8A1E : 0xE8262E;
 
-            c.ReadFrom(v, bx, by, bw, bh);
+            c.BeginLayer(bx, by, bw, bh);
             for (int i = 0; i < kHeartCount; ++i)
             {
                 const float cx = right - (kHeartCount - i - 0.5f) * kHeartStep;
@@ -1769,7 +1827,7 @@ namespace overlay
                 if (part > 0.5f)
                     c.Circle(cx - kHeartSize * 0.2f, cy - kHeartSize * 0.17f, 1.4f, 0xFFFFFF, 170);
             }
-            c.WriteTo(v, bx, by, bw, bh);
+            c.Composite(v, bx, by, bw, bh);
         }
 
         // Name einer Taste aus ihrem Scancode (+0x100 = erweiterte Taste), in der Sprache von Windows
@@ -1799,11 +1857,11 @@ namespace overlay
             const int bh = g_fonts.normalPx + 2 * padY + 2;
             const int x = (v.width - bw) / 2, y = v.height * 68 / 100;
             const bool pulse = (GetTickCount() / 250) % 2 == 0;
-            c.ReadFrom(v, x, y, bw, bh);
+            c.BeginLayer(x, y, bw, bh);
             c.Blend(x, y, bw, bh, 0x160907, 205);
             c.Fill(x, y, 4, bh, pulse ? 0xFF8A1E : 0xE8262E);
             c.Text(x + padX, y + padY, line, g_fonts.normalFont, 0xFFFFFF, TA_LEFT | TA_TOP, false);
-            c.WriteTo(v, x, y, bw, bh);
+            c.Composite(v, x, y, bw, bh);
         }
 
         // Meldung im Spiel, z.B. "Automatisch gespeichert"
@@ -1814,11 +1872,11 @@ namespace overlay
             const int bw = c.TextWidth(g_toast.c_str(), g_fonts.normalFont) + 2 * padX;
             const int bh = g_fonts.normalPx + 2 * padY + 2;
             const int x = (v.width - bw) / 2, y = v.height * 80 / 100;
-            c.ReadFrom(v, x, y, bw, bh);
+            c.BeginLayer(x, y, bw, bh);
             c.Blend(x, y, bw, bh, 0x0B0E12, 200);
             c.Fill(x, y, 4, bh, g_toastError ? 0xE8262E : 0x4CC36B);
             c.Text(x + padX, y + padY, g_toast.c_str(), g_fonts.normalFont, 0xFFFFFF, TA_LEFT | TA_TOP, false);
-            c.WriteTo(v, x, y, bw, bh);
+            c.Composite(v, x, y, bw, bh);
         }
 
         void DrawInfo(SurfaceView& v)
@@ -1844,11 +1902,11 @@ namespace overlay
                 bw = std::max(bw, c.TextWidth(l, g_fonts.smallFont));
             bw = std::min(bw + 12, v.width - 12);
             const int bh = 6 * lh + 8, x = 6, y = 6;
-            c.ReadFrom(v, x, y, bw, bh);
+            c.BeginLayer(x, y, bw, bh);
             c.Blend(x, y, bw, bh, 0x000000, 160);
             for (int i = 0; i < 6; ++i)
                 c.Text(x + 6, y + 4 + i * lh, lines[i], g_fonts.smallFont, 0x9EF01A, TA_LEFT | TA_TOP, false);
-            c.WriteTo(v, x, y, bw, bh);
+            c.Composite(v, x, y, bw, bh);
         }
 
         // Zielkreis für die Twin-Stick-Steuerung mit der Maus
@@ -1857,7 +1915,7 @@ namespace overlay
             Canvas& c = g_canvas;
             const float r = std::max(6.0f, v.height / 55.0f);
             const int bx = (int)(x - r * 2), by = (int)(y - r * 2), bs = (int)(r * 4) + 2;
-            c.ReadFrom(v, bx, by, bs, bs);
+            c.BeginLayer(bx, by, bs, bs);
             c.Ring(x, y, r, 4.0f, 0x000000, 120);
             c.Ring(x, y, r, 2.0f, 0xFFFFFF, 235);
             for (int i = 0; i < 4; ++i)
@@ -1866,7 +1924,7 @@ namespace overlay
                 c.Line(x + dx * r * 0.45f, y + dy * r * 0.45f, x + dx * r * 1.55f, y + dy * r * 1.55f, 2.0f, 0xFFFFFF, 235);
             }
             c.Circle(x, y, 1.8f, 0xFF4B3E);
-            c.WriteTo(v, bx, by, bs, bs);
+            c.Composite(v, bx, by, bs, bs);
         }
 
         // Mauszeiger zum Umschauen im Fahrzeug: schlichter Ring ohne Zielkreuz
@@ -1875,11 +1933,11 @@ namespace overlay
             Canvas& c = g_canvas;
             const float r = std::max(5.0f, v.height / 70.0f);
             const int bx = (int)(x - r * 2), by = (int)(y - r * 2), bs = (int)(r * 4) + 2;
-            c.ReadFrom(v, bx, by, bs, bs);
+            c.BeginLayer(bx, by, bs, bs);
             c.Ring(x, y, r, 4.0f, 0x000000, 100);
             c.Ring(x, y, r, 2.0f, 0xFFFFFF, 200);
             c.Circle(x, y, 1.8f, 0xFFFFFF, 200);
-            c.WriteTo(v, bx, by, bs, bs);
+            c.Composite(v, bx, by, bs, bs);
         }
 
         void Request(Page page);
@@ -1969,6 +2027,7 @@ namespace overlay
         }
         g_screenW = v.width;
         g_screenH = v.height;
+        MeasureReadback(v);
 
         if (g_menu == Menu::Requested)
             OpenNow(v);
@@ -2119,7 +2178,7 @@ namespace overlay
         }
 
         // Nur selbst präsentieren, wenn das Spiel gerade keine Frames liefert
-        if ((g_dirty || g_cursorMoved) && now - ddhook::LastGameFlipTick() > 100 && now - g_presentTick > 15)
+        if ((g_dirty || g_cursorMoved) && now - ddhook::LastGameFlipTick() > kNoFlipTime && now - g_presentTick > 15)
         {
             ddhook::PresentOverlay();
             g_presentTick = now;

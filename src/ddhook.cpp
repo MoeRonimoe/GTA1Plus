@@ -1,9 +1,11 @@
 #include "ddhook.h"
+#include "config.h"
 #include "hooks.h"
 #include "log.h"
 #include "overlay.h"
 
 #include <ddraw.h>
+#include <algorithm>
 #include <cstring>
 
 namespace ddhook
@@ -103,7 +105,28 @@ namespace ddhook
             s_lastFlip = GetTickCount();
             ++s_flips;
 
+            // Festhalten, wie lange das Overlay je Bild braucht (zweimal nach dem Start, mit der Debug-Anzeige alle
+            // 500 Bilder): bei hohen Auflösungen oder langsamem Bildspeicher entscheidet das über die Bildrate
+            static LONGLONG s_spent = 0, s_longest = 0, s_since = 0;
+            static unsigned s_frames = 0;
+            LARGE_INTEGER t0, t1;
+            QueryPerformanceCounter(&t0);
             RenderInto(self, target);
+            QueryPerformanceCounter(&t1);
+            s_spent += t1.QuadPart - t0.QuadPart;
+            s_longest = (std::max)(s_longest, t1.QuadPart - t0.QuadPart);
+            if (++s_frames == 500)
+            {
+                LARGE_INTEGER f;
+                QueryPerformanceFrequency(&f);
+                static int s_logged = 0;
+                if (s_since && (g_cfg.showInfo || s_logged++ < 2))
+                    LOG("Bildrate %.1f/s, Overlay %.2f ms je Bild (längstes %.1f ms)", 500.0 * f.QuadPart / (t1.QuadPart - s_since),
+                        s_spent * 1000.0 / f.QuadPart / 500, s_longest * 1000.0 / f.QuadPart);
+                s_spent = s_longest = 0;
+                s_frames = 0;
+                s_since = t1.QuadPart;
+            }
             return s_origFlip(self, target, flags);
         }
 

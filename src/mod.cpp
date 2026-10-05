@@ -124,6 +124,47 @@ namespace
         }
     }
 
+    // Die Tonbibliothek des Spiels (Miles, mss32.dll) bindet DirectSound an "das Fenster des Programms": das aktive
+    // Fenster oder, wenn gerade keins aktiv ist, das oberste Fenster des Prozesses. DirectInput legt für den
+    // Controller ein verstecktes Fenster an (DIEmWin), das dabei vor dem Spielfenster liegen kann - der Ton bliebe
+    // dann stumm, weil dieses Fenster nie im Vordergrund ist. Miles bekommt deshalb als oberstes Fenster immer das
+    // sichtbare Fenster des Spiels.
+    using GetTopWindow_t = HWND(WINAPI*)(HWND);
+    GetTopWindow_t s_origGetTopWindow = nullptr;
+
+    BOOL CALLBACK FindVisibleWindow(HWND wnd, LPARAM out)
+    {
+        DWORD pid = 0;
+        GetWindowThreadProcessId(wnd, &pid);
+        if (pid != GetCurrentProcessId() || !IsWindowVisible(wnd))
+            return TRUE;
+        *reinterpret_cast<HWND*>(out) = wnd;
+        return FALSE;
+    }
+
+    HWND WINAPI Hook_GetTopWindow(HWND parent)
+    {
+        if (!parent)
+        {
+            HWND game = nullptr;
+            EnumWindows(&FindVisibleWindow, reinterpret_cast<LPARAM>(&game));
+            if (game)
+                return game;
+        }
+        return s_origGetTopWindow(parent);
+    }
+
+    void KeepSoundOnGameWindow()
+    {
+        const HMODULE miles = GetModuleHandleW(L"mss32.dll");
+        if (!miles)
+            return;
+        s_origGetTopWindow = reinterpret_cast<GetTopWindow_t>(
+            hooks::PatchImport(miles, "USER32.dll", "GetTopWindow", reinterpret_cast<void*>(&Hook_GetTopWindow)));
+        if (!s_origGetTopWindow)
+            LOG("Ton: Fenstersuche der Tonbibliothek nicht gefunden - mit Controller kann der Ton stumm bleiben");
+    }
+
     std::wstring SiblingPath(HMODULE self, const wchar_t* ext)
     {
         wchar_t path[MAX_PATH];
@@ -149,6 +190,8 @@ void ModInit(HMODULE self)
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
     LOG("GTA1Plus geladen, Spiel: %ls", exePath);
     text::Init(SiblingPath(self, L"_lang.ini").c_str(), g_cfg.language);
+
+    KeepSoundOnGameWindow();
 
     const HMODULE exe = GetModuleHandleW(nullptr);
     if (gta1::Init(exe))

@@ -165,41 +165,12 @@ namespace controls
             return FALSE;
         }
 
-        // Sichtbares Hauptfenster des Spiel-Threads (für SetCooperativeLevel)
+        // Sichtbares Hauptfenster des Spiel-Threads
         HWND GameWindow()
         {
             HWND found = nullptr;
             EnumThreadWindows(GetCurrentThreadId(), &OnThreadWindow, reinterpret_cast<LPARAM>(&found));
             return found;
-        }
-
-        // Eigenes unsichtbares Fenster für DirectInput: SetCooperativeLevel hängt sich in die Fensterprozedur des
-        // angegebenen Fensters. Am Spielfenster geriet das mit anderen, die dasselbe tun (Fenstermodus im ASI-Loader
-        // der Classics-Ausgabe), kurz nach dem Start in eine Endlosschleife. Mit den echten user32-Funktionen
-        // angelegt, damit Wrapper wie cnc-ddraw es nicht für ein Fenster des Spiels halten.
-        HWND InputWindow()
-        {
-            static HWND s_wnd = nullptr;
-            static bool s_tried = false;
-            if (s_tried)
-                return s_wnd;
-            s_tried = true;
-            const HMODULE user32 = GetModuleHandleW(L"user32.dll");
-            const auto registerClass = reinterpret_cast<ATOM(WINAPI*)(const WNDCLASSW*)>(hooks::FindExport(user32, "RegisterClassW"));
-            const auto createWindow = reinterpret_cast<HWND(WINAPI*)(DWORD, LPCWSTR, LPCWSTR, DWORD, int, int, int, int, HWND, HMENU, HINSTANCE, LPVOID)>(
-                hooks::FindExport(user32, "CreateWindowExW"));
-            const auto defProc = reinterpret_cast<WNDPROC>(hooks::FindExport(user32, "DefWindowProcW"));
-            if (!registerClass || !createWindow || !defProc)
-                return nullptr;
-            WNDCLASSW wc = {};
-            wc.lpfnWndProc = defProc;
-            wc.hInstance = GetModuleHandleW(nullptr);
-            wc.lpszClassName = L"GTA1PlusInput";
-            registerClass(&wc);
-            s_wnd = createWindow(0, wc.lpszClassName, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, wc.hInstance, nullptr);
-            if (!s_wnd)
-                LOG("Fenster für DirectInput ließ sich nicht anlegen (Fehler %u)", GetLastError());
-            return s_wnd;
         }
 
         void DiRelease()
@@ -217,9 +188,8 @@ namespace controls
 
         bool DiOpen()
         {
-            // Erst wenn das Spiel sein Fenster hat; DirectInput bekommt aber ein eigenes
-            HWND wnd = GameWindow() ? InputWindow() : nullptr;
-            if (!wnd || (!g_di.di && FAILED(g_di.create(GetModuleHandleW(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8W,
+            // Erst wenn das Spiel sein Fenster hat
+            if (!GameWindow() || (!g_di.di && FAILED(g_di.create(GetModuleHandleW(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8W,
                                                          reinterpret_cast<void**>(&g_di.di), nullptr))))
                 return false;
             IDirectInputDevice8W* dev = nullptr;
@@ -231,18 +201,26 @@ namespace controls
             range.diph.dwHow = DIPH_DEVICE;
             range.lMin = -32768;
             range.lMax = 32767;
-            if (FAILED(dev->SetDataFormat(&c_dfDIJoystick2)) ||
-                FAILED(dev->SetCooperativeLevel(wnd, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE)))
+            if (FAILED(dev->SetDataFormat(&c_dfDIJoystick2)))
             {
                 dev->Release();
                 return false;
             }
+            // Ohne Fenster: im Hintergrund und nicht exklusiv braucht DirectInput keins. Am Spielfenster hängt es sich
+            // in dessen Fensterprozedur und geriet dort mit dem Fenstermodus im ASI-Loader der Classics-Ausgabe in
+            // eine Endlosschleife; ein eigenes verstecktes Fenster wiederum hält die Tonbibliothek des Spiels für das
+            // Hauptfenster des Programms - dann bleibt der Ton stumm.
+            const HRESULT coop = dev->SetCooperativeLevel(nullptr, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+            if (FAILED(coop))
+                LOG("DirectInput: Zugriffsart ohne Fenster abgelehnt (0x%08X), es bleibt bei der Vorgabe", (unsigned)coop);
             dev->SetProperty(DIPROP_RANGE, &range.diph);
             DIDEVICEOBJECTINSTANCEW oi = {};
             oi.dwSize = sizeof(oi);
             g_di.triggers = SUCCEEDED(dev->GetObjectInfo(&oi, DIJOFS_RX, DIPH_BYOFFSET)) &&
                             SUCCEEDED(dev->GetObjectInfo(&oi, DIJOFS_RY, DIPH_BYOFFSET));
-            dev->Acquire();
+            const HRESULT acquired = dev->Acquire();
+            if (FAILED(acquired))
+                LOG("DirectInput: Gerät ließ sich nicht belegen (0x%08X)", (unsigned)acquired);
             g_di.dev = dev;
             LOG("Controller verbunden (DirectInput): %ls, VID %04X PID %04X%s", g_di.name, g_di.vid, g_di.pid,
                 g_di.triggers ? ", analoge Trigger" : "");

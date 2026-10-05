@@ -40,8 +40,31 @@ public:
     void ReadFrom(const SurfaceView& v, int x, int y, int w, int h);
     void WriteTo(const SurfaceView& v, int x, int y, int w, int h);
 
+    // Ebene: Bereich durchsichtig beginnen, wie gewohnt zeichnen, dann mit Composite auf das Spielbild legen.
+    // Anders als bei ReadFrom/WriteTo wird der Hintergrund nicht aus der Surface geholt: je nach DirectDraw-
+    // Umsetzung liegt das Bild im Grafikspeicher, und Lesen ist dort um Größenordnungen langsamer als Schreiben.
+    // Gelesen werden nur halbdurchsichtige Pixel (weiche Kanten).
+    void BeginLayer(int x, int y, int w, int h);
+    void Composite(const SurfaceView& v, int x, int y, int w, int h);
+    // Lesen aus der Surface ist langsam: Ebenen mit vielen halbdurchsichtigen Pixeln werden dann deckend
+    // gezeichnet (ab halber Deckung), statt jedes Pixel zurückzulesen
+    static void SetSlowReadback(bool slow) { s_slowReadback = slow; }
+
 private:
     bool Clip(int& x, int& y, int& w, int& h) const;
+    void TextLayer(int x, int y, const wchar_t* s, HFONT font, uint32_t rgb, UINT align, bool shadow);
+    void BlendMask(int left, int top, int w, int h, uint32_t rgb);
+    bool EnsureMask(int w, int h);
+
+    // In einer Ebene: Farbe "über Schwarz" (vormultipliziert) und im obersten Byte die Deckung
+    bool m_layer = false;
+    static bool s_slowReadback;
+    // Graustufenmaske für Text in Ebenen (GDI kennt keine Deckung)
+    HDC m_maskDc = nullptr;
+    HBITMAP m_maskBmp = nullptr;
+    HGDIOBJ m_maskOld = nullptr;
+    uint32_t* m_maskPx = nullptr;
+    int m_maskW = 0, m_maskH = 0;
 
     HDC m_dc = nullptr;
     HBITMAP m_bmp = nullptr;
