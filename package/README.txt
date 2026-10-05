@@ -16,9 +16,10 @@ is loaded into the running game.
   also GTA_Intro.exe) ..................................... all features
   GTA_London.exe (London 1969) ............ all features except portrait colours
   GTA_London_1961.exe (London 1961) ....... all features except portrait colours
+  Grand Theft Auto.exe (Rockstar Classics release, 2002, folder WINO)
+  ........................................ all features except the tilted camera
 
   Not supported:
-  - the 2002 freeware release ("Grand Theft Auto.exe") - different data layout
   - the DOS version (e.g. in DOSBox)
 
 With an unknown game version the game starts normally, just without the
@@ -51,6 +52,11 @@ together with the CD music replacement (winmm.dll) of the Ready2Play package.
     only need the scripts folder. Note: the Ultimate ASI Loader by
     ThirteenAG crashes the game together with the Ready2Play music
     replacement, which is why GTA1Plus brings its own loader.
+
+ROCKSTAR CLASSICS RELEASE (2002): the game is WINO\Grand Theft Auto.exe.
+If that folder already has the Ultimate ASI Loader (ddraw.dll, for example
+from the widescreen fix), only copy the two files from "scripts" into
+WINO\scripts; dsound.dll is not needed there. This is the tested setup.
 
 UNINSTALL: delete dsound.dll and the GTA1Plus files in the scripts folder.
 Your saves are in scripts\GTA1Plus_saves.

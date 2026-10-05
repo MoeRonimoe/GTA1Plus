@@ -37,9 +37,11 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 | `GTA.exe` 1.0.0.1 (October 1997, e.g. *Ready2Play*; also `GTA_Intro.exe`) | All features |
 | `GTA_London.exe` (London 1969) | All features except portrait colours |
 | `GTA_London_1961.exe` (London 1961) | All features except portrait colours |
-| 2002 freeware release (`Grand Theft Auto.exe`) | Not yet supported (different data layout) |
+| `Grand Theft Auto.exe` (Rockstar Classics release, November 2002, folder `WINO`) | All features except the tilted camera |
 
 London has its own characters, so the portrait colours (made for the GTA1 characters) stay off there. Unknown executables start normally without the mod's features. The DOS version (e.g. in DOSBox) can't load ASI plugins.
+
+The Classics release is a separate build with a different data layout; GTA1Plus knows the layout of each version. It was tested with the Ultimate ASI Loader as `ddraw.dll` and its built-in window mode, as shipped with ThirteenAG's widescreen fix. In that setup the picture lives in video memory, where reading back is very slow: the mod then draws its displays without reading the picture (slightly harder edges) and leaves the tilted camera off.
 
 ## Installation
 
@@ -48,6 +50,8 @@ London has its own characters, so the portrait colours (made for the GTA1 charac
 3. Start the game. `GTA1Plus.ini` and `GTA1Plus_lang.ini` are created on the first start.
 
 The loader forwards DirectSound unchanged and loads every `scripts\*.asi`. It does not hook anything else, so it works alongside the CD-music replacement (`winmm.dll`) of the Ready2Play package. The Ultimate ASI Loader by ThirteenAG crashes together with that DLL, which is why GTA1Plus brings its own loader.
+
+Rockstar Classics release: the game is `WINO\Grand Theft Auto.exe`. If that folder already has the Ultimate ASI Loader (`ddraw.dll`, e.g. from the widescreen fix), only copy the two files into `WINO\scripts`; `dsound.dll` is not needed there.
 
 ## Controls
 
