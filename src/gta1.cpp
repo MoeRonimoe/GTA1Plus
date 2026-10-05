@@ -140,6 +140,7 @@ namespace gta1
         uint8_t   PunchReg[2] = {};         // Register mit dem Opfer: 5 ebp, 6 esi, 7 edi
         uintptr_t NpcHit = 0;
         uint8_t   NpcHitReg = 0;            // Register mit dem Angreifer
+        int       NpcHitLen = 10;           // Länge dieses Befehls (Classics adressiert ohne Indexregister: 9)
 
         // Fortschritt, wie ihn die Pausenanzeige des Spiels abwechselnd einblendet (1.0.0.1: 0x473470 ff.): Zielpunktzahl,
         // Zahl der Missionen und Geheimnisse sowie je ein Zähler aus dem Missionsskript (Platz in ScriptObjects, -1 =
@@ -387,6 +388,8 @@ namespace gta1
         Layout& l = a.lay;
         l.PedStride = 256; l.PedAnim = 0x18; l.PedCanFire = 0x46; l.PedHealth = 0x49; l.PedFlames = 0x58;
         l.PedWeapon = 0x60; l.PedFireWait = 0x64; l.PedPose = 0x70; l.PedPos = 0x90; l.PedAngleOfs = 0xA8;
+        l.PedTarget = 0x86;
+        l.ObjectSize = 136; l.ObjNext = 0x24;
         l.PlayerStride = 444; l.ScriptObjSize = 32; l.LineSize = 24; l.LineFields = 4; l.TriggerSize = 32;
         a.HudDraw = 0x483390; a.HudCallJmp = 0x430D94; a.HudCallCall = 0x430D71;
         a.GetPlayerPos = 0x462D50;
@@ -400,6 +403,9 @@ namespace gta1
         // Figuren: 620 Stück zu 256 Byte (Position über 0x45FB00)
         a.PedStruct = 0x7284E0; a.PedAngle = 0x728588; a.PedRemap = 0x72853E; a.PedDrawRemap = 0x728580;
         a.PedSprite = 0x44F100;
+        // Objekte zu 136 Byte; Flammen wie in 1.0.0.1 (Liste der aktiven Objekte in 0x44EA30)
+        a.ObjectCreate = 0x44D3D0; a.ObjectDelete = 0x44EB90; a.Objects = 0x6B40D0; a.ActiveObjects = 0x728430;
+        a.BurnDamage = 0x45D088;
         // Kameraführung 0x43B910, Kamera wie in 1.0.0.1 aufgebaut (Sichtbereich wieder 0x14 davor)
         a.Camera = 0x74F160; a.CameraGet = 0x4644E0; a.CameraGetCall = 0x43BB33;
         a.SteadyCamera[0] = 0x43B9EC; a.SteadyCamera[1] = 0x43C87F;
@@ -425,6 +431,11 @@ namespace gta1
         a.TargetScore = 0x6B3B84; a.MissionsTotal = 0x6B3B78; a.MissionsCounter = 0x676388;   // 0x43D1C0 ff.
         a.SecretsTotal = 0x67638C; a.SecretsCounter = 0x693B28;
         a.CarDamage = 0x4BE344; a.CarStride = 688;   // 0x40A1E0
+        // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
+        // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
+        a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
+        a.PunchHit[0] = 0x45A6D8; a.PunchReg[0] = 7; a.PunchHit[1] = 0x45A757; a.PunchReg[1] = 6;
+        a.NpcHit = 0x457DB2; a.NpcHitReg = 6; a.NpcHitLen = 9;
         a.Explode = 0x425170; a.ExplodeLen = 7;      // push ecx / xor ecx,ecx / mov [esp],ecx
         const uint8_t prolog[] = { 0x51, 0x33, 0xC9, 0x89, 0x4C, 0x24, 0x00 };
         memcpy(a.ExplodeProlog, prolog, sizeof(prolog));
@@ -1050,21 +1061,9 @@ namespace gta1
         return true;
     }
 
-    // Brennschaden: statt "cmp word ptr [esi+52h],-1" ruft das Spiel BurnCheck auf. Für die Figur in
+    // Brennschaden: statt "cmp word ptr [esi+Flammen],-1" ruft das Spiel ein Sprungstück auf. Für die Figur in
     // s_noBurnPed meldet der Vergleich "brennt nicht" (ZF = 1), das folgende je überspringt den Abzug.
     static const uint8_t* volatile s_noBurnPed = nullptr;
-
-    __declspec(naked) static void BurnCheck()
-    {
-        __asm
-        {
-            cmp word ptr [esi + 0x52], 0xFFFF
-            je done
-            cmp esi, s_noBurnPed
-        done:
-            ret
-        }
-    }
 
     // ---- Schaden statt sofortigem Tod ----
 
@@ -1166,8 +1165,9 @@ namespace gta1
 
         bool HookBulletHit()
         {
-            static const uint8_t kCmp[] = { 0x66, 0x81, 0x7F, 0x17, 0x89, 0x00, 0x0F, 0x8D };        // cmp word [edi+17h],89h / jge
-            static const uint8_t kMov[] = { 0xB9, 0x89, 0x00, 0x00, 0x00, 0x66, 0x39, 0x4F, 0x17 };  // mov ecx,89h / cmp [edi+17h],cx
+            const uint8_t anim = static_cast<uint8_t>(L.PedAnim);
+            const uint8_t kCmp[] = { 0x66, 0x81, 0x7F, anim, 0x89, 0x00, 0x0F, 0x8D };        // cmp word [edi+Anim],89h / jge
+            const uint8_t kMov[] = { 0xB9, 0x89, 0x00, 0x00, 0x00, 0x66, 0x39, 0x4F, anim };  // mov ecx,89h / cmp [edi+Anim],cx
             const uint8_t* site = reinterpret_cast<const uint8_t*>(A.BulletHit);
             const size_t len = A.BulletHitMovEcx ? 5 : 6;
             if (memcmp(site, A.BulletHitMovEcx ? kMov : kCmp, A.BulletHitMovEcx ? sizeof(kMov) : sizeof(kCmp)) != 0)
@@ -1203,17 +1203,20 @@ namespace gta1
         // Erst alles prüfen, dann einhängen: entweder alle Stellen oder keine
         for (int i = 0; i < 2; ++i)
         {
-            const uint8_t expect[] = { 0x66, 0xC7, static_cast<uint8_t>(0x40 + A.PunchReg[i]), 0x17, 0xAF, 0x00 }; // mov word [reg+17h],0AFh
+            const uint8_t expect[] = { 0x66, 0xC7, static_cast<uint8_t>(0x40 + A.PunchReg[i]), static_cast<uint8_t>(L.PedAnim), 0xAF, 0x00 }; // mov word [reg+Anim],0AFh
             if (memcmp(reinterpret_cast<const void*>(A.PunchHit[i]), expect, sizeof(expect)) != 0)
                 return false;
         }
-        const uint8_t* npc = reinterpret_cast<const uint8_t*>(A.NpcHit);      // mov word [..+Ped+17h],2Bh
-        if (npc[0] != 0x66 || npc[1] != 0xC7 || npc[2] != 0x84 || npc[8] != 0x2B || npc[9] != 0x00)
+        // mov word [..+Ped+Anim],2Bh: mit Indexregister 10 Byte (66 C7 84 ..), ohne 9 (66 C7 8x ..)
+        const uint8_t* npc = reinterpret_cast<const uint8_t*>(A.NpcHit);
+        const int n = A.NpcHitLen;
+        const bool form = n == 10 ? npc[2] == 0x84 : n == 9 && (npc[2] & 0xF8) == 0x80 && npc[2] != 0x84;
+        if (npc[0] != 0x66 || npc[1] != 0xC7 || !form || npc[n - 2] != 0x2B || npc[n - 1] != 0x00)
             return false;
         s_ok = HookBulletHit() &&
                HookAfterInstruction(A.PunchHit[0], 6, A.PunchReg[0], reinterpret_cast<void*>(&OnPunchHit)) &&
                HookAfterInstruction(A.PunchHit[1], 6, A.PunchReg[1], reinterpret_cast<void*>(&OnPunchHit)) &&
-               HookAfterInstruction(A.NpcHit, 10, A.NpcHitReg, reinterpret_cast<void*>(&OnNpcHit));
+               HookAfterInstruction(A.NpcHit, n, A.NpcHitReg, reinterpret_cast<void*>(&OnNpcHit));
         return s_ok;
     }
 
@@ -1327,14 +1330,20 @@ namespace gta1
 
     bool EnableBurnPause()
     {
-        // cmp word ptr [esi+52h],-1 / je ... (Sprungweite je Version verschieden)
-        static const uint8_t expect[] = { 0x66, 0x83, 0x7E, 0x52, 0xFF, 0x74 };
+        // cmp word ptr [esi+Flammen],-1 / je ... (Sprungweite je Version verschieden)
+        const uint8_t expect[] = { 0x66, 0x83, 0x7E, static_cast<uint8_t>(L.PedFlames), 0xFF, 0x74 };
         if (!s_supported || !A.BurnDamage || !hooks::BytesMatch(A.BurnDamage, expect, sizeof(expect)))
             return false;
-        uint8_t patch[5] = { 0xE8 };
-        const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(&BurnCheck) - (A.BurnDamage + 5));
-        memcpy(patch + 1, &rel, 4);
-        return hooks::WriteMemory(reinterpret_cast<void*>(A.BurnDamage), patch, sizeof(patch));
+        uint8_t* stub = AllocStub(16);
+        if (!stub)
+            return false;
+        Emitter e{ stub };
+        e.Bytes(expect, 5);                             // cmp word ptr [esi+Flammen],0FFFFh
+        e.Byte(0x74); e.Byte(0x06);                     // je fertig
+        e.Byte(0x3B); e.Byte(0x35);                     // cmp esi,[s_noBurnPed]
+        e.Dword(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&s_noBurnPed)));
+        e.Byte(0xC3);                                   // fertig: ret
+        return PatchJump(A.BurnDamage, 0xE8, stub, 5);
     }
 
     void SetPlayerBurnPaused(bool paused)
