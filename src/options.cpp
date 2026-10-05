@@ -3,6 +3,7 @@
 #include "hudscale.h"
 #include "log.h"
 #include "text.h"
+#include "tiltcam.h"
 
 #include <algorithm>
 #include <cwchar>
@@ -57,9 +58,9 @@ namespace options
             { Type::Int, text::OptRangeVehicle, &g_cfg.cameraRangeVehicle, false, 0, 90, 10 },
             { Type::Int, text::OptDeadZone, &g_cfg.cameraDeadZone, false, 0, 90, 10 },
             { Type::Bool, text::OptSteady, &g_cfg.cameraSteady, true },
-            { Type::Choice, text::OptTilt, &g_cfg.tilt, false, 0, 2, 1, { text::OptOff, text::InVehicle, text::TiltAlways } },
-            { Type::Degrees, text::OptTiltAngle, &g_cfg.tiltAngle, false, 0, 45, 5 },
-            { Type::Bool, text::OptTiltRotate, &g_cfg.tiltRotate },
+            { Type::Choice, text::OptTilt, &g_cfg.tilt, false, 0, 2, 1, { text::OptOff, text::InVehicle, text::TiltAlways }, &tiltcam::Available },
+            { Type::Degrees, text::OptTiltAngle, &g_cfg.tiltAngle, false, 0, 45, 5, {}, &tiltcam::Available },
+            { Type::Bool, text::OptTiltRotate, &g_cfg.tiltRotate, false, 0, 0, 0, {}, &tiltcam::Available },
             { Type::Choice, text::OptVehicleView, &g_cfg.vehicleView, false, 0, 3, 1,
               { text::ViewGame, text::ViewHigh, text::ViewHigher, text::ViewMax } },
             { Type::Int, text::OptTrafficRange, &g_cfg.trafficRange, false, 100, 250, 25 },

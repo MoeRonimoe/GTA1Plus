@@ -17,7 +17,7 @@ is loaded into the running game.
   GTA_London.exe (London 1969) ............ all features except portrait colours
   GTA_London_1961.exe (London 1961) ....... all features except portrait colours
   Grand Theft Auto.exe (Rockstar Classics release, 2002, folder WINO)
-  ........................................ all features except the tilted camera
+  .................................................................. all features
 
   Not supported:
   - the DOS version (e.g. in DOSBox)

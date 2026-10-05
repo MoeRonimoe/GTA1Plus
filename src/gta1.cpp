@@ -129,7 +129,6 @@ namespace gta1
         // Zeichenpuffer: das Spiel schreibt Welt und HUD direkt in den Speicher der aktiven MGL-Seite und legt
         // Zeiger und Zeilenlänge nach jedem Seitenwechsel hier ab (1.0.0.1: 0x42F890)
         uintptr_t DrawBits = 0, DrawPitch = 0, DrawBytes = 0, DrawWidth = 0, DrawHeight = 0;
-        bool      TiltCamera = true;  // Kippkamera mit dieser Version erprobt
 
         // HUD in ein eigenes Bild umleiten (nur wo nötig, 0 = geht nicht). Die Zeichenroutinen holen sich die Zeilen
         // aus einer Tabelle von Zeilenanfängen und kennen Bildmaße und Bildzeiger noch einmal für sich:
@@ -452,7 +451,6 @@ namespace gta1
         a.TextReady = 0x775550; a.TextBuffer = 0x775578;   // aus GetText 0x47D9A0
         a.MglPrimary = 0x4B5004; a.MglPageCount = 0x4B5000;
         a.DrawBits = 0x511904; a.DrawPitch = 0x503218; a.DrawBytes = 0x50321C; a.DrawWidth = 0x504CC0; a.DrawHeight = 0x504CC4; // 0x414B62
-        a.TiltCamera = false;
         a.DrawSetRows = 0x497BFA; a.DrawSetTarget = 0x486830;
         a.ViewWidth = 0x5C0C00; a.ViewHeight = 0x5BFAB0; a.ViewCenterX = 0x5BFBE4; a.ViewCenterY = 0x5BFBE8; a.ViewZoom = 0x5C1C10; // 0x43B780
         a.IatGetProcAddress = 0x4A70DC; a.IatPeekMessageA = 0x4A71CC;
@@ -619,7 +617,7 @@ namespace gta1
             return false;
         v = { (float)cam.x, (float)cam.y, p->x / 65536.0f, p->y / 65536.0f, p->z / 65536.0f,
               type == 2 ? 10.0f : 24.0f, (float)cam.height, (float)cam.focal,
-              cam.squash ? 5.0f / 6.0f : 1.0f, (float)cam.centerX, (float)cam.centerY, type, p->angle };
+              cam.squash ? 5.0f / 6.0f : 1.0f, (float)cam.centerX, (float)cam.centerY, type, p->angle, (float)cam.zoom };
         return true;
     }
 
@@ -1544,7 +1542,7 @@ namespace gta1
 
     void SetBeforeHudCallback(void (*cb)()) { s_beforeHud = cb; }
     void SetHudDrawer(void (*draw)(void (*drawHud)())) { s_hudDrawer = draw; }
-    bool TiltCameraAvailable() { return s_supported && A.TiltCamera && A.DrawBits; }
+    bool TiltCameraAvailable() { return s_supported && A.DrawBits && A.Camera && HaveViewRect(); }
 
     bool CanRedirectHud()
     {

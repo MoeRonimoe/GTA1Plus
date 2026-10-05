@@ -10,6 +10,8 @@ namespace tiltcam
     // Welt ist gezeichnet, HUD noch nicht: Bild umrechnen
     void Warp();
 
+    // Kann die Kippkamera hier laufen? Sie braucht ein Bild mit 32 Bit Farbtiefe, aus dem sich zügig lesen lässt.
+    bool Available();
     // Aktuelles Bild ist gekippt bzw. gedreht
     bool Active();
     // Drehung des Bildes im Uhrzeigersinn (Bogenmaß): Weltrichtungen erscheinen um diesen Winkel gedreht

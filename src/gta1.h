@@ -71,6 +71,7 @@ namespace gta1
         float halfW, halfH;               // halbe Bildgröße in Pixeln der Spielauflösung
         int ctrlType;                     // 0 Auto, 1 Zug, 2 zu Fuß
         int angle;                        // Richtung der Figur bzw. des Fahrzeugs (Rohwert, 1024 = 360°)
+        float zoom;                       // Zoomwert des Spiels; der Sichtbereich ist (height + 384) * 160 / zoom breit
     };
     // Kamerasteuerung: der Filter läuft jeden Frame, nachdem das Spiel den Bildmittelpunkt bestimmt hat,
     // und liefert einen zusätzlichen Versatz in Weltpixeln. view = nullptr, solange die Kamera nicht der
@@ -97,7 +98,7 @@ namespace gta1
         int pitch, width, height, bytesPerPixel;
     };
     bool GetDrawBuffer(DrawBuffer& out);
-    bool TiltCameraAvailable();    // Kippkamera mit dieser Spielversion erprobt
+    bool TiltCameraAvailable();    // Zeichenpuffer und Kamera dieser Spielversion sind bekannt
 
     // Umschließt das HUD-Zeichnen des Spiels: draw bekommt die Funktion, die das HUD zeichnet
     void SetHudDrawer(void (*draw)(void (*drawHud)()));

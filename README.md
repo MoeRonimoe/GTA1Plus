@@ -37,7 +37,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 | `GTA.exe` 1.0.0.1 (October 1997, e.g. *Ready2Play*; also `GTA_Intro.exe`) | All features |
 | `GTA_London.exe` (London 1969) | All features except portrait colours |
 | `GTA_London_1961.exe` (London 1961) | All features except portrait colours |
-| `Grand Theft Auto.exe` (Rockstar Classics release, November 2002, folder `WINO`) | All features except the tilted camera |
+| `Grand Theft Auto.exe` (Rockstar Classics release, November 2002, folder `WINO`) | All features |
 
 London has its own characters, so the portrait colours (made for the GTA1 characters) stay off there. Unknown executables start normally without the mod's features. The DOS version (e.g. in DOSBox) can't load ASI plugins.
 
@@ -48,7 +48,7 @@ The Classics release is a separate build with a different data layout; GTA1Plus 
 
 - **Readable HUD** (`HudScale`, also "HUD size" in the pause menu under GTA1Plus options → Display): the game draws its own displays – score, lives, multiplier, weapon and ammo, phone messages, area names, the mission arrow – in a fixed pixel size, so they get tiny at high resolutions. GTA1Plus lets the game draw them into a smaller picture and puts them into the frame enlarged by a whole factor (pixel-sharp, see-through parts stay see-through). "Automatic" picks the factor from the screen height so that they are about as large as on the 640×480 screen they were made for: 2× from 810 lines, 3× from 1350 (e.g. 2560×1440), 4× from 1890. 1× is the game's own size. The mod's hearts grow with them. Needs `FrameBuffer`.
 
-These only take effect where they are needed (picture memory that is slow to read, a menu drawn smaller than the screen, a HUD drawn in single pixels); in the other versions they do nothing. The tilted camera stays off in the Classics release.
+These only take effect where they are needed (picture memory that is slow to read, a menu drawn smaller than the screen, a HUD drawn in single pixels); in the other versions they do nothing. The tilted camera works in the Classics release too; it reads the finished picture, so it needs `FrameBuffer` there (without it the camera options are not offered).
 
 ## Installation
 

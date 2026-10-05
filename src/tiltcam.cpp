@@ -1,9 +1,12 @@
 #include "tiltcam.h"
 #include "config.h"
+#include "ddhook.h"
 #include "gta1.h"
 #include "log.h"
+#include "parallel.h"
 
 #include <windows.h>
+#include <emmintrin.h>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -96,13 +99,6 @@ namespace tiltcam
             oy = v.pivotY + y * v.focal * v.squash;
             return true;
         }
-
-        inline uint32_t Lerp(uint32_t a, uint32_t b, uint32_t w) // w 0..256
-        {
-            const uint32_t rb = (((a & 0xFF00FF) * (256 - w) + (b & 0xFF00FF) * w) >> 8) & 0xFF00FF;
-            const uint32_t g = (((a & 0x00FF00) * (256 - w) + (b & 0x00FF00) * w) >> 8) & 0x00FF00;
-            return rb | g;
-        }
     }
 
     void BeginFrame()
@@ -116,7 +112,8 @@ namespace tiltcam
 
         gta1::CameraView cam;
         gta1::DrawBuffer buf;
-        if (!g_cfg.tilt || !gta1::TiltCameraAvailable() || !gta1::GetCameraView(cam) || !gta1::GetDrawBuffer(buf))
+        if (!g_cfg.tilt || !gta1::TiltCameraAvailable() || !gta1::GetCameraView(cam) || !gta1::GetDrawBuffer(buf) ||
+            !ddhook::FastToRead(buf.bits))
         {
             g_ramp = 0;
             g_rot = 0;
@@ -185,7 +182,7 @@ namespace tiltcam
             return;
         // Einen größeren Bereich zeichnet das Spiel nicht vollständig (z.B. mit weit herausgezoomter Fahrzeugkamera).
         // Dann zeigt die gekippte Ansicht einen kleineren Ausschnitt statt leerer Ränder.
-        const float halfWidth = (cam.height + 384) * 160 / (cam.focal * 0.4f);
+        const float halfWidth = (cam.height + 384) * 160 / std::max(1.0f, cam.zoom);
         const float maxShrink = std::clamp(kMaxHalfWidth / halfWidth, 1.0f, kMaxShrink);
         for (int i = 0; i < 3 && need > maxShrink; ++i)
         {
@@ -208,65 +205,124 @@ namespace tiltcam
         }
     }
 
+    namespace
+    {
+        // Ein Bild umrechnen: erst das fertige Weltbild kopieren, dann jede Zeile der Ausgabe daraus holen. Beides
+        // läuft zeilenweise auf mehreren Prozessorkernen.
+        struct WarpJob
+        {
+            View v;
+            gta1::DrawBuffer b;
+            float psx, psy;            // Spielfigur im ungekippten Bild
+        };
+
+        void CopyRows(int first, int last, void* ctx)
+        {
+            const WarpJob& job = *static_cast<const WarpJob*>(ctx);
+            const int W = job.b.width;
+            for (int y = first; y < last; ++y)
+                memcpy(&g_src[(size_t)y * W], job.b.bits + (size_t)y * job.b.pitch, (size_t)W * 4);
+        }
+
+        void WarpRows(int first, int last, void* ctx)
+        {
+            const WarpJob& job = *static_cast<const WarpJob*>(ctx);
+            const View& v = job.v;
+            const int W = job.b.width, H = job.b.height;
+            const float c = std::cos(v.tilt), s = std::sin(v.tilt);
+            const float cr = std::cos(v.rot), sr = std::sin(v.rot);
+            const float inv = 1.0f / v.shrink;
+            const int maxX = (W - 2) << 16, maxY = (H - 2) << 16;
+            const __m128i zero = _mm_setzero_si128();
+            for (int oy = first; oy < last; ++oy)
+            {
+                uint32_t* dst = reinterpret_cast<uint32_t*>(job.b.bits + (size_t)oy * job.b.pitch);
+                const float y = (oy - v.pivotY) / (v.focal * v.squash);
+                const float d = c + y * s;
+                if (d < 0.05f)
+                {
+                    memset(dst, 0, (size_t)W * 4);
+                    continue;
+                }
+                // In jeder Zeile hängt die Quelle linear von x ab
+                const float t = v.focal * c / d;
+                const float k = t / v.focal * v.scale;
+                const float ly = (t * (y * c - s) + v.focal * s) * v.scale;
+                const float lx0 = -k * v.pivotX;
+                const float sx0 = job.psx + (cr * lx0 - sr * ly) * inv;
+                const float sy0 = job.psy + (sr * lx0 + cr * ly) * v.squash * inv;
+                int fx = (int)(sx0 * 65536.0f), fy = (int)(sy0 * 65536.0f);
+                const int stepX = (int)(cr * k * inv * 65536.0f), stepY = (int)(sr * k * v.squash * inv * 65536.0f);
+                for (int ox = 0; ox < W; ++ox, fx += stepX, fy += stepY)
+                {
+                    const int cx = std::clamp(fx, 0, maxX), cy = std::clamp(fy, 0, maxY);
+                    const uint32_t* p = &g_src[(size_t)(cy >> 16) * W + (cx >> 16)];
+                    // Vier Nachbarn mischen, alle Farbkanäle zugleich. Gewichte mit 7 Bit, damit die Produkte in
+                    // 16 Bit mit Vorzeichen passen.
+                    const __m128i wx = _mm_set1_epi16((short)((cx >> 9) & 0x7F)), wy = _mm_set1_epi16((short)((cy >> 9) & 0x7F));
+                    const __m128i top = _mm_unpacklo_epi8(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(p)), zero);
+                    const __m128i bottom = _mm_unpacklo_epi8(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(p + W)), zero);
+                    const __m128i row = _mm_add_epi16(top, _mm_srai_epi16(_mm_mullo_epi16(_mm_sub_epi16(bottom, top), wy), 7));
+                    const __m128i right = _mm_srli_si128(row, 8);
+                    const __m128i mix = _mm_add_epi16(row, _mm_srai_epi16(_mm_mullo_epi16(_mm_sub_epi16(right, row), wx), 7));
+                    dst[ox] = (uint32_t)_mm_cvtsi128_si32(_mm_packus_epi16(mix, mix));
+                }
+            }
+        }
+    }
+
     void Warp()
     {
-        const View v = g_next;
+        WarpJob job;
+        job.v = g_next;
         g_next.active = false;
         g_shown.active = false;
-        if (!v.active)
+        if (!job.v.active)
             return;
-        gta1::DrawBuffer b;
-        float psx, psy;
-        if (!gta1::GetDrawBuffer(b) || b.width != v.width || b.height != v.height || !gta1::PlayerScreenPos(psx, psy))
+        if (!gta1::GetDrawBuffer(job.b) || job.b.width != job.v.width || job.b.height != job.v.height ||
+            !gta1::PlayerScreenPos(job.psx, job.psy))
             return;
-        if (b.bytesPerPixel != 4)
+        if (job.b.bytesPerPixel != 4)
         {
             if (!g_warnedFormat)
             {
                 g_warnedFormat = true;
-                LOG("Kippkamera: nur mit 32 Bit Farbtiefe (Spiel zeichnet mit %d Byte je Pixel)", b.bytesPerPixel);
+                LOG("Kippkamera: nur mit 32 Bit Farbtiefe (Spiel zeichnet mit %d Byte je Pixel)", job.b.bytesPerPixel);
             }
             return;
         }
 
-        const int W = b.width, H = b.height;
-        g_src.resize((size_t)W * H);
-        for (int y = 0; y < H; ++y)
-            memcpy(&g_src[(size_t)y * W], b.bits + (size_t)y * b.pitch, (size_t)W * 4);
+        LARGE_INTEGER t0, t1;
+        QueryPerformanceCounter(&t0);
+        const int W = job.b.width, H = job.b.height;
+        g_src.resize((size_t)W * H + 2);   // die Mischung liest je zwei Pixel am Stück
+        parallel::For(H, 64, &CopyRows, &job);
+        parallel::For(H, 16, &WarpRows, &job);
+        g_shown = job.v;
 
-
-        const float c = std::cos(v.tilt), s = std::sin(v.tilt);
-        const float cr = std::cos(v.rot), sr = std::sin(v.rot);
-        const float inv = 1.0f / v.shrink;
-        const int maxX = (W - 2) << 16, maxY = (H - 2) << 16;
-        for (int oy = 0; oy < H; ++oy)
+        // Aufwand festhalten: einmal nach dem Start, mit der Debug-Anzeige laufend
+        QueryPerformanceCounter(&t1);
+        static LONGLONG s_spent = 0;
+        static int s_frames = 0, s_logged = 0;
+        s_spent += t1.QuadPart - t0.QuadPart;
+        if (++s_frames == 300)
         {
-            uint32_t* dst = reinterpret_cast<uint32_t*>(b.bits + (size_t)oy * b.pitch);
-            const float y = (oy - v.pivotY) / (v.focal * v.squash);
-            const float d = c + y * s;
-            if (d < 0.05f)
-            {
-                memset(dst, 0, (size_t)W * 4);
-                continue;
-            }
-            // In jeder Zeile hängt die Quelle linear von x ab
-            const float t = v.focal * c / d;
-            const float k = t / v.focal * v.scale;
-            const float ly = (t * (y * c - s) + v.focal * s) * v.scale;
-            const float lx0 = -k * v.pivotX;
-            const float sx0 = psx + (cr * lx0 - sr * ly) * inv;
-            const float sy0 = psy + (sr * lx0 + cr * ly) * v.squash * inv;
-            int fx = (int)(sx0 * 65536.0f), fy = (int)(sy0 * 65536.0f);
-            const int stepX = (int)(cr * k * inv * 65536.0f), stepY = (int)(sr * k * v.squash * inv * 65536.0f);
-            for (int ox = 0; ox < W; ++ox, fx += stepX, fy += stepY)
-            {
-                const int cx = std::clamp(fx, 0, maxX), cy = std::clamp(fy, 0, maxY);
-                const uint32_t* p = &g_src[(size_t)(cy >> 16) * W + (cx >> 16)];
-                const uint32_t wx = (cx >> 8) & 0xFF, wy = (cy >> 8) & 0xFF;
-                dst[ox] = Lerp(Lerp(p[0], p[1], wx), Lerp(p[W], p[W + 1], wx), wy);
-            }
+            LARGE_INTEGER f;
+            QueryPerformanceFrequency(&f);
+            if (g_cfg.showInfo || s_logged++ < 1)
+                LOG("Kippkamera: %.2f ms je Bild (%dx%d, %d Threads)", s_spent * 1000.0 / f.QuadPart / 300, W, H, parallel::Threads());
+            s_spent = 0;
+            s_frames = 0;
         }
-        g_shown = v;
+    }
+
+    bool Available()
+    {
+        if (!gta1::TiltCameraAvailable())
+            return false;
+        // Erst im Level zeigt sich, ob das Bild taugt; vorher gilt die Kamera als verfügbar
+        gta1::DrawBuffer b;
+        return !gta1::GetDrawBuffer(b) || (b.bytesPerPixel == 4 && ddhook::FastToRead(b.bits));
     }
 
     bool Active() { return g_shown.active; }
