@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 18;
+static const int kConfigVersion = 19;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=18\r\n"
+    "Version=19\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -160,6 +160,15 @@ static const char kDefaultIni[] =
     "; Pause the game while the menu is open\r\n"
     "PauseGame=1\r\n"
     "\r\n"
+    "[Display]\r\n"
+    "; Both settings only matter where the game runs at a high resolution in the window mode of the ASI\r\n"
+    "; loader (Rockstar Classics release with the widescreen fix); everywhere else they do nothing.\r\n"
+    "; Finish every picture in normal memory and hand it to the screen in one piece: no half-drawn\r\n"
+    "; pictures (flicker), and the mod's displays are blended in full quality\r\n"
+    "FrameBuffer=1\r\n"
+    "; Enlarge the main menu to the screen height instead of the small picture in the top left corner\r\n"
+    "ScaleMenu=1\r\n"
+    "\r\n"
     "[Heading]\r\n"
     "; Heading arrow on the player marker\r\n"
     "Show=1\r\n"
@@ -244,6 +253,8 @@ namespace
         { L"Map",      L"Style",          Kind::Int,  &g_cfg.mapStyle,       L"Overlay", L"MapStyle" },
         { L"Map",      L"MinimapCorner",  Kind::Int,  &g_cfg.minimapCorner,  L"Overlay", L"MinimapCorner" },
         { L"Map",      L"PauseGame",      Kind::Bool, &g_cfg.pauseGame,      L"Overlay", L"PauseGame" },
+        { L"Display",  L"FrameBuffer",    Kind::Bool, &g_cfg.frameBuffer,    nullptr, nullptr },
+        { L"Display",  L"ScaleMenu",      Kind::Bool, &g_cfg.scaleMenu,      nullptr, nullptr },
         { L"Heading",  L"Show",           Kind::Bool, &g_cfg.showHeading,    L"Heading", L"Show" },
         { L"Heading",  L"Offset",         Kind::Int,  &g_cfg.headingOffset,  L"Heading", L"Offset" },
         { L"Heading",  L"CounterClockwise", Kind::Bool, &g_cfg.headingCcw,   L"Heading", L"CounterClockwise" },

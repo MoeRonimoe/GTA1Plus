@@ -65,6 +65,10 @@ struct Config
     int  minimapCorner  = 0;     // 0 unten links, 1 unten rechts, 2 oben links, 3 oben rechts
     bool pauseGame      = true;
 
+    // [Display]
+    bool frameBuffer    = true;  // Bilder im Arbeitsspeicher fertigstellen, wo der Bildspeicher langsam zu lesen ist
+    bool scaleMenu      = true;  // Hauptmenü vergrößern, wo das Spiel es klein in eine Ecke zeichnet
+
     // [Heading]
     bool showHeading    = true;  // Blickrichtung am Spielermarker
     int  headingOffset  = 0;     // zusätzliche Korrektur für den Winkel aus dem Spiel (0..1023)

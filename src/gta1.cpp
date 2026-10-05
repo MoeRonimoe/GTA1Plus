@@ -159,6 +159,7 @@ namespace gta1
         uintptr_t MglPageCount = 0;   // Anzahl Seiten der Flip-Kette
         uintptr_t IatGetProcAddress = 0, IatPeekMessageA = 0;
         uintptr_t LoadGetProcAddress[1] = {};   // "mov reg,[IAT]", holt DirectDrawCreate
+        uintptr_t DDCreateCall = 0, DDCreateCell = 0;   // "call [Zelle]": MGL ruft DirectDrawCreate (nur wo nötig)
         uintptr_t LoadPeekMessageA[3] = {};     // "mov reg,[IAT]" in den Nachrichtenschleifen
 
         Layout lay;                   // Aufbau der Strukturen in dieser Version
@@ -443,6 +444,7 @@ namespace gta1
         a.MglPrimary = 0x4B5004; a.MglPageCount = 0x4B5000;
         a.IatGetProcAddress = 0x4A70DC; a.IatPeekMessageA = 0x4A71CC;
         a.LoadGetProcAddress[0] = 0x48D2D3;
+        a.DDCreateCall = 0x48D397; a.DDCreateCell = 0x787320;
         a.LoadPeekMessageA[0] = 0x4159FF; a.LoadPeekMessageA[1] = 0x489ECB; a.LoadPeekMessageA[2] = 0x48C5EC;
         const Addresses::Sig sigs[] = {
             { 0x483390, { 0xA1, 0x70, 0x2F, 0x50, 0x00, 0x55, 0x33, 0xED, 0x3B, 0xC5 }, 10 }, // HudDraw
@@ -858,11 +860,32 @@ namespace gta1
         return { A.IatPeekMessageA, A.LoadPeekMessageA, sizeof(A.LoadPeekMessageA) / sizeof(uintptr_t) };
     }
 
+    CallCell DirectDrawCreateCall() { return { A.DDCreateCall, A.DDCreateCell }; }
+
     bool Supported() { return s_supported; }
     void SetHudCallback(void (*cb)()) { s_hudCallback = cb; }
     unsigned HudCount() { return s_hudCount; }
     void* PrimarySurface() { return s_supported ? *reinterpret_cast<void**>(A.MglPrimary) : nullptr; }
     int PageCount() { return s_supported ? *reinterpret_cast<int*>(A.MglPageCount) : 0; }
+
+    // MGL hält seine DirectDraw-Objekte in allen Versionen gleich angeordnet: IDirectDraw*, Seitenzahl, Primary,
+    // danach ab +0x0C die Surfaces der Seiten (Seite 0 = Primary) und ab +0x2C deren Bildzeiger
+    void* DirectDrawObject() { return s_supported ? *reinterpret_cast<void**>(A.MglPrimary - 8) : nullptr; }
+
+    bool IsPageSurface(void* surface)
+    {
+        if (!s_supported || !surface)
+            return false;
+        if (*reinterpret_cast<void**>(A.MglPrimary) == surface)
+            return true;
+        // Beim Anlegen trägt MGL jede weitere Seite ein und zählt hoch, bevor es sie zum ersten Mal sperrt
+        const int count = std::min(*reinterpret_cast<int*>(A.MglPageCount), 8);
+        void* const* pages = reinterpret_cast<void* const*>(A.MglPrimary + 0x0C);
+        for (int i = 1; i < count; ++i)
+            if (pages[i] == surface)
+                return true;
+        return false;
+    }
     bool InGame() { return s_supported && s_hudCount && GetTickCount() - s_lastHud < 500; }
 
     // Position dessen, was der Spieler steuert (Auto, Zug, Fußgänger ...) bzw. nullptr

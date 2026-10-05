@@ -27,6 +27,15 @@ namespace gta1
     ImportLoads GetProcAddressLoads();
     ImportLoads PeekMessageLoads();
 
+    // Stelle, an der MGL DirectDrawCreate über eine Speicherzelle aufruft ("call [cell]"); 0 = nicht nötig.
+    // In der Classics-Ausgabe lädt der ASI-Loader die Mod erst, während das Spiel sich die Funktion holt.
+    struct CallCell
+    {
+        uintptr_t site;
+        uintptr_t cell;
+    };
+    CallCell DirectDrawCreateCall();
+
     bool Init(HMODULE exe);        // prüft die GTA.exe-Version und installiert die Spiel-Hooks
     bool Supported();
     void SetHudCallback(void (*cb)()); // läuft nach jedem HUD-Zeichnen im Spiel
@@ -36,6 +45,8 @@ namespace gta1
 
     void* PrimarySurface();        // IDirectDrawSurface* von MGL
     int PageCount();               // 1 = ohne Backbuffer, 2 = Double-Buffering
+    void* DirectDrawObject();      // IDirectDraw* von MGL
+    bool IsPageSurface(void* surface); // Primary oder eine der weiteren Seiten, in die MGL zeichnet
 
     bool IsSinglePlayer();
     int  RunState();               // 1 = läuft, 2 = pausiert

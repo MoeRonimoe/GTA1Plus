@@ -24,4 +24,7 @@ namespace hooks
 
     // Biegt "mov reg, [expectedAddr]" (8B /r mit absoluter Adresse) auf eine eigene Speicherzelle um
     bool RedirectLoad(uintptr_t site, uintptr_t expectedAddr, void* const* newCell);
+
+    // Biegt "call dword ptr [expectedAddr]" (FF 15) auf eine eigene Speicherzelle um
+    bool RedirectCallCell(uintptr_t site, uintptr_t expectedAddr, void* const* newCell);
 }

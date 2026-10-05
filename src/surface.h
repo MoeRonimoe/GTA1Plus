@@ -23,6 +23,7 @@ struct SurfaceView
     int width = 0;
     int height = 0;
     PixelFormat fmt;
+    bool buffered = false;   // eigener Puffer im Arbeitsspeicher statt Bildspeicher der Surface (Lesen ist schnell)
 
     uint8_t* Row(int y) const { return bits + y * pitch; }
 };

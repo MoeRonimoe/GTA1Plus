@@ -41,7 +41,12 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 
 London has its own characters, so the portrait colours (made for the GTA1 characters) stay off there. Unknown executables start normally without the mod's features. The DOS version (e.g. in DOSBox) can't load ASI plugins.
 
-The Classics release is a separate build with a different data layout; GTA1Plus knows the layout of each version. It was tested with the Ultimate ASI Loader as `ddraw.dll` and its built-in window mode, as shipped with ThirteenAG's widescreen fix. In that setup the picture lives in video memory, where reading back is very slow: the mod then draws its displays without reading the picture (slightly harder edges) and leaves the tilted camera off.
+The Classics release is a separate build with a different data layout; GTA1Plus knows the layout of each version. It was tested with the Ultimate ASI Loader as `ddraw.dll` and its built-in window mode, as shipped with ThirteenAG's widescreen fix. For that setup the mod does two more things, both of which can be switched off under `[Display]` in the INI:
+
+- **Steady picture** (`FrameBuffer`): there the game draws every eighth picture straight into the page that is on screen, so a half-drawn picture can show up for a moment (flicker). GTA1Plus lets the game draw every picture in normal memory and hands it to the screen in one piece. Reading the picture back is fast that way, so the mod's displays are blended in full quality as well.
+- **Full-size main menu** (`ScaleMenu`): the game draws the main menu and the other screens outside the levels 640×480 pixels small into the top left corner. GTA1Plus enlarges them to the screen height. Whole factors stay pixel-sharp (3× at 2560×1440); with other factors the pixel edges are smoothed.
+
+Both only take effect where they are needed (picture memory that is slow to read, a menu drawn smaller than the screen); in the other versions they do nothing. The tilted camera stays off in the Classics release.
 
 ## Installation
 

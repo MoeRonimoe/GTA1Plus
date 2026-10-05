@@ -112,4 +112,15 @@ namespace hooks
         const uint32_t cell = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(newCell));
         return WriteMemory(reinterpret_cast<void*>(site + 2), &cell, 4);
     }
+
+    bool RedirectCallCell(uintptr_t site, uintptr_t expectedAddr, void* const* newCell)
+    {
+        auto p = reinterpret_cast<const uint8_t*>(site);
+        uint32_t addr;
+        memcpy(&addr, p + 2, 4);
+        if (p[0] != 0xFF || p[1] != 0x15 || addr != expectedAddr)
+            return false;
+        const uint32_t cell = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(newCell));
+        return WriteMemory(reinterpret_cast<void*>(site + 2), &cell, 4);
+    }
 }

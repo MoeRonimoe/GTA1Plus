@@ -545,13 +545,15 @@ namespace overlay
         // möglichst nichts mehr aus dem Bild zurück.
         bool g_slowRead = false;
         int g_readW = 0, g_readH = 0;
+        bool g_readBuffered = false;
 
         void MeasureReadback(const SurfaceView& v)
         {
-            if (v.width == g_readW && v.height == g_readH)
+            if (v.width == g_readW && v.height == g_readH && v.buffered == g_readBuffered)
                 return;
             g_readW = v.width;
             g_readH = v.height;
+            g_readBuffered = v.buffered;
             static uint32_t probe[1024];
             const int n = std::min(1024, v.width);
             LARGE_INTEGER f, t0, t1;
@@ -563,8 +565,8 @@ namespace overlay
             const double us = (t1.QuadPart - t0.QuadPart) * 1e6 / f.QuadPart;
             g_slowRead = us > 150.0;   // normaler Arbeitsspeicher braucht dafür wenige Mikrosekunden
             Canvas::SetSlowReadback(g_slowRead);
-            LOG("Bildspeicher %dx%d: Lesen von %d Pixeln dauert %.0f µs%s", v.width, v.height, 4 * n, us,
-                g_slowRead ? " - langsam, das Overlay liest nichts mehr zurück" : "");
+            LOG("Bildspeicher %dx%d%s: Lesen von %d Pixeln dauert %.0f µs%s", v.width, v.height,
+                v.buffered ? " (Zwischenpuffer)" : "", 4 * n, us, g_slowRead ? " - langsam, das Overlay liest nichts mehr zurück" : "");
         }
 
         void CaptureBackground(const SurfaceView& v)

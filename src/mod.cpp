@@ -46,6 +46,7 @@ namespace
                 msg->message = WM_NULL;
             overlay::OnPump();
             controls::OnPump();
+            ddhook::OnPump();
         }
         return got;
     }
@@ -200,6 +201,9 @@ void ModInit(HMODULE self)
         // Darum lesen die betroffenen Befehle in GTA.exe ab jetzt aus unseren eigenen Zellen.
         const gta1::ImportLoads gpa = gta1::GetProcAddressLoads();
         ddhook::InstallAtLoads(gpa.iatSlot, gpa.sites, gpa.count);
+        const gta1::CallCell create = gta1::DirectDrawCreateCall();
+        if (create.site && !ddhook::InstallAtCall(create.site, create.cell))
+            LOG("DirectDrawCreate: Aufrufstelle passt nicht - kein Zwischenpuffer, Hauptmenü bleibt klein");
 
         const gta1::ImportLoads peek = gta1::PeekMessageLoads();
         s_iatPeekMessageA = reinterpret_cast<PeekMessageA_t*>(peek.iatSlot);
