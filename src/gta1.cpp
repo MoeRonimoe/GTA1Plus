@@ -701,17 +701,27 @@ namespace gta1
         // der Verkehr auch außerhalb der gekippten Ansicht
     }
 
-    static bool s_noTreeCollision = false;
+    static bool s_noTreeCollision = false;   // gewünscht
+    static bool s_treesChanged = false;      // in diesem Level umgesetzt
     static unsigned s_treeLevel = ~0u;
     static void RemoveTreeCollision();
+    static void RestoreTreeCollision();
+    static void ForgetTreeChanges();
 
     static void __cdecl RenderHook()
     {
-        // Erstes Bild eines Levels: die Objekte der Karte stehen jetzt alle
-        if (s_noTreeCollision && s_treeLevel != s_levelLoads)
+        // Neues Level: die Objekte der Karte sind frisch angelegt, unsere Änderungen damit fort
+        if (s_treeLevel != s_levelLoads)
         {
             s_treeLevel = s_levelLoads;
-            RemoveTreeCollision();
+            ForgetTreeChanges();
+        }
+        if (s_noTreeCollision != s_treesChanged)
+        {
+            if (s_noTreeCollision)
+                RemoveTreeCollision();
+            else
+                RestoreTreeCollision();
         }
         if (s_preRender)
             s_preRender();
@@ -1111,9 +1121,17 @@ namespace gta1
     // Der Status der Objektart ("ohne Belang") und ihre Maße ändern für Fahrzeuge nichts.
     // Stämme und Masten, die aus Kacheln gebaut sind (Palmen, Laternen, Ampeln; in Liberty City steht zusätzlich
     // unter jedem Baum einer), sichert das Spiel mit einem unsichtbaren Pfosten. Diese Objekte werden entfernt.
-    // Die Objekte entstehen bei jedem Levelstart neu aus der Karte, es bleibt also nichts zurück.
+    // Die Objekte entstehen bei jedem Levelstart neu aus der Karte, es bleibt also nichts zurück. Beim Ausschalten
+    // im laufenden Level wird alles zurückgestellt.
     constexpr int kInvisiblePole = 68;   // 8 x 8 Pixel, 64 hoch, unsichtbar (Status 3)
     constexpr int kRaisePixels = 48;     // drei Viertel Block: Luft auch für höhere Fahrzeuge
+
+    struct PolePos
+    {
+        int32_t x, y, z;
+    };
+    static std::vector<PolePos> s_removedPoles;     // in diesem Level entfernt
+    static std::vector<int16_t> s_raisedObjects;    // in diesem Level angehoben
 
     static bool IsRaisedObject(int type)
     {
@@ -1146,30 +1164,63 @@ namespace gta1
         const bool removePoles = pole && pole[0x12] == 3 && dims[0] == (8 << 16) && dims[1] == (8 << 16);
 
         std::vector<int16_t> poles;
-        int raised = 0;
         for (int i = 0; i < addr::ObjectCount; ++i)
         {
             uint8_t* o = reinterpret_cast<uint8_t*>(A.Objects + i * L.ObjectSize);
             if (*reinterpret_cast<const int16_t*>(o) != i || *reinterpret_cast<const int16_t*>(o + L.ObjUsed) == 0)
                 continue;
             const int type = *reinterpret_cast<const int16_t*>(o + L.ObjType);
+            int32_t* pos = reinterpret_cast<int32_t*>(o + L.ObjPos);   // x, y, z; 1 Pixel = 65536, z kleiner = höher
             if (type == kInvisiblePole && removePoles)
-                poles.push_back((int16_t)i);
-            else if (IsRaisedObject(type))
             {
-                int32_t& z = *reinterpret_cast<int32_t*>(o + L.ObjPos + 8);   // 1 Pixel = 65536, kleiner = höher
-                if (z > (kRaisePixels << 16))
-                {
-                    z -= kRaisePixels << 16;
-                    ++raised;
-                }
+                poles.push_back((int16_t)i);
+                s_removedPoles.push_back({ pos[0], pos[1], pos[2] });
+            }
+            else if (IsRaisedObject(type) && pos[2] > (kRaisePixels << 16))
+            {
+                pos[2] -= kRaisePixels << 16;
+                s_raisedObjects.push_back((int16_t)i);
             }
         }
         // Feste Objekte der Karte stehen in keiner der Listen, nur im Raster der Blöcke; das Entfernen des Spiels
         // nimmt sie dort heraus und gibt den Platz frei (Listen fasst es nur für Status 5, 6, 7 und 9 an)
         for (const int16_t handle : poles)
             reinterpret_cast<void(__cdecl*)(int)>(A.ObjectDelete)(handle);
-        LOG("Bäume und Laternen ohne Zusammenstoß: %d angehoben, %d unsichtbare Pfosten entfernt", raised, (int)poles.size());
+        s_treesChanged = true;
+        LOG("Unter Bäumen und Laternen durchfahren: %d angehoben, %d unsichtbare Pfosten entfernt",
+            (int)s_raisedObjects.size(), (int)poles.size());
+    }
+
+    // Ausgeschaltet während des Levels: Bäume und Laternen wieder absenken, die Pfosten neu anlegen
+    static void RestoreTreeCollision()
+    {
+        int lowered = 0, created = 0;
+        for (const int16_t i : s_raisedObjects)
+        {
+            uint8_t* o = reinterpret_cast<uint8_t*>(A.Objects + i * L.ObjectSize);
+            if (*reinterpret_cast<const int16_t*>(o) != i || *reinterpret_cast<const int16_t*>(o + L.ObjUsed) == 0 ||
+                !IsRaisedObject(*reinterpret_cast<const int16_t*>(o + L.ObjType)))
+                continue;   // inzwischen zerstört oder der Platz neu vergeben
+            *reinterpret_cast<int32_t*>(o + L.ObjPos + 8) += kRaisePixels << 16;
+            ++lowered;
+        }
+        if (A.ObjectCreate)
+        {
+            using Create = int(__cdecl*)(int32_t, int32_t, int32_t, int, int, int);
+            for (const PolePos& p : s_removedPoles)
+                if (static_cast<int16_t>(reinterpret_cast<Create>(A.ObjectCreate)(p.x, p.y, p.z, kInvisiblePole, -1, 0)) > 0)
+                    ++created;
+        }
+        LOG("Unter Bäumen und Laternen durchfahren aus: %d abgesenkt, %d von %d Pfosten neu angelegt", lowered, created,
+            (int)s_removedPoles.size());
+        ForgetTreeChanges();
+    }
+
+    static void ForgetTreeChanges()
+    {
+        s_treesChanged = false;
+        s_raisedObjects.clear();
+        s_removedPoles.clear();
     }
 
     bool SetTreeCollision(bool remove)
