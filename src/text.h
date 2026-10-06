@@ -129,7 +129,7 @@ namespace text
         ProgUnavailable,
         OptHudScale,
         HudScaleAuto,
-        OptNoTreeCollision,
+        OptNoPostCollision,
         OptSteerAssist,
         AssistGentle,
         AssistMedium,

@@ -119,7 +119,8 @@ namespace gta1
 
     // Spielregeln ([Gameplay]); false, wenn der Spielcode nicht wie erwartet aussieht
     bool EnableKeepMultiplier();   // Verhaftung halbiert den Multiplikator nicht mehr
-    // Bäume, Laternen und Pfosten halten Fahrzeuge nicht mehr auf; lässt sich im laufenden Level umschalten.
+    // Bäume, Laternen, Pfosten und die Masten von Schildern und Ampeln halten Fahrzeuge nicht mehr auf; lässt sich
+    // im laufenden Level umschalten.
     // Liefert false, wenn die Spielversion es nicht kann.
     bool SetTreeCollision(bool remove);
     // Lenkhilfe: richtet den Wagen der Spielfigur sacht auf die nächste Himmelsrichtung aus, sobald die Lenkung ruht

@@ -128,9 +128,10 @@ GAMEPLAY
     once, and punches now hurt (10 %, for you and for others). Other
     characters still die from one bullet. Adjustable in the pause menu
     (GTA1Plus options, Gameplay); 100 / 100 / 0 is the original game.
-  - Drive under trees and lamp posts: as in GTA2, tree trunks, lamp posts
-    and traffic lights no longer stop your vehicle. Trees and lamps are
-    lifted a little for that, so tree tops look slightly bigger.
+  - Drive through trees, lamp posts and signs: as in GTA2, tree trunks,
+    lamp posts and the posts of road signs and traffic lights no longer
+    stop your vehicle. Trees and lamps are lifted a little for that, so
+    tree tops look slightly bigger.
   - Steering aid: as in GTA2 the car straightens itself along the street
     when you let go of the steering, so it keeps its lane and a short tap
     becomes a lane change. The original game does this only when the car

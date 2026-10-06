@@ -231,7 +231,7 @@ void ModInit(HMODULE self)
         LOG("Schaden statt sofortigem Tod (Pistole %d %%, Maschinenpistole %d %%, Faust %d %%): %s", g_cfg.pistolDamage,
             g_cfg.machineGunDamage, g_cfg.punchDamage, gta1::EnableDamage() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.noTreeCollision)
-            LOG("Unter Bäumen und Laternen durchfahren: %s", gta1::SetTreeCollision(true) ? "aktiv" : "für diese Version nicht verfügbar");
+            LOG("Bäume, Laternen und Schilder ohne Zusammenstoß: %s", gta1::SetTreeCollision(true) ? "aktiv" : "für diese Version nicht verfügbar");
         if (g_cfg.steerAssist)
             LOG("Lenkhilfe (Stufe %d): %s", g_cfg.steerAssist, gta1::SetSteerAssist(g_cfg.steerAssist) ? "aktiv" : "für diese Version nicht verfügbar");
         if (g_cfg.keepMultiplier)

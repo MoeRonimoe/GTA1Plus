@@ -169,6 +169,8 @@ namespace gta1
         // (Index z*65536 + y*256 + x, Bits 4..6: 2 Fahrbahn, 3 Gehweg)
         uintptr_t Cars = 0, Straighten = 0, BlockTypes = 0;
         int       CarWheel = 0x180, CarPos = 0x23C;
+        // Zeiger auf die geladene Karte: Spalten und gleich dahinter die Blockarten (wie in der .cmp, 8 Byte je Art)
+        uintptr_t MapColumns = 0, MapBlocks = 0;
         uintptr_t Explode = 0;        // __cdecl(x, y, z, Auslöser): Explosion erzeugen, alle Explosionen laufen hier durch
         uintptr_t ExplodeThunk = 0;   // London: jmp Explode
         uint8_t   ExplodeProlog[8] = { 0x83, 0xEC, 0x04, 0x33, 0xC9 };   // ohne Thunk: erste ganze Befehle der Funktion
@@ -241,6 +243,7 @@ namespace gta1
         a.SecretsTotal = 0x6FB934; a.SecretsCounter = 0x7169C0;
         a.CarDamage = 0x73B077;   // 0x497220
         a.Cars = 0x73AF80; a.Straighten = 0x46AE99; a.BlockTypes = 0x590798;
+        a.MapColumns = 0x5F395C; a.MapBlocks = 0x5F18E4;
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
@@ -320,6 +323,7 @@ namespace gta1
         a.SecretsTotal = 0x6FB92C; a.SecretsCounter = 0x7169B8;
         a.CarDamage = 0x5105D7;   // 0x4112A0
         a.Cars = 0x5104E0; a.Straighten = 0x4804C1; a.BlockTypes = 0x5C54E8;   // Fahrphysik 0x480110
+        a.MapColumns = 0x6286AC; a.MapBlocks = 0x626634;
         a.Explode = 0x433F50; a.ExplodeThunk = 0x40105F;
         a.TextReady = 0x8378A0; a.TextBuffer = 0x8378CC;   // aus GetText 0x4A6CB0
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
@@ -387,6 +391,7 @@ namespace gta1
         a.CarDamage = 0x511A63; a.CarStride = 668;   // 0x4114E0: die Fahrzeuge sind hier 4 Byte größer
         a.Cars = 0x511968; a.CarWheel = 0x184; a.CarPos = 0x240;   // Fahrphysik 0x4809B0
         a.Straighten = 0x480D61; a.BlockTypes = 0x5C70F0;
+        a.MapColumns = 0x62A2B4; a.MapBlocks = 0x62823C;
         a.Explode = 0x434230; a.ExplodeThunk = 0x40105F;
         a.TextReady = 0x8394B0; a.TextBuffer = 0x8394DC;
         a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
@@ -465,6 +470,7 @@ namespace gta1
         a.CarDamage = 0x4BE344; a.CarStride = 688;   // 0x40A1E0
         a.Cars = 0x4BE248; a.CarWheel = 0x18C; a.CarPos = 0x250;   // Fahrphysik 0x460BE0
         a.Straighten = 0x461110; a.BlockTypes = 0x55FAB0;
+        a.MapColumns = 0x5C2C70; a.MapBlocks = 0x5C0BFC;
         // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
         // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
         a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
@@ -1245,6 +1251,14 @@ namespace gta1
     // unter jedem Baum einer), sichert das Spiel mit einem unsichtbaren Pfosten. Diese Objekte werden entfernt.
     // Die Objekte entstehen bei jedem Levelstart neu aus der Karte, es bleibt also nichts zurück. Beim Ausschalten
     // im laufenden Level wird alles zurückgestellt.
+    //
+    // Die Masten von Schildern und Ampeln selbst sind keine Objekte, sondern durchsichtige ("flache") Seitenkacheln
+    // der Kartenblöcke. Bei flachen Blöcken hält nur die linke bzw. obere Seite Fahrzeuge auf, und zwar an der
+    // West- bzw. Nordkante, von beiden Seiten her (Fußgänger nie). Gezeichnet wird an derselben Kante: von Westen
+    // bzw. Norden gesehen die linke/obere oder ersatzweise die rechte/untere Kachel, von Osten bzw. Süden gesehen
+    // nur die rechte/untere. Steht die Mastkachel also nur noch rechts bzw. unten, sieht der Block aus wie zuvor,
+    // und Fahrzeuge fahren hindurch. Geändert werden die Blockarten der geladenen Karte (Typ, Zusatz, links, rechts,
+    // oben, unten, Deckel), also jede Stelle der Stadt mit dieser Blockart auf einmal.
     constexpr int kInvisiblePole = 68;   // 8 x 8 Pixel, 64 hoch, unsichtbar (Status 3)
     constexpr int kRaisePixels = 48;     // drei Viertel Block: Luft auch für höhere Fahrzeuge
 
@@ -1254,6 +1268,102 @@ namespace gta1
     };
     static std::vector<PolePos> s_removedPoles;     // in diesem Level entfernt
     static std::vector<int16_t> s_raisedObjects;    // in diesem Level angehoben
+
+    struct PoleBlock
+    {
+        uint8_t* block;
+        uint8_t before[4], after[4];   // Kacheln links, rechts, oben, unten
+    };
+    static std::vector<PoleBlock> s_poleBlocks;     // geänderte Blockarten der Karte
+    static const uint8_t* s_poleTable = nullptr;    // Tabelle, in der sie liegen
+
+    // Kacheln, die nur einen Mast zeigen (Nummern der Seitenkacheln in den Style-Dateien der Städte)
+    static bool IsPoleTile(int style, int tile)
+    {
+        if (A.London)
+            return tile == 132 || tile == 142;      // Pfosten mit Schild, Bushaltestelle
+        switch (style)
+        {
+        case 1: return tile == 97;                  // Liberty City: Mast der Schilder und Ampeln
+        case 2: return tile == 21 || tile == 180;   // San Andreas: Mast, Holzmast
+        case 3: return tile == 140 || tile == 171;  // Vice City: Mast, Parkuhr
+        default: return false;
+        }
+    }
+
+    // Unsere Änderungen stehen noch in der Karte (das Spiel hat sie seither nicht neu geladen)
+    static bool PoleFacesApplied(const uint8_t* blocks)
+    {
+        if (s_poleBlocks.empty() || blocks != s_poleTable)
+            return false;
+        for (const PoleBlock& p : s_poleBlocks)
+            if (memcmp(p.block + 3, p.after, 4))
+                return false;
+        return true;
+    }
+
+    static int RemovePoleFaces()
+    {
+        if (!A.MapColumns || !A.MapBlocks)
+            return 0;
+        // Größe der Tabellen aus dem Kopf der Kartendatei, die das Spiel geladen hat
+        struct Header
+        {
+            uint32_t version;
+            uint8_t style, sample;
+            uint16_t reserved;
+            uint32_t routeSize, objectSize, columnSize, blockSize, navSize;
+        } hdr = {};
+        const std::string path = MapFile();
+        FILE* f = nullptr;
+        if (path.empty() || fopen_s(&f, path.c_str(), "rb") || !f)
+            return 0;
+        const bool read = fread(&hdr, sizeof(hdr), 1, f) == 1;
+        fclose(f);
+        uint8_t* columns = *reinterpret_cast<uint8_t**>(A.MapColumns);
+        uint8_t* blocks = *reinterpret_cast<uint8_t**>(A.MapBlocks);
+        if (!read || !columns || blocks != columns + hdr.columnSize || hdr.blockSize % 8 || hdr.blockSize > 8 * 65536)
+            return 0;
+        if (PoleFacesApplied(blocks))
+            return (int)s_poleBlocks.size();
+        s_poleBlocks.clear();
+        s_poleTable = blocks;
+        for (uint32_t i = 0; i < hdr.blockSize / 8; ++i)
+        {
+            uint8_t* b = blocks + i * 8;
+            if (!(b[0] & 0x80))   // nicht flach
+                continue;
+            PoleBlock p = { b };
+            memcpy(p.before, b + 3, 4);
+            for (int pair = 0; pair < 4; pair += 2)
+            {
+                uint8_t& blocking = b[3 + pair];   // links bzw. oben
+                uint8_t& shown = b[4 + pair];      // rechts bzw. unten
+                if (!IsPoleTile(hdr.style, blocking) || (shown && shown != blocking))
+                    continue;
+                shown = blocking;
+                blocking = 0;
+            }
+            memcpy(p.after, b + 3, 4);
+            if (memcmp(p.before, p.after, 4))
+                s_poleBlocks.push_back(p);
+        }
+        return (int)s_poleBlocks.size();
+    }
+
+    static int RestorePoleFaces()
+    {
+        int restored = 0;
+        if (A.MapBlocks && PoleFacesApplied(*reinterpret_cast<uint8_t**>(A.MapBlocks)))
+            for (const PoleBlock& p : s_poleBlocks)
+            {
+                memcpy(p.block + 3, p.before, 4);
+                ++restored;
+            }
+        s_poleBlocks.clear();
+        s_poleTable = nullptr;
+        return restored;
+    }
 
     static bool IsRaisedObject(int type)
     {
@@ -1309,8 +1419,8 @@ namespace gta1
         for (const int16_t handle : poles)
             reinterpret_cast<void(__cdecl*)(int)>(A.ObjectDelete)(handle);
         s_treesChanged = true;
-        LOG("Unter Bäumen und Laternen durchfahren: %d angehoben, %d unsichtbare Pfosten entfernt",
-            (int)s_raisedObjects.size(), (int)poles.size());
+        LOG("Bäume, Laternen und Schilder ohne Zusammenstoß: %d angehoben, %d unsichtbare Pfosten entfernt, %d Blockarten "
+            "mit Mast geändert", (int)s_raisedObjects.size(), (int)poles.size(), RemovePoleFaces());
     }
 
     // Ausgeschaltet während des Levels: Bäume und Laternen wieder absenken, die Pfosten neu anlegen
@@ -1333,11 +1443,12 @@ namespace gta1
                 if (static_cast<int16_t>(reinterpret_cast<Create>(A.ObjectCreate)(p.x, p.y, p.z, kInvisiblePole, -1, 0)) > 0)
                     ++created;
         }
-        LOG("Unter Bäumen und Laternen durchfahren aus: %d abgesenkt, %d von %d Pfosten neu angelegt", lowered, created,
-            (int)s_removedPoles.size());
+        LOG("Bäume, Laternen und Schilder wieder fest: %d abgesenkt, %d von %d Pfosten neu angelegt, %d Blockarten "
+            "zurückgestellt", lowered, created, (int)s_removedPoles.size(), RestorePoleFaces());
         ForgetTreeChanges();
     }
 
+    // Neues Level. Die Karte bleibt stehen, wenn das Spiel sie nicht neu lädt; das prüft RemovePoleFaces selbst
     static void ForgetTreeChanges()
     {
         s_treesChanged = false;
