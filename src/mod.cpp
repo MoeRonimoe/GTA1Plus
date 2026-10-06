@@ -223,10 +223,11 @@ void ModInit(HMODULE self)
         gta1::SetBeforeHudCallback(&tiltcam::Warp);
         if (!gta1::SetCameraOverride(&tiltcam::BeginFrame))
             LOG("Kippkamera: Spielcode passt nicht");
-        int vehicleHeight, vehicleZoom;
+        int vehicleHeight, vehicleZoom, footHeight, footZoom;
         VehicleCameraView(g_cfg.vehicleView, vehicleHeight, vehicleZoom);
-        if (!gta1::SetViewOptions(g_cfg.trafficRange / 100.0f, vehicleHeight, vehicleZoom))
-            LOG("Sichtbereich und Fahrzeugkamera: Spielcode passt nicht");
+        FootCameraView(g_cfg.footView, footHeight, footZoom);
+        if (!gta1::SetViewOptions(g_cfg.trafficRange / 100.0f, vehicleHeight, vehicleZoom, footHeight, footZoom))
+            LOG("Sichtbereich und Kamerahöhe: Spielcode passt nicht");
         gta1::SetDamage(g_cfg.pistolDamage, g_cfg.machineGunDamage, g_cfg.punchDamage);
         LOG("Schaden statt sofortigem Tod (Pistole %d %%, Maschinenpistole %d %%, Faust %d %%): %s", g_cfg.pistolDamage,
             g_cfg.machineGunDamage, g_cfg.punchDamage, gta1::EnableDamage() ? "aktiv" : "Spielcode passt nicht");

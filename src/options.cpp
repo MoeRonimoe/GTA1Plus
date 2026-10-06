@@ -63,6 +63,8 @@ namespace options
             { Type::Bool, text::OptTiltRotate, &g_cfg.tiltRotate, false, 0, 0, 0, {}, &tiltcam::Available },
             { Type::Choice, text::OptVehicleView, &g_cfg.vehicleView, false, 0, 3, 1,
               { text::ViewGame, text::ViewHigh, text::ViewHigher, text::ViewMax } },
+            { Type::Choice, text::OptFootView, &g_cfg.footView, false, 0, 3, 1,
+              { text::ViewGame, text::ViewHigh, text::ViewHigher, text::ViewMax } },
             { Type::Int, text::OptTrafficRange, &g_cfg.trafficRange, false, 100, 250, 25 },
 
             { Type::Header, text::OptGroupGameplay },

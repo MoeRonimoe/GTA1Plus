@@ -134,6 +134,7 @@ namespace text
         AssistGentle,
         AssistMedium,
         AssistStrong,
+        OptFootView,
         Count
     };
 

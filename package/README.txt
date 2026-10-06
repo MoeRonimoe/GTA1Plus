@@ -113,6 +113,8 @@ CAMERA
     behind (the hex patch shared by amilmand on GTAforums, applied in
     memory).
   - Optional fixed camera height in vehicles, e.g. always zoomed out.
+  - Optional camera height on foot: three steps that show more of the
+    surroundings, up to the view from a fast car.
   - Optional larger traffic range: new cars appear further outside the
     screen, so you have more time to react.
   - Tilted camera (prototype, off by default): a view in the style of

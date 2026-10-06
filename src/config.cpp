@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 22;
+static const int kConfigVersion = 23;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=22\r\n"
+    "Version=23\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -128,6 +128,10 @@ static const char kDefaultIni[] =
     "; Camera height in vehicles: 0 = as in the game (zooms out with speed), 1 = high, 2 = very high,\r\n"
     "; 3 = maximum (as far out as the game goes at top speed). 1..3 keep that view, also when standing still\r\n"
     "VehicleView=0\r\n"
+    "; Camera height on foot: 0 = as in the game (close), 1 = high, 2 = very high, 3 = maximum (as far out as\r\n"
+    "; the game goes in a vehicle at top speed, the same view as VehicleView=3). Each step shows about two\r\n"
+    "; thirds more of the surroundings in every direction\r\n"
+    "FootView=0\r\n"
     "; Traffic appears and disappears outside this range around the camera, in percent of the visible\r\n"
     "; area (100 = as in the game, up to 250). More gives you more time to react to cars\r\n"
     "TrafficRange=100\r\n"
@@ -251,6 +255,7 @@ namespace
         { L"Camera",   L"TiltAngle",      Kind::Int,  &g_cfg.tiltAngle,          nullptr, nullptr },
         { L"Camera",   L"TiltRotate",     Kind::Bool, &g_cfg.tiltRotate,         nullptr, nullptr },
         { L"Camera",   L"VehicleView",    Kind::Int,  &g_cfg.vehicleView,        nullptr, nullptr },
+        { L"Camera",   L"FootView",       Kind::Int,  &g_cfg.footView,           nullptr, nullptr },
         { L"Camera",   L"TrafficRange",   Kind::Int,  &g_cfg.trafficRange,       nullptr, nullptr },
         { L"PlayerColors", L"Character1", Kind::Int,  &g_cfg.playerColors[0], nullptr, nullptr },
         { L"PlayerColors", L"Character2", Kind::Int,  &g_cfg.playerColors[1], nullptr, nullptr },
@@ -376,6 +381,7 @@ void LoadConfig(const wchar_t* ini)
     g_cfg.tilt = std::clamp(g_cfg.tilt, 0, 2);
     g_cfg.tiltAngle = std::clamp(g_cfg.tiltAngle, 0, 45);
     g_cfg.vehicleView = std::clamp(g_cfg.vehicleView, 0, 3);
+    g_cfg.footView = std::clamp(g_cfg.footView, 0, 3);
     g_cfg.trafficRange = std::clamp(g_cfg.trafficRange, 100, 250);
     g_cfg.vibration = std::clamp(g_cfg.vibration, 0, 100);
     g_cfg.hudScale = std::clamp(g_cfg.hudScale, 0, 4);

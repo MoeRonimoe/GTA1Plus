@@ -801,9 +801,10 @@ namespace overlay
                 g_minimap = g_cfg.minimap;
             if (g_cfg.mapStyle != style)
                 g_style = g_map.HasTextures() ? g_cfg.mapStyle : CityMap::Schematic;
-            int vehicleHeight, vehicleZoom;
+            int vehicleHeight, vehicleZoom, footHeight, footZoom;
             VehicleCameraView(g_cfg.vehicleView, vehicleHeight, vehicleZoom);
-            gta1::SetViewOptions(g_cfg.trafficRange / 100.0f, vehicleHeight, vehicleZoom);
+            FootCameraView(g_cfg.footView, footHeight, footZoom);
+            gta1::SetViewOptions(g_cfg.trafficRange / 100.0f, vehicleHeight, vehicleZoom, footHeight, footZoom);
             gta1::SetDamage(g_cfg.pistolDamage, g_cfg.machineGunDamage, g_cfg.punchDamage);
             if (options::NeedsRestart(i))
                 ShowStatus(text::Get(text::OptRestart));

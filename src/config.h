@@ -43,6 +43,7 @@ struct Config
     int  tiltAngle           = 35;   // Neigung in Grad
     bool tiltRotate          = true; // im Fahrzeug dreht sich das Bild mit (Fahrtrichtung oben)
     int  vehicleView         = 0;    // Kamerahöhe im Fahrzeug: 0 wie im Spiel, 1 hoch, 2 sehr hoch, 3 maximal
+    int  footView            = 0;    // Kamerahöhe zu Fuß: 0 wie im Spiel, 1 hoch, 2 sehr hoch, 3 maximal
     int  trafficRange        = 100;  // Prozent: Sichtbereich, außerhalb dessen Verkehr entsteht und verschwindet
 
     // [Keys]
@@ -88,12 +89,24 @@ void LoadConfig(const wchar_t* iniPath);
 // Einen geänderten Wert aus g_cfg (Adresse des Felds) in die INI zurückschreiben
 bool SaveConfigValue(const void* value);
 
-// Fahrzeugkamera für [Camera] VehicleView: Höhe und zoom wie beim Spiel zwischen stehend (80/126) und schneller
-// Fahrt (268/90, gemessen in 1.0.0.1); 0/0 = wie im Spiel
+// Fahrzeugkamera für [Camera] VehicleView. Das Spiel zeigt aus Höhe/zoom zu Fuß 78/284 und im stehenden Fahrzeug
+// 80/284 gut 4 Blöcke nach jeder Seite und zoomt mit dem Tempo bis 268/90 heraus (18 Blöcke; in allen Versionen
+// gleich). Die Stufen liegen im oberen Teil davon (12, 15 und 18 Blöcke); 0/0 = wie im Spiel
 inline void VehicleCameraView(int view, int& height, int& zoom)
 {
     static const float kShare[] = { 0.0f, 0.4f, 0.7f, 1.0f };
     const float t = view > 0 && view < 4 ? kShare[view] : 0.0f;
     height = t > 0 ? (int)(80 + t * 188) : 0;
     zoom = t > 0 ? (int)(126 - t * 36) : 0;
+}
+
+// Kamera zu Fuß für [Camera] FootView: drei gleich große Schritte von der Kamera des Spiels (78/284) bis zu der
+// bei schneller Fahrt (268/90, dasselbe Bild wie VehicleView=3), Höhe und zoom gemeinsam wie beim Spiel. Jede
+// Stufe zeigt rund zwei Drittel mehr nach jeder Seite: 7, 11 und 18 Blöcke. 0/0 = wie im Spiel
+inline void FootCameraView(int view, int& height, int& zoom)
+{
+    static const int kHeight[] = { 0, 141, 205, 268 }, kZoom[] = { 0, 194, 132, 90 };
+    const int i = view > 0 && view < 4 ? view : 0;
+    height = kHeight[i];
+    zoom = kZoom[i];
 }

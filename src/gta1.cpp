@@ -563,7 +563,9 @@ namespace gta1
     static bool s_inViewRect = false;
     static float s_viewRectScale = 1.0f;   // Sichtbereich der Spiellogik (Verkehr entsteht knapp außerhalb)
     static int s_vehicleHeight = 0, s_vehicleZoom = 0; // feste Fahrzeugkamera, 0 = wie im Spiel
-    static float s_heightBlend = 0;
+    static int s_footHeight = 0, s_footZoom = 0;       // dasselbe zu Fuß
+    static float s_heightBlend = 0;                    // Anteil der festen Kamera am Bild
+    static float s_fixedHeight = 0, s_fixedZoom = 0;   // feste Kamera, läuft ihrem Ziel nach
     static DWORD s_heightTick = 0;
     static void RestoreRenderCamera();
 
@@ -619,22 +621,41 @@ namespace gta1
         rect[4] = halfW;
     }
 
-    // Feste Fahrzeugkamera, beim Ein- und Aussteigen überblendet. Das Spiel zoomt mit dem Tempo über Höhe und zoom
-    // heraus (stehend etwa 80/126, schnell 268/90) und schreibt beide jeden Tick neu, deshalb wirkt das nicht auf
-    // seine eigene Glättung zurück. focal folgt aus zoom wie in der Kameraführung (Bezugsbreite * zoom / 320).
-    static void ApplyVehicleHeight(int player, CameraData& cam)
+    // Feste Kamera im Fahrzeug und zu Fuß, weich überblendet beim Ein- und Aussteigen und beim Umstellen. Das Spiel
+    // zoomt über Höhe und zoom: zu Fuß fest 78/284, im Fahrzeug mit dem Tempo von 80/284 (stehend) bis 268/90.
+    // Es schreibt beide jeden Tick neu, deshalb wirkt das nicht auf seine eigene Glättung zurück. focal folgt aus
+    // zoom wie in der Kameraführung (Bezugsbreite * zoom / 320). Die Bildbreite geht mit 1/zoom, zoom wird deshalb
+    // im Verhältnis überblendet - sonst liefe das Herauszoomen zu Fuß (284 -> 90) am Ende davon.
+    static void ApplyFixedHeight(int player, CameraData& cam)
     {
         const DWORD now = GetTickCount();
         const float dt = s_heightTick ? std::min((now - s_heightTick) / 1000.0f, 0.1f) : 0.0f;
         s_heightTick = now;
         const int type = *reinterpret_cast<int*>(A.PlayerCtrl + player * L.PlayerStride);
-        const bool want = s_vehicleHeight > 0 && type == 0;
+        const int height = type == 0 ? s_vehicleHeight : type == 2 ? s_footHeight : 0;
+        const int zoom = type == 0 ? s_vehicleZoom : type == 2 ? s_footZoom : 0;
+        const bool want = height > 0 && zoom > 0;
+        if (want)
+        {
+            if (s_heightBlend <= 0)
+            {
+                s_fixedHeight = (float)height;
+                s_fixedZoom = (float)zoom;
+            }
+            else
+            {
+                // Anderes Ziel als bisher (ein- oder ausgestiegen, Einstellung geändert): zügig hinüber
+                const float k = std::min(1.0f, dt / 0.25f);
+                s_fixedHeight += (height - s_fixedHeight) * k;
+                s_fixedZoom *= std::pow(zoom / s_fixedZoom, k);
+            }
+        }
         s_heightBlend = std::clamp(s_heightBlend + (want ? dt : -dt) / 0.8f, 0.0f, 1.0f);
-        if (s_heightBlend <= 0 || s_vehicleHeight <= 0 || s_vehicleZoom <= 0)
+        if (s_heightBlend <= 0 || s_fixedZoom <= 0 || cam.zoom <= 0)
             return;
         const float t = s_heightBlend * s_heightBlend * (3 - 2 * s_heightBlend);
-        cam.height = (int)std::lround(cam.height + (s_vehicleHeight - cam.height) * t);
-        cam.zoom = (int)std::lround(cam.zoom + (s_vehicleZoom - cam.zoom) * t);
+        cam.height = (int)std::lround(cam.height + (s_fixedHeight - cam.height) * t);
+        cam.zoom = std::max(1, (int)std::lround(cam.zoom * std::pow(s_fixedZoom / cam.zoom, t)));
         cam.focal = cam.baseW * cam.zoom / 320;
     }
 
@@ -652,14 +673,14 @@ namespace gta1
         return true;
     }
 
-    // Zwischen Kameraführung und Sichtbereich: Höhe im Fahrzeug festlegen und Versatz der Kamerasteuerung
+    // Zwischen Kameraführung und Sichtbereich: feste Kamerahöhe einstellen und Versatz der Kamerasteuerung
     // aufschlagen. Die Glättung des Spiels rechnet mit dem Mittelpunkt ohne unseren Versatz weiter, der
     // Sichtbereich passt zum Bild.
     static void BeforeViewRect(int player)
     {
         RestoreRenderCamera(); // falls seit dem letzten Mal kein Bild gezeichnet wurde
         if (player == *reinterpret_cast<int*>(A.LocalPlayer))
-            ApplyVehicleHeight(player, CameraOf(player));
+            ApplyFixedHeight(player, CameraOf(player));
         if (s_cameraFilter && player == *reinterpret_cast<int*>(A.LocalPlayer))
         {
             CameraData& cam = CameraOf(player);
@@ -1910,7 +1931,7 @@ namespace gta1
         return true;
     }
 
-    bool SetViewOptions(float viewRectScale, int vehicleHeight, int vehicleZoom)
+    bool SetViewOptions(float viewRectScale, int vehicleHeight, int vehicleZoom, int footHeight, int footZoom)
     {
         if (!s_supported || !A.Camera || !HaveViewRect() || !A.PlayerCtrl)
             return false;
@@ -1919,6 +1940,8 @@ namespace gta1
         s_viewRectScale = std::clamp(viewRectScale, 1.0f, 3.0f);
         s_vehicleHeight = std::clamp(vehicleHeight, 0, 716);
         s_vehicleZoom = std::clamp(vehicleZoom, 0, 500);
+        s_footHeight = std::clamp(footHeight, 0, 716);
+        s_footZoom = std::clamp(footZoom, 0, 500);
         return true;
     }
 
