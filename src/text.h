@@ -130,6 +130,10 @@ namespace text
         OptHudScale,
         HudScaleAuto,
         OptNoTreeCollision,
+        OptSteerAssist,
+        AssistGentle,
+        AssistMedium,
+        AssistStrong,
         Count
     };
 

@@ -162,6 +162,13 @@ namespace gta1
         uintptr_t TargetScore = 0, MissionsTotal = 0, MissionsCounter = 0, SecretsTotal = 0, SecretsCounter = 0;
         uintptr_t CarDamage = 0;      // byte je Fahrzeug: Schaden 0..100 (bei 100 explodiert es)
         int       CarStride = 664;
+        // Fahrzeuge und darin die Fahrphysik (1.0.0.1: 0x46A940): float Richtung der Vorderräder im Bogenmaß, dahinter
+        // Ort x, y (+4, +8), Kurs der Karosserie (+0x0C) und Geschwindigkeit x, y (+0x10, +0x14); CarPos = Ort als
+        // GtaPos. Die Physik richtet den Wagen der Spielfigur auf Fahrbahn selbst gerade: Straighten = das "jle" hinter
+        // "cmp word [Auto+Tempo],6", das diesen Teil überspringt. BlockTypes = Art jedes Blocks der Karte
+        // (Index z*65536 + y*256 + x, Bits 4..6: 2 Fahrbahn, 3 Gehweg)
+        uintptr_t Cars = 0, Straighten = 0, BlockTypes = 0;
+        int       CarWheel = 0x180, CarPos = 0x23C;
         uintptr_t Explode = 0;        // __cdecl(x, y, z, Auslöser): Explosion erzeugen, alle Explosionen laufen hier durch
         uintptr_t ExplodeThunk = 0;   // London: jmp Explode
         uint8_t   ExplodeProlog[8] = { 0x83, 0xEC, 0x04, 0x33, 0xC9 };   // ohne Thunk: erste ganze Befehle der Funktion
@@ -233,6 +240,7 @@ namespace gta1
         a.TargetScore = 0x736A20; a.MissionsTotal = 0x736A10; a.MissionsCounter = 0x6FB930;
         a.SecretsTotal = 0x6FB934; a.SecretsCounter = 0x7169C0;
         a.CarDamage = 0x73B077;   // 0x497220
+        a.Cars = 0x73AF80; a.Straighten = 0x46AE99; a.BlockTypes = 0x590798;
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
@@ -311,6 +319,7 @@ namespace gta1
         a.TargetScore = 0x736A18; a.MissionsTotal = 0x736A08; a.MissionsCounter = 0x6FB928;   // 0x452A70 ff.
         a.SecretsTotal = 0x6FB92C; a.SecretsCounter = 0x7169B8;
         a.CarDamage = 0x5105D7;   // 0x4112A0
+        a.Cars = 0x5104E0; a.Straighten = 0x4804C1; a.BlockTypes = 0x5C54E8;   // Fahrphysik 0x480110
         a.Explode = 0x433F50; a.ExplodeThunk = 0x40105F;
         a.TextReady = 0x8378A0; a.TextBuffer = 0x8378CC;   // aus GetText 0x4A6CB0
         a.MglPrimary = 0x503CFC; a.MglPageCount = 0x503CF8;
@@ -376,6 +385,8 @@ namespace gta1
         a.TargetScore = 0x738620; a.MissionsTotal = 0x738610; a.MissionsCounter = 0x6FD530;   // 0x452E30 ff.
         a.SecretsTotal = 0x6FD534; a.SecretsCounter = 0x7185C0;
         a.CarDamage = 0x511A63; a.CarStride = 668;   // 0x4114E0: die Fahrzeuge sind hier 4 Byte größer
+        a.Cars = 0x511968; a.CarWheel = 0x184; a.CarPos = 0x240;   // Fahrphysik 0x4809B0
+        a.Straighten = 0x480D61; a.BlockTypes = 0x5C70F0;
         a.Explode = 0x434230; a.ExplodeThunk = 0x40105F;
         a.TextReady = 0x8394B0; a.TextBuffer = 0x8394DC;
         a.MglPrimary = 0x505194; a.MglPageCount = 0x505190;
@@ -452,6 +463,8 @@ namespace gta1
         a.TargetScore = 0x6B3B84; a.MissionsTotal = 0x6B3B78; a.MissionsCounter = 0x676388;   // 0x43D1C0 ff.
         a.SecretsTotal = 0x67638C; a.SecretsCounter = 0x693B28;
         a.CarDamage = 0x4BE344; a.CarStride = 688;   // 0x40A1E0
+        a.Cars = 0x4BE248; a.CarWheel = 0x18C; a.CarPos = 0x250;   // Fahrphysik 0x460BE0
+        a.Straighten = 0x461110; a.BlockTypes = 0x55FAB0;
         // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
         // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
         a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
@@ -708,8 +721,117 @@ namespace gta1
     static void RestoreTreeCollision();
     static void ForgetTreeChanges();
 
+    // Lenkhilfe (wie in GTA2). Das Spiel führt je Fahrzeug die Richtung der Vorderräder: Lenken dreht sie je Bild um
+    // einige Grad (Wert des Fahrzeugtyps, oft 12), die Karosserie läuft ihr weich nach. Das Spiel richtet den Wagen
+    // der Spielfigur zwar selbst gerade, aber nur bis 11 Grad Abweichung von der Himmelsrichtung - weniger, als ein
+    // kurzer Tipper auf die Lenkung den Wagen dreht - und in festen Schritten von 1,6 Grad je Bild, die um das Ziel
+    // pendeln. Solange die Lenkhilfe läuft, ersetzt sie diesen Teil: Ruht die Lenkung, ziehen wir die Räder sacht
+    // auf die nächste Himmelsrichtung (alle Straßen verlaufen rechtwinklig), den Wagen richtet das Spiel danach aus.
+    static int s_steerAssist = 0;        // 0 aus (Verhalten des Spiels), 1 leicht, 2 mittel, 3 stark
+    static bool s_ownStraighten = true;  // der Teil des Spiels läuft noch
+
+    // "jle Ende" (0F 8E rel32) <-> "jmp Ende; nop"
+    static bool SetOwnStraightening(bool on)
+    {
+        if (on == s_ownStraighten)
+            return true;
+        uint8_t* site = reinterpret_cast<uint8_t*>(A.Straighten);
+        static const uint8_t jle[2] = { 0x0F, 0x8E };
+        uint8_t code[6];
+        int32_t rel;
+        if (on)
+        {
+            if (site[0] != 0xE9 || site[5] != 0x90)
+                return false;
+            memcpy(&rel, site + 1, 4);
+            --rel;
+            memcpy(code, jle, 2);
+            memcpy(code + 2, &rel, 4);
+        }
+        else
+        {
+            // davor: cmp word ptr [reg+Tempo],6
+            if (!hooks::BytesMatch(A.Straighten, jle, 2) || site[-5] != 0x66 || site[-4] != 0x83 || site[-1] != 0x06)
+                return false;
+            memcpy(&rel, site + 2, 4);
+            ++rel;
+            code[0] = 0xE9;
+            memcpy(code + 1, &rel, 4);
+            code[5] = 0x90;
+        }
+        if (!hooks::WriteMemory(site, code, sizeof(code)))
+            return false;
+        s_ownStraighten = on;
+        return true;
+    }
+
+    static void AssistSteering()
+    {
+        struct Level
+        {
+            float window;    // Grad: größte Abweichung, die noch korrigiert wird
+            float pull;      // Anteil der Abweichung je Bild
+            float maxStep;   // Grad je Bild höchstens
+        };
+        // Ein Bild Lenken dreht die Räder bei fast allen Fahrzeugen um 12 Grad; nach zwei Bildern (dem üblichen Tipper)
+        // stehen sie 16 Grad neben der alten Richtung, nach dreien etwa 25
+        static const Level kLevels[] = { {}, { 13.0f, 0.12f, 0.8f }, { 18.0f, 0.15f, 1.0f }, { 28.0f, 0.20f, 1.4f } };
+        constexpr int kRestFrames = 5;       // so viele Bilder muss die Lenkung ruhen
+        constexpr float kMinSpeed = 2.0f;    // im Stand, beim Rangieren und rückwärts nicht eingreifen (Spiel: Tempo > 6)
+        constexpr double kQuarter = 1.5707963267948966, kDegree = kQuarter / 90.0;
+        static int s_car = -1, s_rest = 0;
+        static float s_seen = 0;
+
+        Player p;
+        if (s_steerAssist <= 0 || s_ownStraighten || !GetPlayer(p) || p.ctrlType != 0)
+        {
+            s_car = -1;
+            return;
+        }
+        const int car = *reinterpret_cast<int*>(A.PlayerObject + *reinterpret_cast<int*>(A.LocalPlayer) * L.PlayerStride) & 0xFFFF;
+        if (car >= 400)
+        {
+            s_car = -1;
+            return;
+        }
+        uint8_t* rec = reinterpret_cast<uint8_t*>(A.Cars + car * A.CarStride);
+        float* wheel = reinterpret_cast<float*>(rec + A.CarWheel);
+        // Andere Radrichtung als im letzten Bild: es wird gelenkt, oder die Räder stellen sich nach dem Lenken zurück
+        if (car != s_car || *wheel != s_seen)
+        {
+            s_car = car;
+            s_seen = *wheel;
+            s_rest = 0;
+            return;
+        }
+        if (++s_rest < kRestFrames)
+            return;
+        // Vorwärts in Richtung der Räder, schnell genug
+        if (wheel[4] * std::cos(*wheel) + wheel[5] * std::sin(*wheel) < kMinSpeed)
+            return;
+        // Wie im Spiel nur auf Fahrbahn, dazu auf dem Gehweg; über Wiesen und Plätze fährt man, wie man will
+        const int32_t* pos = reinterpret_cast<const int32_t*>(rec + A.CarPos);
+        const unsigned block = (static_cast<unsigned>(pos[2] >> 22) << 16) | (static_cast<unsigned>(pos[1] >> 22) << 8) |
+                               static_cast<unsigned>(pos[0] >> 22);
+        if (block >= 6u * 65536u)
+            return;
+        const int ground = (*reinterpret_cast<const uint8_t*>(A.BlockTypes + block) >> 4) & 7;
+        if (ground != 2 && ground != 3)
+            return;
+
+        const Level& level = kLevels[std::min(s_steerAssist, 3)];
+        const double target = std::round(*wheel / kQuarter) * kQuarter;
+        const double off = *wheel - target;
+        if (std::fabs(off) > level.window * kDegree || static_cast<float>(target) == *wheel)
+            return;
+        const double step = std::clamp(off * level.pull, -level.maxStep * kDegree, level.maxStep * kDegree);
+        *wheel = static_cast<float>(std::fabs(off) < 0.05 * kDegree ? target : *wheel - step);
+        s_seen = *wheel;
+    }
+
     static void __cdecl RenderHook()
     {
+        AssistSteering();
         // Neues Level: die Objekte der Karte sind frisch angelegt, unsere Änderungen damit fort
         if (s_treeLevel != s_levelLoads)
         {
@@ -1228,6 +1350,17 @@ namespace gta1
         const bool can = s_supported && A.ObjInfo && A.Objects && A.ObjectDelete && A.RenderCall;
         s_noTreeCollision = remove && can;
         return can;
+    }
+
+    bool SetSteerAssist(int level)
+    {
+        if (!s_supported || !A.Cars || !A.Straighten || !A.BlockTypes || !A.RenderCall)
+            return false;
+        // Unsere Regelung und die des Spiels schließen sich aus
+        if (!SetOwnStraightening(level <= 0))
+            return false;
+        s_steerAssist = level;
+        return true;
     }
 
     bool ExtinguishPlayer()

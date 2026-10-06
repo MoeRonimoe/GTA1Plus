@@ -72,6 +72,8 @@ namespace options
             { Type::Int, text::OptPunchDamage, &g_cfg.punchDamage, false, 0, 100, 5 },
             { Type::Bool, text::OptExtinguish, &g_cfg.extinguish, true },
             { Type::Bool, text::OptNoTreeCollision, &g_cfg.noTreeCollision },
+            { Type::Choice, text::OptSteerAssist, &g_cfg.steerAssist, false, 0, 3, 1,
+              { text::OptOff, text::AssistGentle, text::AssistMedium, text::AssistStrong } },
             { Type::Bool, text::OptQuickRetry, &g_cfg.quickRetry, true },
             { Type::Bool, text::OptKeepMultiplier, &g_cfg.keepMultiplier, true },
             { Type::Bool, text::OptAllCharacters, &g_cfg.allCharacters, true },

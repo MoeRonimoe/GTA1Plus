@@ -131,6 +131,11 @@ GAMEPLAY
   - Drive under trees and lamp posts: as in GTA2, tree trunks, lamp posts
     and traffic lights no longer stop your vehicle. Trees and lamps are
     lifted a little for that, so tree tops look slightly bigger.
+  - Steering aid: as in GTA2 the car straightens itself along the street
+    when you let go of the steering, so it keeps its lane and a short tap
+    becomes a lane change. The original game does this only when the car
+    is almost straight already. Strength (gentle, medium, strong) in the
+    pause menu (GTA1Plus options, Gameplay); off = original behaviour.
   - Quick retry: after "MISSION FAILED" the phone of the mission rings again
     right away. Rewards already paid in the failed attempt are not paid again.
   - Busted: the multiplier is not halved.

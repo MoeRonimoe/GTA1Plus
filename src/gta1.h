@@ -122,6 +122,9 @@ namespace gta1
     // Bäume, Laternen und Pfosten halten Fahrzeuge nicht mehr auf; lässt sich im laufenden Level umschalten.
     // Liefert false, wenn die Spielversion es nicht kann.
     bool SetTreeCollision(bool remove);
+    // Lenkhilfe: richtet den Wagen der Spielfigur sacht auf die nächste Himmelsrichtung aus, sobald die Lenkung ruht
+    // (0 aus, 1 leicht, 2 mittel, 3 stark); lässt sich jederzeit umstellen. false, wenn die Spielversion es nicht kann.
+    bool SetSteerAssist(int level);
     bool EnableAllCharacters();    // Hauptmenü: Frauen auch in nicht-englischen Sprachversionen wählbar
     bool EnableQuickRetry();       // nach "MISSION FEHLGESCHLAGEN" Skriptpausen bis zum Neuaufbau verkürzen
     bool EnableSteadyCamera();     // Kamera folgt enger statt zu schwimmen (Patch aus GTAforums: shl 5 -> shl 2)

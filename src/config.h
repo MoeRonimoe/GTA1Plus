@@ -23,6 +23,7 @@ struct Config
     // [Gameplay]
     bool keepMultiplier = true;  // Multiplikator bei Verhaftung nicht halbieren
     bool noTreeCollision = true; // Bäume, Büsche, Laternen und Pfosten halten nichts mehr auf
+    int  steerAssist    = 2;     // Lenkhilfe: Wagen auf die Straßenrichtung ausrichten (0 aus, 1 leicht, 2 mittel, 3 stark)
     bool quickRetry     = true;  // nach gescheiterter Mission ohne lange Wartezeit neu versuchen
     bool allCharacters  = true;  // Frauen im Hauptmenü auch in nicht-englischen Versionen wählbar
     bool extinguish     = true;  // brennend mit der Sprungtaste am Boden wälzen und löschen
