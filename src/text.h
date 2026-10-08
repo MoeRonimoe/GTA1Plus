@@ -135,6 +135,7 @@ namespace text
         AssistMedium,
         AssistStrong,
         OptFootView,
+        LevelStarting,
         Count
     };
 

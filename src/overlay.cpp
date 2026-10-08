@@ -767,7 +767,9 @@ namespace overlay
                 g_page = Page::Progress;
                 break;
             case Item::Save:
-                if (!saves::CanSave())
+                if (!saves::LevelReady())
+                    ShowStatus(text::Get(text::LevelStarting), true);
+                else if (!saves::CanSave())
                     ShowStatus(text::Get(text::SaveBlocked), true);
                 else if (saves::Save(false))
                     ShowStatus(text::Get(text::SaveDone));
@@ -775,7 +777,9 @@ namespace overlay
                     ShowStatus(text::Get(text::SaveFailed), true);
                 break;
             case Item::Load:
-                if (saves::HasSave())
+                if (!saves::LevelReady())
+                    ShowStatus(text::Get(text::LevelStarting), true);
+                else if (saves::HasSave())
                     OpenConfirm(Confirm::Load);
                 else
                     ShowStatus(text::Get(text::NoSave), true);

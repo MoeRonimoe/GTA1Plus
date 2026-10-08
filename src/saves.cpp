@@ -14,9 +14,9 @@ namespace saves
     namespace
     {
         constexpr uint32_t kMagic = 0x53503147;    // "G1PS"
-        constexpr uint32_t kVersion = 2;   // 2: mit Trigger-Tabelle
+        constexpr uint32_t kVersion = 3;   // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore
         constexpr DWORD kAutosaveDelay = 2500;      // nach MISSION_END, bis Belohnung und Ansage durch sind
-        constexpr DWORD kOfferDelay = 3000;         // nach Levelstart, bis das Skript seine Startbefehle ausgeführt hat
+        constexpr DWORD kOfferDelay = 3000;         // frühestens so lange nach Levelstart anbieten
 
         std::wstring g_dir;
         DWORD    g_autosaveAt = 0;                  // 0 = kein Autosave fällig
@@ -107,6 +107,7 @@ namespace saves
             w.Blob(s.procState);
             w.Blob(s.lines);
             w.Blob(s.triggers);
+            w.Blob(s.doors);
             return w.buf;
         }
 
@@ -139,6 +140,8 @@ namespace saves
             r.Blob(s.lines);
             if (h.version >= 2)
                 r.Blob(s.triggers);
+            if (h.version >= 3)
+                r.Blob(s.doors);
             return r.ok;
         }
 
@@ -218,7 +221,15 @@ namespace saves
         return !path.empty() && GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES;
     }
 
-    bool CanSave() { return Available() && !gta1::MissionActive() && !gta1::IsPlayerDead(); }
+    // Das Skript richtet den Level in den ersten Sekunden noch ein; ein Stand von vorher oder ein Laden mittendrin
+    // ließe einen Teil davon ausfallen (Tore der Bombenläden, Schranken, Waffen, Kräne)
+    bool LevelReady()
+    {
+        TrackLevel();
+        return Available() && gta1::LevelSetUp(GetTickCount() - g_levelSince);
+    }
+
+    bool CanSave() { return LevelReady() && !gta1::MissionActive() && !gta1::IsPlayerDead(); }
 
     bool Save(bool autosave)
     {
@@ -240,6 +251,8 @@ namespace saves
     {
         if (!Available())
             return "nicht im Level";
+        if (!LevelReady())
+            return "Level wird noch eingerichtet";
         std::vector<uint8_t> data;
         const std::wstring path = SlotPath();
         if (path.empty() || !ReadAll(path, data))
@@ -306,7 +319,7 @@ namespace saves
     bool TakeLoadOffer()
     {
         TrackLevel();
-        if (g_level == g_offered || GetTickCount() - g_levelSince < kOfferDelay || !Available())
+        if (g_level == g_offered || GetTickCount() - g_levelSince < kOfferDelay || !LevelReady())
             return false;
         g_offered = g_level;
         const std::wstring path = SlotPath();

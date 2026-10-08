@@ -93,7 +93,9 @@ SAVE GAMES
   - One save per level and character.
   - Saving works between missions, not while a phone mission is running.
   - The game saves automatically after every completed mission.
-  - When you start a level that has a save, the mod offers to load it.
+  - When you start a level that has a save, the mod offers to load it. This
+    comes a few seconds after the level starts, once the game has set the
+    level up (weapon crates, bomb shop doors, mission gates, car cranes).
   - A save keeps the mission progress, score, multiplier, lives, weapons and
     your position. Buildings destroyed by missions are back after loading.
 

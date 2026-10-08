@@ -20,7 +20,7 @@ namespace text
             L"HelpMapMouse", L"HelpMapMouseNoWaypoints",
             L"HintBurning", L"PadJumpButton", L"KeySpace",
             L"MenuBriefings", L"MenuSave", L"MenuLoad", L"MenuOptions", L"OptOn", L"OptOff", L"OptRestart", L"OptGroupDisplay", L"OptGroupControls", L"OptGroupCamera", L"OptGroupGameplay", L"OptGroupOther", L"OptMinimap", L"OptMinimapOnStart", L"OptHint", L"OptGps", L"OptGpsArrow", L"OptWaypoints", L"OptHearts", L"OptMapStyle", L"OptMinimapCorner", L"OptPauseGame", L"OptTwinStick", L"OptAlwaysAim", L"OptWasdDriving", L"OptController", L"OptCamera", L"OptCameraMouseVehicle", L"OptRangeFoot", L"OptRangeVehicle", L"OptDeadZone", L"OptSteady", L"OptKeepMultiplier", L"OptAllCharacters", L"OptQuickRetry", L"OptExtinguish", L"OptPortraitColors", L"OptAutosave", L"OptLanguage", L"OptShowInfo", L"CornerBottomLeft", L"CornerBottomRight", L"CornerTopLeft", L"CornerTopRight", L"LanguageAuto", L"HelpOptions", L"BriefingsEmpty", L"HelpBriefings", L"SaveDone", L"SaveBlocked", L"SaveFailed", L"LoadTitle", L"LoadText", L"LoadDone", L"LoadFailed", L"NoSave", L"AutoSaved", L"SaveSlotInfo", L"StartLoadTitle", L"StartLoadText", L"OptTilt", L"OptTiltAngle", L"OptTiltRotate", L"TiltAlways", L"OptVehicleView", L"OptTrafficRange", L"ViewGame", L"ViewHigh", L"ViewHigher", L"ViewMax", L"OptPois", L"PoiSpray", L"PoiBombShop", L"PoiCrane", L"OptPistolDamage", L"OptMachineGunDamage", L"OptPunchDamage", L"OptRumble", L"MenuProgress", L"HelpProgress", L"ProgScore", L"ProgMissions", L"ProgSecrets", L"ProgLives", L"ProgMultiplier", L"ProgUnavailable", L"OptHudScale", L"HudScaleAuto", L"OptNoPostCollision",
-            L"OptSteerAssist", L"AssistGentle", L"AssistMedium", L"AssistStrong", L"OptFootView",
+            L"OptSteerAssist", L"AssistGentle", L"AssistMedium", L"AssistStrong", L"OptFootView", L"LevelStarting",
         };
 
         struct LangTable
@@ -133,7 +133,7 @@ namespace text
                 L"HUD-Größe", L"automatisch (%d\u00D7)",
                 L"Durch Bäume, Laternen und Schilder fahren",
                 L"Lenkhilfe: Wagen gerade ausrichten", L"leicht", L"mittel", L"stark",
-                L"Kamerahöhe zu Fuß",
+                L"Kamerahöhe zu Fuß", L"Der Level startet noch – bitte gleich noch einmal",
             } },
             { L"en", {
                 L"PAUSED", L"Resume", L"Map & waypoints", L"Map", L"Quit level",
@@ -238,7 +238,7 @@ namespace text
                 L"HUD size", L"automatic (%d\u00D7)",
                 L"Drive through trees, lamp posts and signs",
                 L"Steering aid: straighten the car", L"gentle", L"medium", L"strong",
-                L"Camera height on foot",
+                L"Camera height on foot", L"The level is still starting – please try again in a moment",
             } },
             { L"fr", {
                 L"PAUSE", L"Reprendre", L"Carte et repères", L"Carte", L"Quitter le niveau",
@@ -343,7 +343,7 @@ namespace text
                 L"Taille du HUD", L"automatique (%d\u00D7)",
                 L"Traverser arbres, lampadaires et panneaux",
                 L"Aide au volant : redresser la voiture", L"légère", L"moyenne", L"forte",
-                L"Hauteur caméra à pied",
+                L"Hauteur caméra à pied", L"Le niveau démarre encore – réessayez dans un instant",
             } },
             { L"it", {
                 L"PAUSA", L"Riprendi", L"Mappa e segnaposti", L"Mappa", L"Esci dal livello",
@@ -448,7 +448,7 @@ namespace text
                 L"Dimensione HUD", L"automatica (%d\u00D7)",
                 L"Attraversare alberi, lampioni e cartelli",
                 L"Aiuto sterzo: raddrizzare l'auto", L"leggero", L"medio", L"forte",
-                L"Altezza telecamera a piedi",
+                L"Altezza telecamera a piedi", L"Il livello sta ancora partendo – riprova tra un attimo",
             } },
         };
         constexpr int kBuiltinCount = sizeof(kBuiltin) / sizeof(kBuiltin[0]);

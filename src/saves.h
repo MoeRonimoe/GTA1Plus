@@ -10,6 +10,7 @@ namespace saves
 
     bool Available();       // Speichern ist in diesem Spiel und Level grundsätzlich möglich
     bool HasSave();         // für Level und Charakter gibt es einen Stand
+    bool LevelReady();      // das Skript hat den Level eingerichtet (erst dann speichern und laden)
     bool CanSave();         // jetzt speichern (keine Mission läuft)
     bool Save(bool autosave);
     // nullptr = geladen, sonst Grund (für das Log)

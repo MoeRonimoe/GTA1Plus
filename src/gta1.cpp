@@ -43,6 +43,12 @@ namespace gta1
         int ScriptObjSize = 29;     // Objekte aus mission.ini: +0 Typ, +4 Wert/Handle
         int LineSize = 22, LineFields = 2;  // Skriptzeile: Befehl (uint16), ab LineFields fünf int32
         int TriggerSize = 29;       // Auslöser (ENABLE/DISABLE): +0 Zustand
+        // Tore und Schranken (DOOR, BARRIER ...) liegen bei der Auslöser-Tabelle, Abstände ab A.Triggers
+        // (1.0.0.1: Tor-Logik 0x4905A0, DOOR_ON 0x48A5F0, DOOR_OFF 0x48A5B0)
+        int DoorCount = -0x520;     // int32 Anzahl der Tore
+        int DoorsOn   = -0x0C;      // int32, zählt mit jedem Einschalten hoch; bei 0 läuft die Tor-Logik nicht
+        int DoorTable = 0x1988;
+        int DoorSize  = 36, DoorState = 1, DoorOff = 5;   // int32 Zustand (2, 3 = in Bewegung), int32 aus 1 / an 0
     };
 
     // Adressen je Spielversion, per Disassembler ermittelt. 0 = in dieser Version (noch) nicht bekannt;
@@ -427,6 +433,8 @@ namespace gta1
         l.PedTarget = 0x86;
         l.ObjectSize = 136; l.ObjNext = 0x24; l.ObjPos = 0x2C;
         l.PlayerStride = 444; l.ScriptObjSize = 32; l.LineSize = 24; l.LineFields = 4; l.TriggerSize = 32;
+        l.DoorCount = -0x538; l.DoorsOn = -0x10; l.DoorTable = 0x1BF8;   // Tor-Logik 0x479E00, DOOR_ON 0x474840
+        l.DoorSize = 40; l.DoorState = 4; l.DoorOff = 8;
         a.HudDraw = 0x483390; a.HudCallJmp = 0x430D94; a.HudCallCall = 0x430D71;
         a.GetPlayerPos = 0x462D50;
         // F6-Handler 0x430FC4: PauseOn, RunState = 2, Ton anhalten
@@ -2379,11 +2387,71 @@ namespace gta1
                 s_scriptEvent(ScriptEvent::MissionEnd, 0);
         }
 
+        // Start eines Levels. Das Skript richtet ihn über mehrere Sekunden ein, mit einem Befehl je Prozess und
+        // Bild: die Folge hinter STARTUP legt Waffen aus und schaltet Tore, Schranken und Auslöser (130 bis 190
+        // Befehle, 6 bis 8 Sekunden), ein zweiter Prozess stellt die Autokräne auf. Wer vorher einen Spielstand
+        // lädt, ersetzt diese Prozesse durch die gespeicherten, und der Rest der Einrichtung fällt aus: Bombenläden
+        // und Schranken bleiben zu (ihre Tore schaltet erst DOOR_ON ein), Waffen und Kräne fehlen.
+        // Eingerichtet ist der Level, sobald jeder Prozess, der seit dem Start solche Befehle ausgeführt hat,
+        // beendet ist oder seit zwei Sekunden keinen mehr ausführt.
+        constexpr int kSetupMinTicks = 60, kSetupQuietTicks = 46, kSetupMaxTicks = 500;
+        constexpr int kSetupNoStartup = 150;        // Level ohne STARTUP (Mehrspieler-Karten): so lange abwarten
+        unsigned s_setupLevel = ~0u;
+        int  s_setupTick = 0;                       // Durchläufe des Skripts seit dem Levelstart
+        int  s_setupLastProc = addr::ScriptProcs;
+        int  s_setupSeen[addr::ScriptProcs] = {};   // Durchlauf des letzten Einrichtungsbefehls je Prozess, 0 = keiner
+        bool s_setupStartup = false, s_setupDone = false;
+
+        bool IsSetupCommand(uint32_t c)
+        {
+            switch (c)
+            {
+            case 8: case 11:            // DUMMYON, MAKEOBJ
+            case CmdDisable: case CmdEnable:
+            case 22:                    // CRANE
+            case CmdLockDoor: case CmdUnlockDoor:
+            case 30: case 31: case 33:  // DROP_ON, PED_ON, CAR_ON
+            case 47: case 59: case 60:  // START_MODEL, MODEL_FUTURE, STARTUP
+            case CmdDummyOff: case 64:  // POWERUP_ON
+            case 66: case 67:           // CHANGE_BLOCK, CHANGE_TYPE
+            case CmdDoorOn: case CmdDoorOff: case 73: case CmdCloseDoor:
+            case 83: case 88: case 89:  // DUMMY_DRIVE_ON, PARKED_ON, KICKSTART
+            case CmdPowerupOff: case 112: case 117: case 121:   // PIXEL_CAR_ON, PARKED_PIXELS_ON, HELL_ON
+            case CmdKeepThisProc:
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        void TrackSetup(uint32_t command, int proc)
+        {
+            if (s_setupLevel != s_levelLoads)
+            {
+                s_setupLevel = s_levelLoads;
+                s_setupTick = 0;
+                s_setupLastProc = addr::ScriptProcs;
+                memset(s_setupSeen, 0, sizeof(s_setupSeen));
+                s_setupStartup = s_setupDone = false;
+            }
+            if (s_setupDone)
+                return;
+            if (proc <= s_setupLastProc)    // die Prozesse kommen je Durchlauf in aufsteigender Folge dran
+                ++s_setupTick;
+            s_setupLastProc = proc;
+            if (IsSetupCommand(command))
+            {
+                s_setupSeen[proc] = s_setupTick;
+                s_setupStartup |= command == 60;
+            }
+        }
+
         void __cdecl OnScriptCommand(uint32_t command, uint8_t* line)
         {
             const int proc = *reinterpret_cast<int16_t*>(A.ScriptProc);
             if (proc < 0 || proc >= addr::ScriptProcs)
                 return;
+            TrackSetup(command, proc);
             // Einmal je Level festhalten, dass der Hook läuft (hilft bei Fehlerberichten und neuen Spielversionen)
             static unsigned s_seenLevel = ~0u;
             if (s_seenLevel != s_levelLoads)
@@ -2622,6 +2690,69 @@ namespace gta1
 
     bool CanUseSaves() { return StateAddressesKnown() && InGame() && IsSinglePlayer(); }
 
+    bool LevelSetUp(unsigned msSinceLevelStart)
+    {
+        // Ohne den Skript-Hook bleibt nur die Uhr
+        if (!EnableScriptHook())
+            return msSinceLevelStart >= 15000;
+        if (s_setupLevel != s_levelLoads)
+            return false;   // in diesem Level lief noch kein Befehl
+        if (s_setupDone)
+            return true;
+        if (s_setupTick < kSetupMinTicks || (!s_setupStartup && s_setupTick < kSetupNoStartup))
+            return false;
+        if (s_setupTick < kSetupMaxTicks)
+            for (int i = 0; i < addr::ScriptProcs; ++i)
+                if (s_setupSeen[i] && s_setupTick - s_setupSeen[i] < kSetupQuietTicks &&
+                    *reinterpret_cast<const int16_t*>(A.ScriptActive + i * 2) != 0)
+                    return false;
+        s_setupDone = true;
+        LOG("Level eingerichtet nach %d Skript-Durchläufen", s_setupTick);
+        return true;
+    }
+
+    // Tore und Schranken: ein Byte je Tor, 1 = aus. Den Schalter setzen nur DOOR_ON und DOOR_OFF des Skripts; er
+    // steht in keiner der Skript-Tabellen, ein geladener Stand hätte sonst die Tore des frischen Levels.
+    static uint8_t* DoorAt(int index) { return reinterpret_cast<uint8_t*>(A.Triggers + L.DoorTable + index * L.DoorSize); }
+
+    static int DoorCount()
+    {
+        if (!A.Triggers)
+            return 0;
+        const int32_t n = *reinterpret_cast<const int32_t*>(A.Triggers + L.DoorCount);
+        return n > 0 && n <= 64 ? n : 0;
+    }
+
+    static void CaptureDoors(std::vector<uint8_t>& out)
+    {
+        out.clear();
+        for (int i = 0, n = DoorCount(); i < n; ++i)
+            out.push_back(*reinterpret_cast<const int32_t*>(DoorAt(i) + L.DoorOff) != 0);
+    }
+
+    // Wie DOOR_ON / DOOR_OFF des Spiels: nicht, solange das Tor in Bewegung ist; der Zähler geht mit
+    static int RestoreDoors(const std::vector<uint8_t>& in)
+    {
+        int changed = 0;
+        if (in.empty() || (int)in.size() != DoorCount())
+            return 0;
+        int32_t& on = *reinterpret_cast<int32_t*>(A.Triggers + L.DoorsOn);
+        for (int i = 0; i < (int)in.size(); ++i)
+        {
+            const int32_t state = *reinterpret_cast<const int32_t*>(DoorAt(i) + L.DoorState);
+            int32_t& off = *reinterpret_cast<int32_t*>(DoorAt(i) + L.DoorOff);
+            if (state == 2 || state == 3 || (off != 0) == (in[i] != 0))
+                continue;
+            if (in[i])
+                --on;
+            else
+                ++on;
+            off = in[i] ? 1 : 0;
+            ++changed;
+        }
+        return changed;
+    }
+
     bool CaptureGameState(GameState& out)
     {
         if (!CanUseSaves())
@@ -2671,6 +2802,7 @@ namespace gta1
             const uint8_t* triggers = reinterpret_cast<const uint8_t*>(A.Triggers);
             out.triggers.assign(triggers, triggers + kTriggerCount * L.TriggerSize);
         }
+        CaptureDoors(out.doors);
         return true;
     }
 
@@ -2697,6 +2829,10 @@ namespace gta1
         // Telefongruppe aus, während das geladene Skript schon auf einen Anruf wartet
         if (A.Triggers && in.triggers.size() == (size_t)kTriggerCount * L.TriggerSize)
             memcpy(reinterpret_cast<void*>(A.Triggers), in.triggers.data(), in.triggers.size());
+        // Tore so ein- und ausgeschaltet wie beim Speichern (ältere Stände: wie nach dem Start des Levels)
+        const int doors = RestoreDoors(in.doors);
+        if (doors)
+            LOG("Spielstand: %d Tore umgeschaltet", doors);
         s_mission = MissionLog();
         s_phones = PhoneGroup();
         memset(s_failedAt, 0, sizeof(s_failedAt));
