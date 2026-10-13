@@ -136,6 +136,7 @@ namespace text
         AssistStrong,
         OptFootView,
         LevelStarting,
+        OptWalkToCrosshair,
         Count
     };
 

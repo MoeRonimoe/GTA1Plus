@@ -101,6 +101,8 @@ SAVE GAMES
 
 CONTROLS
   - Twin-stick: walk with WASD in screen directions and aim with the mouse.
+    Optionally W walks towards the crosshair instead (S away from it, A and
+    D sideways around it).
     Optionally drive with WASD too.
   - Controllers: Xbox pads (XInput) and PS4/PS5 or other DirectInput pads,
     in levels and in the main menu.

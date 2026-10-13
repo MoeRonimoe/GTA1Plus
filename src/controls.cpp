@@ -571,7 +571,7 @@ namespace controls
             if (Key(g_cfg.moveLeftKey)) mx -= 1;
             if (Key(g_cfg.moveDownKey)) my += 1;
             if (Key(g_cfg.moveUpKey)) my -= 1;
-            const bool moving = mx != 0 || my != 0;
+            bool moving = mx != 0 || my != 0;
 
             int gw = 0, gh = 0;
             const bool haveMouse = !g_padActive && overlay::ScreenSize(gw, gh) && MouseToGame(g_crossX, g_crossY);
@@ -590,9 +590,24 @@ namespace controls
                 ay = gy - py;
             }
             const bool lmb = Key(VK_LBUTTON), rmb = Key(VK_RBUTTON);
-            const bool aiming = haveMouse && (g_cfg.alwaysAim || lmb || rmb) && ax * ax + ay * ay > 16.0f;
+            // Lauf zum Fadenkreuz: die Tasten gelten aus Sicht der Figur, die dabei zum Fadenkreuz schaut - W läuft
+            // hin, S davon weg, A und D seitwärts darum herum
+            const bool toCross = g_cfg.walkToCrosshair && haveMouse && moving;
+            const float dist2 = ax * ax + ay * ay;
+            const bool aiming = haveMouse && (g_cfg.alwaysAim || lmb || rmb || toCross) && dist2 > 16.0f;
             const bool pulling = haveMouse && g_cfg.camera && MouseCamera(g_cfg.cameraRangeFoot, gw, gh);
             g_crosshair = haveMouse && (aiming || pulling || GetTickCount() - g_mouseMoved < 2500);
+
+            // Am Fadenkreuz angekommen (ein Sechstel Block): stehen bleiben, statt darüber hin- und herzulaufen
+            if (toCross)
+            {
+                float reach = 16.0f;
+                gta1::CameraView view;
+                if (gta1::GetCameraView(view) && view.height + view.playerZ > 0)
+                    reach = std::max(4.0f, 10.0f * view.focal / (view.height + view.playerZ));
+                if (dist2 <= reach * reach)
+                    moving = false;
+            }
 
             if (!moving && !aiming)
                 return;
@@ -603,7 +618,17 @@ namespace controls
             {
                 const int aim = AngleFromScreen(ax, ay);
                 in.fire = lmb;
-                if (moving && g_cfg.alwaysAim)
+                if (moving && toCross)
+                {
+                    // Wie bei "immer zielen": für die Simulation in Laufrichtung drehen, gezeichnet wird die Figur
+                    // mit Blick zum Fadenkreuz. Im Bild zeigt (ax, ay) nach vorn und (-ay, ax) nach rechts.
+                    // (Von selbst liefe die Figur nur vor und - halb so schnell - zurück.)
+                    const float forward = -my, side = mx;
+                    in.angle = AngleFromScreen(ax * forward - ay * side, ay * forward + ax * side);
+                    in.throttle = 3;
+                    in.renderAngle = aim;
+                }
+                else if (moving && g_cfg.alwaysAim)
                 {
                     // Das Spiel bewegt Fußgänger nur in Blickrichtung: für die Simulation in Laufrichtung
                     // drehen und erst direkt vor dem Zeichnen wieder zum Fadenkreuz

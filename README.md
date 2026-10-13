@@ -12,7 +12,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **GPS**: a route to the waypoint or mission target on the map and minimap, plus a direction arrow at the top of the screen. Routes prefer roads.
 - **Minimap**: a round minimap in a screen corner of your choice.
 - **Places on the map**: paint shops, bomb shops and car cranes are shown as icons on the map and minimap, with a legend. They are read from the level's mission script, so they also work in London.
-- **Twin-stick controls**: WASD movement and mouse aiming on foot, optional strafing (always face the crosshair), and WASD driving.
+- **Twin-stick controls**: WASD movement and mouse aiming on foot, optional strafing (always face the crosshair), and WASD driving. Optionally the keys work from the character's point of view: W walks towards the crosshair, S away from it, A and D sideways around it (`[Features] WalkToCrosshair`, also in the pause menu).
 - **Controllers**: Xbox (XInput) and PS4/PS5 or other DirectInput pads, in levels and in the main menu.
 - **Controller vibration**: for your own shots (strongest for the rocket launcher), hits you take, damage to your vehicle and explosions nearby. Adjustable strength, 0 switches it off (GTA1Plus options → Controls or `[Features] Vibration`). Works with Xbox pads and with PS4 pads over USB or Bluetooth; PS5 pads are implemented but untested. It only runs while you are actually playing with the controller.
 - **Steerable camera**: look ahead with the mouse or the right stick.

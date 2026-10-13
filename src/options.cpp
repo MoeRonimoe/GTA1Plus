@@ -47,6 +47,7 @@ namespace options
             { Type::Header, text::OptGroupControls },
             { Type::Bool, text::OptTwinStick, &g_cfg.twinStick },
             { Type::Bool, text::OptAlwaysAim, &g_cfg.alwaysAim },
+            { Type::Bool, text::OptWalkToCrosshair, &g_cfg.walkToCrosshair },
             { Type::Bool, text::OptWasdDriving, &g_cfg.wasdDriving },
             { Type::Bool, text::OptController, &g_cfg.controller },
             { Type::Int, text::OptRumble, &g_cfg.vibration, false, 0, 100, 10 },

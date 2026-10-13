@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 23;
+static const int kConfigVersion = 24;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=23\r\n"
+    "Version=24\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -47,6 +47,9 @@ static const char kDefaultIni[] =
     "; Twin-stick: the character always faces the crosshair and also walks sideways/backwards\r\n"
     "; (0 = aim only while holding the right mouse button; the walk animation may not always match)\r\n"
     "AlwaysAim=0\r\n"
+    "; Twin-stick: the movement keys work from the character's point of view instead of the screen's.\r\n"
+    "; W walks towards the crosshair, S away from it, A and D sideways around it\r\n"
+    "WalkToCrosshair=0\r\n"
     "; With TwinStick=1, also drive vehicles with WASD (the arrow keys still work)\r\n"
     "WASDDriving=1\r\n"
     "; Controller: Xbox (XInput) plus PS4/PS5 and other DirectInput pads.\r\n"
@@ -229,6 +232,7 @@ namespace
         { L"Features", L"Waypoints",      Kind::Bool, &g_cfg.waypoints,      nullptr, nullptr },
         { L"Features", L"TwinStick",      Kind::Bool, &g_cfg.twinStick,      nullptr, nullptr },
         { L"Features", L"AlwaysAim",      Kind::Bool, &g_cfg.alwaysAim,      nullptr, nullptr },
+        { L"Features", L"WalkToCrosshair", Kind::Bool, &g_cfg.walkToCrosshair, nullptr, nullptr },
         { L"Features", L"WASDDriving",    Kind::Bool, &g_cfg.wasdDriving,    nullptr, nullptr },
         { L"Features", L"Controller",     Kind::Bool, &g_cfg.controller,     nullptr, nullptr },
         { L"Features", L"Vibration",      Kind::Int,  &g_cfg.vibration,      nullptr, nullptr },

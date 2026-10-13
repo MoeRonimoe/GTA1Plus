@@ -15,6 +15,7 @@ struct Config
     bool controller     = true;  // XInput- und DirectInput-Controller
     int  vibration      = 70;    // Stärke der Controller-Vibration in Prozent, 0 = aus
     bool alwaysAim      = false; // Twin-Stick: immer zum Fadenkreuz schauen, seitwärts laufen
+    bool walkToCrosshair = false; // Twin-Stick: W läuft zum Fadenkreuz statt im Bild nach oben
     bool wasdDriving    = true;  // Twin-Stick: auch im Auto mit WASD fahren
     bool portraitColors = true;  // Spielfigur passend zum Portrait einfärben
     bool pois           = true;  // Lackierereien, Bombenläden und Autokräne auf der Karte
