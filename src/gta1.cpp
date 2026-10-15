@@ -864,8 +864,14 @@ namespace gta1
         s_seen = *wheel;
     }
 
+    namespace
+    {
+        void RestoreTimerPatch();
+    }
+
     static void __cdecl RenderHook()
     {
+        RestoreTimerPatch();
         AssistSteering();
         // Neues Level: die Objekte der Karte sind frisch angelegt, unsere Änderungen damit fort
         if (s_treeLevel != s_levelLoads)
@@ -2446,12 +2452,54 @@ namespace gta1
             }
         }
 
+        // Mehr Zeit für Missionen (missiontimers.cpp ordnet zu, was verlängert wird). Den Wert in <data> liest der
+        // Befehl nur beim ersten Ausführen: P_BRIEF_TIMED die angezeigten Sekunden, KF_BRIEF_TIMED die Zeit des
+        // Amoklaufs (mal 25 in den Spieler), SURVIVE kopiert die Bilder nach <fail> und zählt dort herunter, LOCATE,
+        // STEAL und GOTO setzen ihren Prozesszustand auf Bilder + 5 (int16). <data> wird nur für diesen einen Aufruf
+        // erhöht und beim nächsten Befehl wieder zurückgesetzt, so bleibt die Skriptzeile (auch im Spielstand) unverändert.
+        const std::vector<uint8_t>* s_timerMarks = nullptr;
+        int s_timerSeconds = 0;
+        int32_t* s_timerField = nullptr;
+        int32_t s_timerOriginal = 0;
+
+        void RestoreTimerPatch()
+        {
+            if (s_timerField)
+                *s_timerField = s_timerOriginal;
+            s_timerField = nullptr;
+        }
+
+        void ExtendTimer(uint32_t command, uint8_t* line, int proc)
+        {
+            RestoreTimerPatch();
+            if (!s_timerMarks || s_timerSeconds <= 0)
+                return;
+            const int index = (int)((reinterpret_cast<uintptr_t>(line) - A.ScriptLines) / L.LineSize);
+            if (index < 0 || index >= (int)s_timerMarks->size() || !(*s_timerMarks)[index])
+                return;
+            int add = 0;
+            if ((*s_timerMarks)[index] == TimerBrief && (command == 68 || command == 137))
+                add = s_timerSeconds;
+            else if ((*s_timerMarks)[index] == TimerDeadline && (command == CmdSurvive || command == 109 || command == 3 ||
+                     command == 21) && *reinterpret_cast<const int16_t*>(A.ScriptState + proc * 2) == 1)
+                add = s_timerSeconds * 25;
+            if (!add)
+                return;
+            int32_t* data = reinterpret_cast<int32_t*>(line + L.LineFields + 12);
+            s_timerField = data;
+            s_timerOriginal = *data;
+            *data = std::min(*data + add, command == 68 ? 30000 : command == 137 ? 1300 : 32000);
+            LOG("Mehr Zeit für Missionen: %s in Zeile %d von %d auf %d", (*s_timerMarks)[index] == TimerBrief ? "Countdown" : "Frist",
+                index, s_timerOriginal, *data);
+        }
+
         void __cdecl OnScriptCommand(uint32_t command, uint8_t* line)
         {
             const int proc = *reinterpret_cast<int16_t*>(A.ScriptProc);
             if (proc < 0 || proc >= addr::ScriptProcs)
                 return;
             TrackSetup(command, proc);
+            ExtendTimer(command, line, proc);
             // Einmal je Level festhalten, dass der Hook läuft (hilft bei Fehlerberichten und neuen Spielversionen)
             static unsigned s_seenLevel = ~0u;
             if (s_seenLevel != s_levelLoads)
@@ -2689,6 +2737,31 @@ namespace gta1
     }
 
     bool CanUseSaves() { return StateAddressesKnown() && InGame() && IsSinglePlayer(); }
+
+    bool GetScriptCommand(int index, ScriptCommand& out)
+    {
+        if (!s_supported || !A.ScriptLines || index < 0 || index >= kScriptLines)
+            return false;
+        const uint8_t* line = LineAt(index);
+        int32_t f[5];
+        memcpy(f, line + L.LineFields, sizeof(f));
+        out.command = LineCommand(line);
+        out.obj = f[0];
+        out.succ = f[1];
+        out.fail = f[2];
+        out.data = f[3];
+        out.score = f[4];
+        return true;
+    }
+
+    void SetTimerExtension(const std::vector<uint8_t>* marks, int seconds)
+    {
+        // Ohne den Skript-Hook gibt es nichts zu verlängern
+        if (marks && seconds > 0 && !EnableScriptHook())
+            marks = nullptr;
+        s_timerMarks = marks;
+        s_timerSeconds = seconds;
+    }
 
     bool LevelSetUp(unsigned msSinceLevelStart)
     {

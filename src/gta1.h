@@ -233,6 +233,19 @@ namespace gta1
     std::string MapFile();         // zuletzt vom Spiel geöffnete .cmp (voller Pfad)
     unsigned MapGeneration();      // zählt hoch, sobald eine andere Karte geöffnet wird
     unsigned LevelLoads();         // zählt bei jedem Levelstart hoch (Karte wird geöffnet)
+
+    // Befehl im Missionsskript des laufenden Levels. Index = Reihenfolge der Befehlszeilen im Abschnitt der mission.ini
+    struct ScriptCommand
+    {
+        uint16_t command = 0;
+        int32_t obj = 0, succ = 0, fail = 0, data = 0, score = 0;
+    };
+    bool GetScriptCommand(int index, ScriptCommand& out);
+    // Mehr Zeit für Missionen: marks je Befehl (Index wie oben); TimerBrief = Countdown in Sekunden (P_BRIEF_TIMED,
+    // KF_BRIEF_TIMED), TimerDeadline = Frist in Bildern (SURVIVE, LOCATE, STEAL, GOTO). Beim ersten Ausführen bekommt
+    // ein markierter Befehl seconds dazu. marks = nullptr: aus. Spiel-Thread.
+    enum TimerMark : uint8_t { TimerNone = 0, TimerBrief = 1, TimerDeadline = 2 };
+    void SetTimerExtension(const std::vector<uint8_t>* marks, int seconds);
     std::string MissionFile();     // zuletzt gelesenes Missionsskript (voller Pfad)
     // Zeilennummern der Objekte aus dem Missionsskript des laufenden Levels (ohne die erste)
     bool ScriptObjectLines(std::vector<int>& lines);

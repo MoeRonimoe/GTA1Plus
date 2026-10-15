@@ -13,7 +13,7 @@ namespace options
 {
     namespace
     {
-        enum class Type { Header, Bool, Int, Degrees, Choice, Language, HudScale };
+        enum class Type { Header, Bool, Int, Degrees, Choice, Language, HudScale, Seconds };
 
         struct Option
         {
@@ -77,6 +77,7 @@ namespace options
             { Type::Bool, text::OptNoPostCollision, &g_cfg.noTreeCollision },
             { Type::Choice, text::OptSteerAssist, &g_cfg.steerAssist, false, 0, 3, 1,
               { text::OptOff, text::AssistGentle, text::AssistMedium, text::AssistStrong } },
+            { Type::Seconds, text::OptExtraMissionTime, &g_cfg.extraMissionTime, false, 0, 300, 15 },
             { Type::Bool, text::OptQuickRetry, &g_cfg.quickRetry, true },
             { Type::Bool, text::OptKeepMultiplier, &g_cfg.keepMultiplier, true },
             { Type::Bool, text::OptAllCharacters, &g_cfg.allCharacters, true },
@@ -135,6 +136,11 @@ namespace options
         case Type::Degrees:
             swprintf_s(buf, L"%d\u00B0", *static_cast<int*>(o.value));
             return buf;
+        case Type::Seconds:
+            if (*static_cast<int*>(o.value) == 0)
+                return text::Get(text::OptOff);
+            swprintf_s(buf, L"+%d s", *static_cast<int*>(o.value));
+            return buf;
         case Type::Choice:
             return text::Get(o.choices[std::clamp(*static_cast<int*>(o.value), 0, o.maxValue)]);
         case Type::Language:
@@ -168,6 +174,7 @@ namespace options
         }
         case Type::Int:
         case Type::Degrees:
+        case Type::Seconds:
         {
             int& v = *static_cast<int*>(o.value);
             const int next = std::clamp(v + dir * o.step, o.minValue, o.maxValue);

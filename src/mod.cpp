@@ -12,6 +12,7 @@
 #include "hooks.h"
 #include "hudscale.h"
 #include "log.h"
+#include "missiontimers.h"
 #include "overlay.h"
 #include "rumble.h"
 #include "saves.h"
@@ -113,6 +114,7 @@ namespace
         saves::Tick();
         gta1::SetTreeCollision(g_cfg.noTreeCollision);   // im Optionsmenü umschaltbar
         gta1::SetSteerAssist(g_cfg.steerAssist);
+        missiontimers::Tick();
     }
 
     // Aus dem Missionsskript: Ansagen für die Briefings, geschaffte Missionen für das Autosave

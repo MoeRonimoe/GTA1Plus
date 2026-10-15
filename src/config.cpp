@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 24;
+static const int kConfigVersion = 25;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=24\r\n"
+    "Version=25\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -83,6 +83,9 @@ static const char kDefaultIni[] =
     "; 0 = off (as in the original game), 1 = gentle (up to 13 degrees off), 2 = medium (18 degrees, one tap),\r\n"
     "; 3 = strong (28 degrees, corrects faster)\r\n"
     "SteerAssist=2\r\n"
+    "; Extra seconds for every mission countdown (time to reach a place, to steal a car, kill frenzies ...),\r\n"
+    "; to make hard levels such as London 1961 easier. 0 = as in the game, up to 300\r\n"
+    "ExtraMissionTime=0\r\n"
     "; Make the four women (Ulrika, Katie, Mikki, Divine) selectable in the main menu - the game locks them\r\n"
     "; in every language version except English\r\n"
     "AllCharacters=1\r\n"
@@ -242,6 +245,7 @@ namespace
         { L"Gameplay", L"KeepMultiplier", Kind::Bool, &g_cfg.keepMultiplier, nullptr, nullptr },
         { L"Gameplay", L"NoTreeCollision", Kind::Bool, &g_cfg.noTreeCollision, nullptr, nullptr },
         { L"Gameplay", L"SteerAssist",    Kind::Int,  &g_cfg.steerAssist,    nullptr, nullptr },
+        { L"Gameplay", L"ExtraMissionTime", Kind::Int, &g_cfg.extraMissionTime, nullptr, nullptr },
         { L"Gameplay", L"QuickRetry",     Kind::Bool, &g_cfg.quickRetry,     nullptr, nullptr },
         { L"Gameplay", L"AllCharacters",  Kind::Bool, &g_cfg.allCharacters,  nullptr, nullptr },
         { L"Gameplay", L"Extinguish",     Kind::Bool, &g_cfg.extinguish,     nullptr, nullptr },
@@ -390,6 +394,7 @@ void LoadConfig(const wchar_t* ini)
     g_cfg.vibration = std::clamp(g_cfg.vibration, 0, 100);
     g_cfg.hudScale = std::clamp(g_cfg.hudScale, 0, 4);
     g_cfg.steerAssist = std::clamp(g_cfg.steerAssist, 0, 3);
+    g_cfg.extraMissionTime = std::clamp(g_cfg.extraMissionTime, 0, 300);
 
     // Neue oder veraltete INI: kommentierte Vorlage schreiben und die aktuellen Werte übernehmen
     if (!exists || version < kConfigVersion)
