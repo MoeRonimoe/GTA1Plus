@@ -2455,7 +2455,8 @@ namespace gta1
         // Mehr Zeit für Missionen (missiontimers.cpp ordnet zu, was verlängert wird). Den Wert in <data> liest der
         // Befehl nur beim ersten Ausführen: P_BRIEF_TIMED die angezeigten Sekunden, KF_BRIEF_TIMED die Zeit des
         // Amoklaufs (mal 25 in den Spieler), SURVIVE kopiert die Bilder nach <fail> und zählt dort herunter, LOCATE,
-        // STEAL und GOTO setzen ihren Prozesszustand auf Bilder + 5 (int16). <data> wird nur für diesen einen Aufruf
+        // STEAL und GOTO setzen ihren Prozesszustand auf Bilder + 5 (int16), ANSWER auf Klingeltöne + 10 (ein Ton alle
+        // 50 Bilder, also 2 Sekunden je Ton). <data> wird nur für diesen einen Aufruf
         // erhöht und beim nächsten Befehl wieder zurückgesetzt, so bleibt die Skriptzeile (auch im Spielstand) unverändert.
         const std::vector<uint8_t>* s_timerMarks = nullptr;
         int s_timerSeconds = 0;
@@ -2480,9 +2481,13 @@ namespace gta1
             int add = 0;
             if ((*s_timerMarks)[index] == TimerBrief && (command == 68 || command == 137))
                 add = s_timerSeconds;
-            else if ((*s_timerMarks)[index] == TimerDeadline && (command == CmdSurvive || command == 109 || command == 3 ||
-                     command == 21) && *reinterpret_cast<const int16_t*>(A.ScriptState + proc * 2) == 1)
-                add = s_timerSeconds * 25;
+            else if ((*s_timerMarks)[index] == TimerDeadline && *reinterpret_cast<const int16_t*>(A.ScriptState + proc * 2) == 1)
+            {
+                if (command == CmdSurvive || command == 109 || command == 3 || command == 21)
+                    add = s_timerSeconds * 25;
+                else if (command == 2)
+                    add = (s_timerSeconds + 1) / 2;   // aufgerundet, die Frist ist nie kürzer als die Anzeige
+            }
             if (!add)
                 return;
             int32_t* data = reinterpret_cast<int32_t*>(line + L.LineFields + 12);

@@ -4,6 +4,7 @@
 #include "gta1.h"
 #include "log.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -15,9 +16,11 @@
 // Ein Countdown im Spiel besteht aus zwei Befehlen, die das Missionsskript getrennt hinschreibt: P_BRIEF_TIMED zeigt
 // die Restzeit in Sekunden am Pager, die eigentliche Frist hat ein Befehl im Ablauf dahinter in seinem <data> als Zahl
 // der Bilder (25 je Sekunde): SURVIVE in einem eigenen Prozess, der danach die Mission scheitern lässt, oder LOCATE,
-// STEAL bzw. GOTO mit Zeitlimit. Verlängert wird nur, wo beides zusammenpasst - sonst liefe die Anzeige der Frist
-// davon. Partner ist ein solcher Befehl mit <data> = Sekunden * 25, den der Ablauf ab dem Countdown erreicht (den
-// <succ>- und <fail>-Verweisen und den KICKSTART-Zielen nach; in allen Skripten 1 bis 5 Schritte, nie mehrdeutig).
+// STEAL bzw. GOTO mit Zeitlimit; beim klingelnden Telefon ("zum Telefon fahren") ANSWER mit der Zahl der Klingeltöne
+// zu je 50 Bildern. Verlängert wird nur, wo beides zusammenpasst - sonst liefe die Anzeige der Frist davon. Partner
+// ist ein solcher Befehl, dessen Frist so lang wie der Countdown ist oder bis 3 bzw. 4 Sekunden länger, und den der
+// Ablauf ab dem Countdown erreicht (den <succ>- und <fail>-Verweisen und den KICKSTART-Zielen nach, dazu einem
+// KICKSTART direkt davor; in allen Skripten 1 bis 5 Schritte, nie mehrdeutig).
 // Beim Amoklauf (KF_BRIEF_TIMED) ist die angezeigte Zeit selbst die Frist.
 // Im Speicher stehen die Befehle eines Abschnitts lückenlos in der Reihenfolge der Datei; deren Zeilennummern
 // (Ziele der Verweise) gibt es nur in der mission.ini.
@@ -25,9 +28,25 @@ namespace missiontimers
 {
     namespace
     {
-        enum : uint16_t { CmdSteal = 3, CmdSurvive = 4, CmdGoto = 21, CmdPBriefTimed = 68, CmdKickstart = 89,
+        enum : uint16_t { CmdAnswer = 2, CmdSteal = 3, CmdSurvive = 4, CmdGoto = 21, CmdPBriefTimed = 68, CmdKickstart = 89,
                           CmdLocate = 109, CmdKfBriefTimed = 137 };
+
         constexpr int kTicksPerSecond = 25, kMaxSteps = 60;
+
+        // Frist, die zu einem Countdown von seconds Sekunden gehört
+        bool IsDeadline(const gta1::ScriptCommand& c, int32_t seconds)
+        {
+            const int32_t ticks = seconds * kTicksPerSecond;
+            switch (c.command)
+            {
+            case CmdSurvive: case CmdLocate: case CmdSteal: case CmdGoto:
+                return ticks > 0 && c.data >= ticks && c.data <= ticks + 3 * kTicksPerSecond;
+            case CmdAnswer:
+                return seconds > 0 && c.data * 2 >= seconds && c.data * 2 <= seconds + 4;
+            default:
+                return false;
+            }
+        }
 
         struct FileCommand
         {
@@ -140,20 +159,32 @@ namespace missiontimers
                 if (brief.command != CmdPBriefTimed && brief.command != CmdKfBriefTimed)
                     continue;
                 ++countdowns;
-                const int32_t ticks = brief.data * kTicksPerSecond;
                 int partners = 0;
+                auto line = [&](int32_t nr) {
+                    auto it = indexOf.find(nr);
+                    return it != indexOf.end() ? it->second : -1;
+                };
                 // Ablauf ab dem Countdown in die Breite (Zeilen der Datei); seen merkt sich den Countdown
                 todo.assign(1, b);
                 depth.assign(1, 0);
                 seen[b] = b;
+                // Manchmal startet der Prozess mit der Frist schon kurz vorher
+                for (int k = std::max(0, b - 3); k < b; ++k)
+                    if (place[k] >= 0 && mem[place[k]].command == CmdKickstart)
+                        for (int j : { line(mem[place[k]].obj), mem[place[k]].succ == 0 ? k + 1 : line(mem[place[k]].succ) })
+                            if (j >= 0 && seen[j] != b)
+                            {
+                                seen[j] = b;
+                                todo.push_back(j);
+                                depth.push_back(1);
+                            }
                 for (size_t k = 0; k < todo.size(); ++k)
                 {
                     const int i = todo[k], d = depth[k];
                     if (place[i] < 0)
                         continue;
                     const gta1::ScriptCommand& c = mem[place[i]];
-                    if (i != b && ticks > 0 && c.data == ticks &&
-                        (c.command == CmdSurvive || c.command == CmdLocate || c.command == CmdSteal || c.command == CmdGoto))
+                    if (i != b && c.command != CmdPBriefTimed && c.command != CmdKfBriefTimed && IsDeadline(c, brief.data))
                     {
                         marks[place[i]] = gta1::TimerDeadline;
                         ++partners;
@@ -167,10 +198,6 @@ namespace missiontimers
                         seen[j] = b;
                         todo.push_back(j);
                         depth.push_back(d + 1);
-                    };
-                    auto line = [&](int32_t nr) {
-                        auto it = indexOf.find(nr);
-                        return it != indexOf.end() ? it->second : -1;
                     };
                     if (c.succ == 0)
                         follow(i + 1);
