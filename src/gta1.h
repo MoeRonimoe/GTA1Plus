@@ -153,6 +153,7 @@ namespace gta1
         std::vector<uint8_t> objects, procBlock, procState, lines;
         std::vector<uint8_t> triggers;          // leer bei Spielständen der Version 1
         std::vector<uint8_t> doors;             // je Tor 1 = aus; leer bei Spielständen bis Version 2
+        std::vector<uint8_t> arrows;            // Missionspfeil und roter Pfeil; leer bis Version 3
     };
     // Das Skript hat den Level fertig eingerichtet (Waffen, Tore, Kräne; dauert 4 bis 9 Sekunden). Vorher darf
     // kein Stand geladen oder gespeichert werden. msSinceLevelStart zählt nur, wenn der Skript-Hook fehlt.

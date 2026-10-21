@@ -14,7 +14,7 @@ namespace saves
     namespace
     {
         constexpr uint32_t kMagic = 0x53503147;    // "G1PS"
-        constexpr uint32_t kVersion = 3;   // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore
+        constexpr uint32_t kVersion = 4;   // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen
         constexpr DWORD kAutosaveDelay = 2500;      // nach MISSION_END, bis Belohnung und Ansage durch sind
         constexpr DWORD kOfferDelay = 3000;         // frühestens so lange nach Levelstart anbieten
 
@@ -108,6 +108,7 @@ namespace saves
             w.Blob(s.lines);
             w.Blob(s.triggers);
             w.Blob(s.doors);
+            w.Blob(s.arrows);
             return w.buf;
         }
 
@@ -142,6 +143,8 @@ namespace saves
                 r.Blob(s.triggers);
             if (h.version >= 3)
                 r.Blob(s.doors);
+            if (h.version >= 4)
+                r.Blob(s.arrows);
             return r.ok;
         }
 

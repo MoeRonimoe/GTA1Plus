@@ -49,6 +49,8 @@ namespace gta1
         int DoorsOn   = -0x0C;      // int32, zählt mit jedem Einschalten hoch; bei 0 läuft die Tor-Logik nicht
         int DoorTable = 0x1988;
         int DoorSize  = 36, DoorState = 1, DoorOff = 5;   // int32 Zustand (2, 3 = in Bewegung), int32 aus 1 / an 0
+        // Ziel eines Pfeils (A.ArrowMain, A.ArrowRed): int32 Typ, int16 Index, Position x, y, z, int32
+        int ArrowSize = 22;
     };
 
     // Adressen je Spielversion, per Disassembler ermittelt. 0 = in dieser Version (noch) nicht bekannt;
@@ -435,6 +437,7 @@ namespace gta1
         l.PlayerStride = 444; l.ScriptObjSize = 32; l.LineSize = 24; l.LineFields = 4; l.TriggerSize = 32;
         l.DoorCount = -0x538; l.DoorsOn = -0x10; l.DoorTable = 0x1BF8;   // Tor-Logik 0x479E00, DOOR_ON 0x474840
         l.DoorSize = 40; l.DoorState = 4; l.DoorOff = 8;
+        l.ArrowSize = 24;   // Pfeil 0x481907 ff.
         a.HudDraw = 0x483390; a.HudCallJmp = 0x430D94; a.HudCallCall = 0x430D71;
         a.GetPlayerPos = 0x462D50;
         // F6-Handler 0x430FC4: PauseOn, RunState = 2, Ton anhalten
@@ -2808,6 +2811,56 @@ namespace gta1
             out.push_back(*reinterpret_cast<const int32_t*>(DoorAt(i) + L.DoorOff) != 0);
     }
 
+    // Missionspfeil und roter Pfeil. Sie stehen in keiner Skript-Tabelle: ohne sie zeigte der Pfeil nach dem Laden
+    // weiter dorthin, wohin ihn der frisch gestartete Level gesetzt hat - etwa auf das Telefon der Startmission von
+    // Liberty City Kapitel 2, die im geladenen Stand längst erledigt ist. Ziele auf Fahrzeuge und Fußgänger (Typ 0
+    // und 3) sind Nummern der gespeicherten Sitzung und werden nicht übernommen; ohne Angaben (ältere Stände) aus.
+    static void CaptureArrows(std::vector<uint8_t>& out)
+    {
+        out.clear();
+        if (!A.ArrowMainOn || !A.ArrowMain || !A.ArrowRedOn || !A.ArrowRed)
+            return;
+        for (const uintptr_t on : { A.ArrowMainOn, A.ArrowRedOn })
+        {
+            const uint8_t* target = reinterpret_cast<const uint8_t*>(on == A.ArrowMainOn ? A.ArrowMain : A.ArrowRed);
+            const uint8_t* flag = reinterpret_cast<const uint8_t*>(on);
+            out.insert(out.end(), flag, flag + 4);
+            out.insert(out.end(), target, target + L.ArrowSize);
+        }
+    }
+
+    static void RestoreArrows(const std::vector<uint8_t>& in)
+    {
+        if (!A.ArrowMainOn || !A.ArrowMain || !A.ArrowRedOn || !A.ArrowRed)
+            return;
+        const bool have = in.size() == 2 * (4 + (size_t)L.ArrowSize);
+        int k = 0;
+        for (const uintptr_t on : { A.ArrowMainOn, A.ArrowRedOn })
+        {
+            uint8_t* target = reinterpret_cast<uint8_t*>(on == A.ArrowMainOn ? A.ArrowMain : A.ArrowRed);
+            int32_t savedOn = 0, type = -1;
+            const uint8_t* saved = have ? in.data() + k * (4 + L.ArrowSize) : nullptr;
+            if (saved)
+            {
+                memcpy(&savedOn, saved, 4);
+                memcpy(&type, saved + 4, 4);
+            }
+            if (savedOn && type != 0 && type != 3)
+            {
+                memcpy(target, saved + 4, L.ArrowSize);
+                *reinterpret_cast<int32_t*>(on) = savedOn;
+            }
+            else
+            {
+                memset(target, 0, L.ArrowSize);
+                *reinterpret_cast<int32_t*>(on) = 0;
+            }
+            LOG("Spielstand: %s %s", k ? "roter Pfeil" : "Missionspfeil", !have ? "aus (Stand ohne Pfeil)" :
+                savedOn && type != 0 && type != 3 ? "wie beim Speichern" : "aus");
+            ++k;
+        }
+    }
+
     // Wie DOOR_ON / DOOR_OFF des Spiels: nicht, solange das Tor in Bewegung ist; der Zähler geht mit
     static int RestoreDoors(const std::vector<uint8_t>& in)
     {
@@ -2881,6 +2934,7 @@ namespace gta1
             out.triggers.assign(triggers, triggers + kTriggerCount * L.TriggerSize);
         }
         CaptureDoors(out.doors);
+        CaptureArrows(out.arrows);
         return true;
     }
 
@@ -2911,6 +2965,7 @@ namespace gta1
         const int doors = RestoreDoors(in.doors);
         if (doors)
             LOG("Spielstand: %d Tore umgeschaltet", doors);
+        RestoreArrows(in.arrows);
         s_mission = MissionLog();
         s_phones = PhoneGroup();
         memset(s_failedAt, 0, sizeof(s_failedAt));
