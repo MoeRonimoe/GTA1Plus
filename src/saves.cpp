@@ -14,7 +14,8 @@ namespace saves
     namespace
     {
         constexpr uint32_t kMagic = 0x53503147;    // "G1PS"
-        constexpr uint32_t kVersion = 4;   // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen
+        constexpr uint32_t kVersion = 5;   // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen,
+                                           // 5: mit der Rüstung (vorher stand hier ein Zeitzähler daneben)
         constexpr DWORD kAutosaveDelay = 2500;      // nach MISSION_END, bis Belohnung und Ansage durch sind
         constexpr DWORD kOfferDelay = 3000;         // frühestens so lange nach Levelstart anbieten
 
@@ -126,6 +127,8 @@ namespace saves
             r.Get(s.score);
             r.Get(s.multiplier);
             r.Get(s.armor);
+            if (h.version < 5)
+                s.armor = -1;
             r.Get(s.jailCard);
             r.Get(s.lives);
             r.Get(s.ammo);

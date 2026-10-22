@@ -96,8 +96,9 @@ SAVE GAMES
   - When you start a level that has a save, the mod offers to load it. This
     comes a few seconds after the level starts, once the game has set the
     level up (weapon crates, bomb shop doors, mission gates, car cranes).
-  - A save keeps the mission progress, score, multiplier, lives, weapons and
-    your position. Buildings destroyed by missions are back after loading.
+  - A save keeps the mission progress, score, multiplier, lives, weapons,
+    armour and your position. Buildings destroyed by missions are back after
+    loading.
 
 CONTROLS
   - Twin-stick: walk with WASD in screen directions and aim with the mouse.
@@ -134,6 +135,9 @@ GAMEPLAY
     once, and punches now hurt (10 %, for you and for others). Other
     characters still die from one bullet. Adjustable in the pause menu
     (GTA1Plus options, Gameplay); 100 / 100 / 0 is the original game.
+    While you have armour, a bullet only takes one armour point. This now
+    also goes for the armour of the SUCKMYROCKET cheat, which the original
+    game showed but which did not protect you.
   - Drive through trees, lamp posts and signs: as in GTA2, tree trunks,
     lamp posts and the posts of road signs and traffic lights no longer
     stop your vehicle. Trees and lamps are lifted a little for that, so

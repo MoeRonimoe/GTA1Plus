@@ -28,6 +28,7 @@ namespace gta1
         int PedAnim     = 0x17;     // int16 Animationsbild (0x88 steht, 0xAF..0xB2 fällt, 0xE9..0xED liegt)
         int PedCanFire  = 0x41;     // byte: darf schießen
         int PedHealth   = 0x44;     // byte Lebensenergie 0..100
+        int PedArmor    = 0x45;     // byte 1: Rüstung hält Kugeln ab (gesetzt beim Einsammeln, 0x4425F0)
         int PedFlames   = 0x52;     // int16 Handle der Flammen an der Figur (-1 = brennt nicht)
         int PedWeapon   = 0x59;     // int32 Waffe: 0 Faust, 1 Pistole, 2 Maschinenpistole, 3 Raketen, 4 Flammen
         int PedFireWait = 0x5D;     // int16 Schritte bis zum nächsten Schuss
@@ -137,7 +138,7 @@ namespace gta1
         uintptr_t Triggers = 0;        // 210 Einträge zu 29 Byte, +0 Zustand (1 an, 4 aus): ENABLE/DISABLE z.B. auf
                                        // Telefongruppen (1.0.0.1: 0x48AB30 / 0x48AB90)
 
-        // Spielerwerte (Spieler 0, weitere im Abstand PlayerStride)
+        // Spielerwerte (Spieler 0, weitere im Abstand PlayerStride); PlayerArmor: int16 Zahl der Rüstungen (0..3)
         uintptr_t PlayerScore = 0, PlayerMultiplier = 0, PlayerJailCard = 0, PlayerLives = 0, PlayerAmmo = 0, PlayerArmor = 0;
 
         // Zeichenpuffer: das Spiel schreibt Welt und HUD direkt in den Speicher der aktiven MGL-Seite und legt
@@ -242,7 +243,7 @@ namespace gta1
         a.ScriptObjSlot = 0x6DB768; a.ScriptObjects = 0x6796F8;
         a.ScriptLines = 0x6FBC08; a.ScriptProcBlock = 0x6FB768; a.Triggers = 0x7386A0;
         a.PlayerScore = 0x6576B8; a.PlayerMultiplier = 0x6576BC; a.PlayerJailCard = 0x6576BE;
-        a.PlayerLives = 0x65774C; a.PlayerAmmo = 0x657718; a.PlayerArmor = 0x65775C;
+        a.PlayerLives = 0x65774C; a.PlayerAmmo = 0x657718; a.PlayerArmor = 0x657758;   // Rüstung weniger 0x464B90
         a.DrawBits = 0x737034; a.DrawPitch = 0x5F3AB4; a.DrawBytes = 0x5F3AB8; a.DrawWidth = 0x5F5560; a.DrawHeight = 0x5F5564;
         a.BulletHit = 0x425065; a.BulletHitSkip = 0x425108;
         a.PunchHit[0] = 0x44ED70; a.PunchReg[0] = 5; a.PunchHit[1] = 0x44EE01; a.PunchReg[1] = 7;
@@ -320,7 +321,7 @@ namespace gta1
         a.ScriptObjSlot = 0x6DB760; a.ScriptObjects = 0x6796F0;
         a.ScriptLines = 0x6FBC00; a.ScriptProcBlock = 0x6FB760; a.Triggers = 0x832FB8;   // 0x49B160
         a.PlayerScore = 0x80D018; a.PlayerMultiplier = 0x80D01C; a.PlayerJailCard = 0x80D01E;
-        a.PlayerLives = 0x80D0AC; a.PlayerAmmo = 0x80D078; a.PlayerArmor = 0x80D0BC;
+        a.PlayerLives = 0x80D0AC; a.PlayerAmmo = 0x80D078; a.PlayerArmor = 0x80D0B8;   // Rüstung weniger 0x4833F0
         a.LocalPlayer = 0x80D5B0; a.NumPlayers = 0x80D5AC;
         a.PlayerCtrl = 0x80CFF5; a.PlayerObject = 0x80CFF9; a.RunState = 0x572ACC;
         a.DrawBits = 0x570BC4; a.DrawPitch = 0x5605F4; a.DrawBytes = 0x5605F8; a.DrawWidth = 0x5620A0; a.DrawHeight = 0x5620A4; // 0x41F730
@@ -387,7 +388,7 @@ namespace gta1
         a.ScriptObjSlot = 0x6DD368; a.ScriptObjects = 0x67B2F8;
         a.ScriptLines = 0x6FD808; a.ScriptProcBlock = 0x6FD368; a.Triggers = 0x834BC8;   // 0x49BA90
         a.PlayerScore = 0x80EC20; a.PlayerMultiplier = 0x80EC24; a.PlayerJailCard = 0x80EC26;
-        a.PlayerLives = 0x80ECB4; a.PlayerAmmo = 0x80EC80; a.PlayerArmor = 0x80ECC4;
+        a.PlayerLives = 0x80ECB4; a.PlayerAmmo = 0x80EC80; a.PlayerArmor = 0x80ECC0;   // Rüstung weniger 0x483C90
         a.LocalPlayer = 0x80F1B8; a.NumPlayers = 0x80F1B4;
         a.PlayerCtrl = 0x80EBFD; a.PlayerObject = 0x80EC01; a.RunState = 0x5746D4;
         a.DrawBits = 0x5727CC; a.DrawPitch = 0x5621FC; a.DrawBytes = 0x562200; a.DrawWidth = 0x563CA8; a.DrawHeight = 0x563CAC; // 0x41F9C0
@@ -430,7 +431,7 @@ namespace gta1
         a.name = "Grand Theft Auto.exe (Rockstar Classics 2002)";
         a.timestamp = 0x3DCFD617;
         Layout& l = a.lay;
-        l.PedStride = 256; l.PedAnim = 0x18; l.PedCanFire = 0x46; l.PedHealth = 0x49; l.PedFlames = 0x58;
+        l.PedStride = 256; l.PedAnim = 0x18; l.PedCanFire = 0x46; l.PedHealth = 0x49; l.PedArmor = 0x4A; l.PedFlames = 0x58;
         l.PedWeapon = 0x60; l.PedFireWait = 0x64; l.PedPose = 0x70; l.PedPos = 0x90; l.PedAngleOfs = 0xA8;
         l.PedTarget = 0x86;
         l.ObjectSize = 136; l.ObjNext = 0x24; l.ObjPos = 0x2C;
@@ -475,7 +476,7 @@ namespace gta1
         a.ScriptObjSlot = 0x6561C0; a.ScriptObjects = 0x5F30E8;
         a.ScriptLines = 0x676660; a.ScriptProcBlock = 0x6761C0; a.Triggers = 0x771628;   // 0x474D30 / 0x474D70
         a.PlayerScore = 0x74F23C; a.PlayerMultiplier = 0x74F240; a.PlayerJailCard = 0x74F242;
-        a.PlayerLives = 0x74F2DF; a.PlayerAmmo = 0x74F2A0; a.PlayerArmor = 0x74F2F4;
+        a.PlayerLives = 0x74F2DF; a.PlayerAmmo = 0x74F2A0; a.PlayerArmor = 0x74F2F0;   // Rüstung weniger 0x4636A0
         a.TargetScore = 0x6B3B84; a.MissionsTotal = 0x6B3B78; a.MissionsCounter = 0x676388;   // 0x43D1C0 ff.
         a.SecretsTotal = 0x67638C; a.SecretsCounter = 0x693B28;
         a.CarDamage = 0x4BE344; a.CarStride = 688;   // 0x40A1E0
@@ -872,10 +873,27 @@ namespace gta1
         void RestoreTimerPatch();
     }
 
+    static uint8_t* PlayerPedStruct();
+
+    // Rüstung: Kugeln hält sie nur ab, solange auch der Merker an der Spielfigur gesetzt ist. Das Spiel setzt ihn beim
+    // Einsammeln und löscht ihn, wenn die letzte Rüstung verbraucht ist. Der Cheat SUCKMYROCKET gibt nach jedem Start
+    // und Neuanfang drei Rüstungen ohne den Merker (0x464891) - angezeigt, aber wirkungslos. Wie beim Einsammeln nachziehen.
+    static void SyncArmorFlag()
+    {
+        uint8_t* ped = PlayerPedStruct();
+        if (!ped || !A.PlayerArmor || ped[L.PedArmor] || static_cast<int8_t>(ped[L.PedHealth]) <= 0)
+            return;
+        const int32_t pose = *reinterpret_cast<const int32_t*>(ped + L.PedPose);
+        const int p = *reinterpret_cast<int*>(A.LocalPlayer);
+        if (pose != 5 && pose != 0x15 && pose != 0x17 && *reinterpret_cast<const int16_t*>(A.PlayerArmor + p * L.PlayerStride) > 0)
+            ped[L.PedArmor] = 1;
+    }
+
     static void __cdecl RenderHook()
     {
         RestoreTimerPatch();
         AssistSteering();
+        SyncArmorFlag();
         // Neues Level: die Objekte der Karte sind frisch angelegt, unsere Änderungen damit fort
         if (s_treeLevel != s_levelLoads)
         {
@@ -2976,7 +2994,8 @@ namespace gta1
         *reinterpret_cast<uint8_t*>(A.PlayerJailCard + po) = in.jailCard;
         *reinterpret_cast<uint8_t*>(A.PlayerLives + po) = in.lives;
         memcpy(reinterpret_cast<void*>(A.PlayerAmmo + po), in.ammo, 4);
-        *reinterpret_cast<int16_t*>(A.PlayerArmor + po) = in.armor;
+        if (in.armor >= 0)
+            *reinterpret_cast<int16_t*>(A.PlayerArmor + po) = in.armor;   // den Merker an der Figur zieht SyncArmorFlag nach
 
         // Position nur zu Fuß: Figur versetzen und die Kamera gleich mitnehmen
         const int ped = PlayerPed();
