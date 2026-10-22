@@ -22,6 +22,7 @@ namespace saves
         std::wstring g_dir;
         DWORD    g_autosaveAt = 0;                  // 0 = kein Autosave fällig
         unsigned g_autosaveLevel = 0;
+        bool     g_autosaveWaiting = false;         // fällig, der Spieler sitzt aber noch im Fahrzeug
         unsigned g_level = ~0u;                     // zuletzt gesehener Levelstart (gta1::LevelLoads)
         DWORD    g_levelSince = 0;
         unsigned g_offered = ~0u;                   // Levelstart, für den das Laden schon angeboten wurde
@@ -210,6 +211,7 @@ namespace saves
                 g_level = level;
                 g_levelSince = GetTickCount();
                 g_autosaveAt = 0;
+                g_autosaveWaiting = false;
             }
         }
     }
@@ -235,7 +237,8 @@ namespace saves
         return Available() && gta1::LevelSetUp(GetTickCount() - g_levelSince);
     }
 
-    bool CanSave() { return LevelReady() && !gta1::MissionActive() && !gta1::IsPlayerDead(); }
+    // Nur zu Fuß: geladen wird die Position auf die Figur, ein Fahrzeug lässt sich nicht mitversetzen
+    bool CanSave() { return LevelReady() && !gta1::MissionActive() && !gta1::IsPlayerDead() && gta1::IsPlayerOnFoot(); }
 
     bool Save(bool autosave)
     {
@@ -259,6 +262,8 @@ namespace saves
             return "nicht im Level";
         if (!LevelReady())
             return "Level wird noch eingerichtet";
+        if (!gta1::IsPlayerOnFoot())
+            return "Spieler sitzt in einem Fahrzeug";
         std::vector<uint8_t> data;
         const std::wstring path = SlotPath();
         if (path.empty() || !ReadAll(path, data))
@@ -301,6 +306,7 @@ namespace saves
         TrackLevel();
         g_autosaveAt = GetTickCount() + kAutosaveDelay;
         g_autosaveLevel = g_level;
+        g_autosaveWaiting = false;
         if (!g_autosaveAt)
             g_autosaveAt = 1;
     }
@@ -310,7 +316,16 @@ namespace saves
         TrackLevel();
         if (!g_autosaveAt || (int)(GetTickCount() - g_autosaveAt) < 0)
             return;
+        // Nach einer Mission sitzt der Spieler oft noch im Fahrzeug: erst speichern, wenn er ausgestiegen ist
+        if (g_autosaveLevel == g_level && !gta1::IsPlayerOnFoot() && !gta1::IsPlayerDead() && !gta1::MissionActive())
+        {
+            if (!g_autosaveWaiting)
+                LOG("Autosave wartet, bis der Spieler aussteigt");
+            g_autosaveWaiting = true;
+            return;
+        }
         g_autosaveAt = 0;
+        g_autosaveWaiting = false;
         if (g_autosaveLevel != g_level || !g_cfg.autosave || !Available())
             return;
         if (!CanSave())
@@ -325,7 +340,7 @@ namespace saves
     bool TakeLoadOffer()
     {
         TrackLevel();
-        if (g_level == g_offered || GetTickCount() - g_levelSince < kOfferDelay || !LevelReady())
+        if (g_level == g_offered || GetTickCount() - g_levelSince < kOfferDelay || !LevelReady() || !gta1::IsPlayerOnFoot())
             return false;
         g_offered = g_level;
         const std::wstring path = SlotPath();

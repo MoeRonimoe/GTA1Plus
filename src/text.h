@@ -138,6 +138,7 @@ namespace text
         LevelStarting,
         OptWalkToCrosshair,
         OptExtraMissionTime,
+        OnFootOnly,
         Count
     };
 

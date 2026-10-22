@@ -92,7 +92,8 @@ GPS AND MINIMAP
 SAVE GAMES
   - One save per level and character.
   - Saving works between missions, not while a phone mission is running.
-  - The game saves automatically after every completed mission.
+  - Saving and loading work on foot only. The game saves automatically
+    after every completed mission, as soon as you get out of your vehicle.
   - When you start a level that has a save, the mod offers to load it. This
     comes a few seconds after the level starts, once the game has set the
     level up (weapon crates, bomb shop doors, mission gates, car cranes).

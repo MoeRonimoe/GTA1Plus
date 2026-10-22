@@ -769,6 +769,8 @@ namespace overlay
             case Item::Save:
                 if (!saves::LevelReady())
                     ShowStatus(text::Get(text::LevelStarting), true);
+                else if (!gta1::IsPlayerOnFoot())
+                    ShowStatus(text::Get(text::OnFootOnly), true);
                 else if (!saves::CanSave())
                     ShowStatus(text::Get(text::SaveBlocked), true);
                 else if (saves::Save(false))
@@ -779,6 +781,8 @@ namespace overlay
             case Item::Load:
                 if (!saves::LevelReady())
                     ShowStatus(text::Get(text::LevelStarting), true);
+                else if (!gta1::IsPlayerOnFoot())
+                    ShowStatus(text::Get(text::OnFootOnly), true);
                 else if (saves::HasSave())
                     OpenConfirm(Confirm::Load);
                 else
