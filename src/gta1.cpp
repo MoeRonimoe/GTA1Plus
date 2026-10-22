@@ -885,8 +885,17 @@ namespace gta1
             return;
         const int32_t pose = *reinterpret_cast<const int32_t*>(ped + L.PedPose);
         const int p = *reinterpret_cast<int*>(A.LocalPlayer);
-        if (pose != 5 && pose != 0x15 && pose != 0x17 && *reinterpret_cast<const int16_t*>(A.PlayerArmor + p * L.PlayerStride) > 0)
-            ped[L.PedArmor] = 1;
+        const int16_t armor = *reinterpret_cast<const int16_t*>(A.PlayerArmor + p * L.PlayerStride);
+        if (pose == 5 || pose == 0x15 || pose == 0x17 || armor <= 0)
+            return;
+        ped[L.PedArmor] = 1;
+        // Für Fehlerberichte: außer dem Cheat ist kein Weg bekannt, auf dem der Merker fehlt
+        static int s_logged = 0;
+        if (s_logged < 20)
+        {
+            ++s_logged;
+            LOG("Rüstung %d ohne Merker an der Spielfigur - nachgezogen", armor);
+        }
     }
 
     static void __cdecl RenderHook()
@@ -3014,6 +3023,8 @@ namespace gta1
                 cam.y = in.y >> 16;
             }
         }
+        else if (in.hasPos)
+            LOG("Spielstand: Position nicht übernommen, der Spieler sitzt in einem Fahrzeug");
         return nullptr;
     }
 

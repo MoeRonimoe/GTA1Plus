@@ -195,7 +195,7 @@ void ModInit(HMODULE self)
 
     wchar_t exePath[MAX_PATH];
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-    LOG("GTA1Plus geladen, Spiel: %ls", exePath);
+    LOG("GTA1Plus (erstellt %s) geladen, Spiel: %ls", __DATE__, exePath);
     text::Init(SiblingPath(self, L"_lang.ini").c_str(), g_cfg.language);
 
     KeepSoundOnGameWindow();
