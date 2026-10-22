@@ -876,8 +876,8 @@ namespace gta1
     static uint8_t* PlayerPedStruct();
 
     // Rüstung: Kugeln hält sie nur ab, solange auch der Merker an der Spielfigur gesetzt ist. Das Spiel setzt ihn beim
-    // Einsammeln und löscht ihn, wenn die letzte Rüstung verbraucht ist. Der Cheat SUCKMYROCKET gibt nach jedem Start
-    // und Neuanfang drei Rüstungen ohne den Merker (0x464891) - angezeigt, aber wirkungslos. Wie beim Einsammeln nachziehen.
+    // Einsammeln und löscht ihn, wenn die letzte Rüstung verbraucht ist. Der Cheat SUCKMYROCKET gibt beim Start des
+    // Levels drei Rüstungen ohne den Merker (0x464891) - angezeigt, aber wirkungslos. Wie beim Einsammeln nachziehen.
     static void SyncArmorFlag()
     {
         uint8_t* ped = PlayerPedStruct();
