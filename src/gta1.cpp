@@ -876,8 +876,10 @@ namespace gta1
     static uint8_t* PlayerPedStruct();
 
     // Rüstung: Kugeln hält sie nur ab, solange auch der Merker an der Spielfigur gesetzt ist. Das Spiel setzt ihn beim
-    // Einsammeln und löscht ihn, wenn die letzte Rüstung verbraucht ist. Der Cheat SUCKMYROCKET gibt beim Start des
-    // Levels drei Rüstungen ohne den Merker (0x464891) - angezeigt, aber wirkungslos. Wie beim Einsammeln nachziehen.
+    // Einsammeln und löscht ihn, wenn die letzte Rüstung verbraucht ist. Ohne den Merker ist die Rüstung angezeigt, aber
+    // wirkungslos: der Cheat SUCKMYROCKET gibt beim Start des Levels drei Rüstungen ohne ihn (0x464891), und nach einer
+    // Verhaftung im Fahrzeug mit Gefängniskarte behält der Spieler die Rüstung, die Figur aber nicht den Merker (vom
+    // Benutzer nachgestellt; zu Fuß bleibt er). Wie beim Einsammeln nachziehen.
     static void SyncArmorFlag()
     {
         uint8_t* ped = PlayerPedStruct();
@@ -889,7 +891,7 @@ namespace gta1
         if (pose == 5 || pose == 0x15 || pose == 0x17 || armor <= 0)
             return;
         ped[L.PedArmor] = 1;
-        // Für Fehlerberichte: außer dem Cheat ist kein Weg bekannt, auf dem der Merker fehlt
+        // Für Fehlerberichte: zeigt, ob noch andere Wege den Merker verlieren
         static int s_logged = 0;
         if (s_logged < 20)
         {
