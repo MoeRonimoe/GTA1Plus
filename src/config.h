@@ -25,6 +25,7 @@ struct Config
     bool keepMultiplier = true;  // Multiplikator bei Verhaftung nicht halbieren
     bool noTreeCollision = true; // Bäume, Laternen, Pfosten und Schildermasten halten Fahrzeuge nicht mehr auf
     int  steerAssist    = 2;     // Lenkhilfe: Wagen auf die Straßenrichtung ausrichten (0 aus, 1 leicht, 2 mittel, 3 stark)
+    bool trams          = true;  // Straßenbahnen in San Andreas fahren lassen (das Spiel hat sie abgeschaltet)
     int  extraMissionTime = 0;   // Sekunden mehr für jeden Countdown einer Mission (0 = wie im Spiel)
     bool quickRetry     = true;  // nach gescheiterter Mission ohne lange Wartezeit neu versuchen
     bool allCharacters  = true;  // Frauen im Hauptmenü auch in nicht-englischen Versionen wählbar

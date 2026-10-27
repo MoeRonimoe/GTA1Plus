@@ -3,6 +3,7 @@
 #include "log.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -185,6 +186,11 @@ namespace gta1
         uint8_t   ExplodeProlog[8] = { 0x83, 0xEC, 0x04, 0x33, 0xC9 };   // ohne Thunk: erste ganze Befehle der Funktion
         int       ExplodeLen = 5;     // (1.0.0.1: sub esp,4 / xor ecx,ecx), werden in ein Sprungstück ausgelagert
 
+        // Straßenbahn: Gleise auf Fahrbahn (nur San Andreas) legt das Spiel als Zugart 2 mit einem Wagen an, überspringt
+        // sie aber beim Anlegen und in jedem Bild mit je einem "je" (6 Byte, TramSkipInit / TramSkipUpdate). Die Gleis-
+        // und Zuglogik fragt Blöcke über BlockQuery(x, y, z) ab (typeMap | typeMapExt << 16), Aufruf an BlockQueryCall.
+        uintptr_t TramSkipInit = 0, TramSkipUpdate = 0, BlockQuery = 0, BlockQueryCall = 0;
+
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
         uintptr_t TextBuffer = 0;     // char*: "[Schlüssel]Text\0..." bis "[]"
         uintptr_t MglPrimary = 0;     // IDirectDrawSurface* (Primary von MGL)
@@ -253,6 +259,8 @@ namespace gta1
         a.CarDamage = 0x73B077;   // 0x497220
         a.Cars = 0x73AF80; a.Straighten = 0x46AE99; a.BlockTypes = 0x590798;
         a.MapColumns = 0x5F395C; a.MapBlocks = 0x5F18E4;
+        a.TramSkipInit = 0x45E173; a.TramSkipUpdate = 0x45EDCD;   // Züge anlegen 0x45E0A0, jedes Bild 0x45ED80
+        a.BlockQuery = 0x428A20; a.BlockQueryCall = 0x437137;      // in der Abfrage 0x4370C0 (Gleis-Suchlauf 0x432A00)
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
@@ -483,6 +491,8 @@ namespace gta1
         a.Cars = 0x4BE248; a.CarWheel = 0x18C; a.CarPos = 0x250;   // Fahrphysik 0x460BE0
         a.Straighten = 0x461110; a.BlockTypes = 0x55FAB0;
         a.MapColumns = 0x5C2C70; a.MapBlocks = 0x5C0BFC;
+        a.TramSkipInit = 0x46B2F7; a.TramSkipUpdate = 0x46BDA2;   // Züge anlegen, jedes Bild (Datensätze 0x7514A8)
+        a.BlockQuery = 0x438900; a.BlockQueryCall = 0x44B387;      // in der Abfrage 0x44B310
         // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
         // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
         a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
@@ -1538,6 +1548,77 @@ namespace gta1
         if (!SetOwnStraightening(level <= 0))
             return false;
         s_steerAssist = level;
+        return true;
+    }
+
+    // ---- Straßenbahn in San Andreas ----
+    // Die Karte sanb.cmp hat zwei Schleifen mit Gleisen auf der Fahrbahn und darauf Stationen (Wert 6) und Stationen
+    // mit eigenem Zug (Wert 7). Ein Zug fährt erst los, wenn die nächste Station frei ist: die linke Schleife hat vier
+    // Stationen und vier Bahnen und stünde für immer. Die zweite der beiden dicht hintereinander liegenden Stationen
+    // bekommt deshalb keinen eigenen Zug.
+    namespace
+    {
+        bool s_trams = false;
+        unsigned s_tramMapGen = ~0u;
+        bool s_tramMap = false;          // geladene Karte ist sanb.cmp
+
+        struct RailOverride { int x, y; uint8_t code; };
+        constexpr RailOverride kSanAndreasRail[] = { { 99, 60, 6 } };
+
+        uint32_t __cdecl BlockQueryHook(int x, int y, int z)
+        {
+            uint32_t v = reinterpret_cast<uint32_t(__cdecl*)(int, int, int)>(A.BlockQuery)(x, y, z);
+            if (!s_trams || !(v & 0x800000))   // kein Gleis
+                return v;
+            if (s_tramMapGen != s_mapGen)
+            {
+                s_tramMapGen = s_mapGen;
+                std::string map = MapFile();
+                for (char& c : map)
+                    c = (char)tolower((unsigned char)c);
+                s_tramMap = map.size() >= 8 && map.compare(map.size() - 8, 8, "sanb.cmp") == 0;
+            }
+            if (s_tramMap)
+                for (const RailOverride& o : kSanAndreasRail)
+                    if (o.x == x && o.y == y)
+                        return (v & ~0x70000u) | (uint32_t(o.code) << 16);
+            return v;
+        }
+
+        bool SetJumpSkipped(uintptr_t site, bool skipped, uint8_t (&original)[6])
+        {
+            uint8_t* p = reinterpret_cast<uint8_t*>(site);
+            if (!original[0])
+            {
+                if (p[0] != 0x0F || p[1] != 0x84)   // je rel32
+                    return false;
+                memcpy(original, p, 6);
+            }
+            static const uint8_t nops[6] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+            return hooks::WriteMemory(p, skipped ? nops : original, 6);
+        }
+    }
+
+    bool TramsAvailable() { return s_supported && A.TramSkipInit && A.TramSkipUpdate && A.BlockQuery && A.BlockQueryCall; }
+
+    bool SetTrams(bool on)
+    {
+        static uint8_t s_init[6], s_update[6];
+        static bool s_hooked = false, s_applied = false;
+        if (s_applied && on == s_trams)
+            return true;
+        if (!TramsAvailable())
+            return false;
+        if (on && !s_hooked)
+        {
+            if (!Redirect(A.BlockQueryCall, 0xE8, A.BlockQuery, reinterpret_cast<void*>(&BlockQueryHook)))
+                return false;
+            s_hooked = true;
+        }
+        if (!SetJumpSkipped(A.TramSkipInit, on, s_init) || !SetJumpSkipped(A.TramSkipUpdate, on, s_update))
+            return false;
+        s_trams = on;
+        s_applied = true;
         return true;
     }
 

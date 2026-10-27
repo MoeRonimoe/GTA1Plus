@@ -139,6 +139,7 @@ namespace text
         OptWalkToCrosshair,
         OptExtraMissionTime,
         OnFootOnly,
+        OptTrams,
         Count
     };
 

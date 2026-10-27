@@ -114,6 +114,7 @@ namespace
         saves::Tick();
         gta1::SetTreeCollision(g_cfg.noTreeCollision);   // im Optionsmenü umschaltbar
         gta1::SetSteerAssist(g_cfg.steerAssist);
+        gta1::SetTrams(g_cfg.trams);                     // wirkt ab dem nächsten Levelstart
         missiontimers::Tick();
     }
 
@@ -237,6 +238,8 @@ void ModInit(HMODULE self)
             LOG("Bäume, Laternen und Schilder ohne Zusammenstoß: %s", gta1::SetTreeCollision(true) ? "aktiv" : "für diese Version nicht verfügbar");
         if (g_cfg.steerAssist)
             LOG("Lenkhilfe (Stufe %d): %s", g_cfg.steerAssist, gta1::SetSteerAssist(g_cfg.steerAssist) ? "aktiv" : "für diese Version nicht verfügbar");
+        if (g_cfg.trams)
+            LOG("Straßenbahnen in San Andreas: %s", gta1::SetTrams(true) ? "aktiv" : "für diese Version nicht verfügbar");
         if (g_cfg.keepMultiplier)
             LOG("Multiplikator bei Verhaftung behalten: %s", gta1::EnableKeepMultiplier() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.allCharacters)

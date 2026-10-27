@@ -1,5 +1,6 @@
 #include "options.h"
 #include "config.h"
+#include "gta1.h"
 #include "hudscale.h"
 #include "log.h"
 #include "text.h"
@@ -77,6 +78,7 @@ namespace options
             { Type::Bool, text::OptNoPostCollision, &g_cfg.noTreeCollision },
             { Type::Choice, text::OptSteerAssist, &g_cfg.steerAssist, false, 0, 3, 1,
               { text::OptOff, text::AssistGentle, text::AssistMedium, text::AssistStrong } },
+            { Type::Bool, text::OptTrams, &g_cfg.trams, false, 0, 0, 0, {}, &gta1::TramsAvailable },
             { Type::Seconds, text::OptExtraMissionTime, &g_cfg.extraMissionTime, false, 0, 300, 15 },
             { Type::Bool, text::OptQuickRetry, &g_cfg.quickRetry, true },
             { Type::Bool, text::OptKeepMultiplier, &g_cfg.keepMultiplier, true },
