@@ -181,6 +181,11 @@ namespace gta1
         int       CarWheel = 0x180, CarPos = 0x23C;
         // Zeiger auf die geladene Karte: Spalten und gleich dahinter die Blockarten (wie in der .cmp, 8 Byte je Art)
         uintptr_t MapColumns = 0, MapBlocks = 0;
+        // Der Kartenlader holt einen Speicher für die Offsets der Spalten (256 x 256 uint32 relativ zu MapColumns,
+        // Zeiger in MapBase), die Spalten, die Blockarten und zwei Puffer (0x4000 Byte): MapAllocAdd = disp32 von
+        // "lea reg,[a+b+44000h]". Die Lesegröße rechnet er daraus zurück: MapReadAdd = imm32 von "sub reg,4000h"
+        // (1.0.0.1) bzw. "add reg,-4000h" (Classics)
+        uintptr_t MapAllocAdd = 0, MapReadAdd = 0, MapBase = 0;
         uintptr_t Explode = 0;        // __cdecl(x, y, z, Auslöser): Explosion erzeugen, alle Explosionen laufen hier durch
         uintptr_t ExplodeThunk = 0;   // London: jmp Explode
         uint8_t   ExplodeProlog[8] = { 0x83, 0xEC, 0x04, 0x33, 0xC9 };   // ohne Thunk: erste ganze Befehle der Funktion
@@ -297,6 +302,7 @@ namespace gta1
         a.CarDamage = 0x73B077;   // 0x497220
         a.Cars = 0x73AF80; a.Straighten = 0x46AE99; a.BlockTypes = 0x590798;
         a.MapColumns = 0x5F395C; a.MapBlocks = 0x5F18E4;
+        a.MapAllocAdd = 0x42824C; a.MapReadAdd = 0x4282B1; a.MapBase = 0x5F2904;   // Lader 0x428249 / 0x4282AF
         a.TramSkipInit = 0x45E173; a.TramSkipUpdate = 0x45EDCD;   // Züge anlegen 0x45E0A0, jedes Bild 0x45ED80
         a.BlockQuery = 0x428A20; a.BlockQueryCall = 0x437137;      // in der Abfrage 0x4370C0 (Gleis-Suchlauf 0x432A00)
         a.TramObstacleNext = 0x4611E6;                             // mov ecx,0Ch in 0x461100
@@ -542,6 +548,7 @@ namespace gta1
         a.Cars = 0x4BE248; a.CarWheel = 0x18C; a.CarPos = 0x250;   // Fahrphysik 0x460BE0
         a.Straighten = 0x461110; a.BlockTypes = 0x55FAB0;
         a.MapColumns = 0x5C2C70; a.MapBlocks = 0x5C0BFC;
+        a.MapAllocAdd = 0x438271; a.MapReadAdd = 0x4382D7; a.MapBase = 0x5C1C1C;   // Lader 0x43826E / 0x4382D5
         a.TramSkipInit = 0x46B2F7; a.TramSkipUpdate = 0x46BDA2;   // Züge anlegen, jedes Bild (Datensätze 0x7514A8)
         a.BlockQuery = 0x438900; a.BlockQueryCall = 0x44B387;      // in der Abfrage 0x44B310
         a.TramObstacleNext = 0x46DE47;                             // mov byte [Bahn+9],0Ch
@@ -836,6 +843,7 @@ namespace gta1
     static void RemoveTreeCollision();
     static void RestoreTreeCollision();
     static void ForgetTreeChanges();
+    static void PlaceTramSigns();
 
     // Lenkhilfe (wie in GTA2). Das Spiel führt je Fahrzeug die Richtung der Vorderräder: Lenken dreht sie je Bild um
     // einige Grad (Wert des Fahrzeugtyps, oft 12), die Karosserie läuft ihr weich nach. Das Spiel richtet den Wagen
@@ -988,6 +996,7 @@ namespace gta1
             s_treeLevel = s_levelLoads;
             ForgetTreeChanges();
         }
+        PlaceTramSigns();
         if (s_noTreeCollision != s_treesChanged)
         {
             if (s_noTreeCollision)
@@ -1446,27 +1455,38 @@ namespace gta1
         return true;
     }
 
-    static int RemovePoleFaces()
+    // Kopf der Kartendatei, die das Spiel geladen hat: Größe der Tabellen
+    struct MapHeader
+    {
+        uint32_t version;
+        uint8_t style, sample;
+        uint16_t reserved;
+        uint32_t routeSize, objectSize, columnSize, blockSize, navSize;
+    };
+
+    // Karte im Speicher: Spalten, gleich dahinter die Blockarten (8 Byte je Art)
+    static bool LoadedMap(MapHeader& hdr, uint8_t*& columns, uint8_t*& blocks)
     {
         if (!A.MapColumns || !A.MapBlocks)
-            return 0;
-        // Größe der Tabellen aus dem Kopf der Kartendatei, die das Spiel geladen hat
-        struct Header
-        {
-            uint32_t version;
-            uint8_t style, sample;
-            uint16_t reserved;
-            uint32_t routeSize, objectSize, columnSize, blockSize, navSize;
-        } hdr = {};
+            return false;
+        hdr = {};
         const std::string path = MapFile();
         FILE* f = nullptr;
         if (path.empty() || fopen_s(&f, path.c_str(), "rb") || !f)
-            return 0;
+            return false;
         const bool read = fread(&hdr, sizeof(hdr), 1, f) == 1;
         fclose(f);
-        uint8_t* columns = *reinterpret_cast<uint8_t**>(A.MapColumns);
-        uint8_t* blocks = *reinterpret_cast<uint8_t**>(A.MapBlocks);
-        if (!read || !columns || blocks != columns + hdr.columnSize || hdr.blockSize % 8 || hdr.blockSize > 8 * 65536)
+        columns = *reinterpret_cast<uint8_t**>(A.MapColumns);
+        blocks = *reinterpret_cast<uint8_t**>(A.MapBlocks);
+        return read && columns && blocks == columns + hdr.columnSize && hdr.blockSize % 8 == 0 &&
+               hdr.blockSize <= 8 * 65536;
+    }
+
+    static int RemovePoleFaces()
+    {
+        MapHeader hdr;
+        uint8_t *columns, *blocks;
+        if (!LoadedMap(hdr, columns, blocks))
             return 0;
         if (PoleFacesApplied(blocks))
             return (int)s_poleBlocks.size();
@@ -1655,11 +1675,8 @@ namespace gta1
             { 109, 136, 6 }, { 109, 105, 6 }, { 109, 88, 6 }, { 109, 62, 6 },                   // links (nach Norden)
         };
 
-        uint32_t __cdecl BlockQueryHook(int x, int y, int z)
+        bool IsTramMap()
         {
-            uint32_t v = reinterpret_cast<uint32_t(__cdecl*)(int, int, int)>(A.BlockQuery)(x, y, z);
-            if (!s_trams || !(v & 0x800000))   // kein Gleis
-                return v;
             if (s_tramMapGen != s_mapGen)
             {
                 s_tramMapGen = s_mapGen;
@@ -1668,12 +1685,132 @@ namespace gta1
                     c = (char)tolower((unsigned char)c);
                 s_tramMap = map.size() >= 8 && map.compare(map.size() - 8, 8, "sanb.cmp") == 0;
             }
-            if (s_tramMap)
+            return s_tramMap;
+        }
+
+        uint32_t __cdecl BlockQueryHook(int x, int y, int z)
+        {
+            uint32_t v = reinterpret_cast<uint32_t(__cdecl*)(int, int, int)>(A.BlockQuery)(x, y, z);
+            if (!s_trams || !(v & 0x800000))   // kein Gleis
+                return v;
+            if (IsTramMap())
                 for (const RailOverride& o : kSanAndreasRail)
                     if (o.x == x && o.y == y)
                         return (v & ~0x70000u) | (uint32_t(o.code) << 16);
             return v;
         }
+
+        // Haltestellenschilder: die Style-Datei von San Andreas hat eins (Seitenkachel 185, Mast mit Tafel und
+        // Fahrplankasten), die Karte benutzt es nirgends. Es kommt als flache Seite in den Gehweg neben der Station:
+        // rechts (Westkante der Zelle) bzw. unten (Nordkante), so ist es von beiden Seiten zu sehen und hält keine
+        // Fahrzeuge auf (siehe RemovePoleFaces). Blockarten und Spalten teilen sich viele Zellen, deshalb bekommt
+        // jede Schild-Zelle eine eigene Kopie beider. Platz dafür hängt der Lader hinter seine Puffer an.
+        constexpr uint32_t kMapReserve = 0x4000;   // Puffer des Spiels hinter den Blockarten
+        constexpr uint32_t kMapExtra = 0x1000;     // unserer
+        constexpr uint8_t kTramSignTile = 185;
+        constexpr uint8_t kRight = 4, kBottom = 6; // Byte in der Blockart
+
+        // before: Kachel, die das Schild ersetzt. Vom Gleis aus richtig herum steht die Tafel an der Nordkante und an
+        // der Westkante mit dem Gleis im Westen; mit dem Gleis im Osten spiegelt sie Bit 6 im Zusatzbyte (wie beim Zaun)
+        struct TramSign { int x, y; uint8_t face, before, flip; };
+        constexpr uint8_t kFlipSides = 0x40;
+        constexpr TramSign kSanAndreasSigns[] = {
+            { 97, 61, kBottom, 0, 0 }, { 99, 61, kBottom, 0, 0 },
+            { 63, 29, kRight, 112, kFlipSides },                           // vor dem Zaun, nach Westen bleibt er
+            { 63, 57, kRight, 0, kFlipSides }, { 141, 35, kBottom, 0, 0 },
+            { 173, 56, kRight, 0, kFlipSides }, { 173, 82, kRight, 0, kFlipSides },   // Ecke, am Gleis eine Rampe
+            { 174, 95, kRight, 0, kFlipSides }, { 174, 118, kRight, 0, kFlipSides }, { 174, 129, kRight, 0, kFlipSides },
+            { 110, 137, kRight, 0, 0 }, { 110, 106, kRight, 0, 0 }, { 110, 89, kRight, 0, 0 }, { 110, 61, kRight, 0, 0 },
+        };
+
+        bool s_mapExtra = false;           // Lader legt kMapExtra Byte mehr an
+        unsigned s_mapExtraLevel = 0;      // ab dem Level danach
+        unsigned s_signLevel = ~0u;
+
+        bool EnlargeMapMemory()
+        {
+            if (s_mapExtra)
+                return true;
+            if (!A.MapAllocAdd || !A.MapReadAdd || !A.MapBase)
+                return false;
+            const int32_t alloc = *reinterpret_cast<const int32_t*>(A.MapAllocAdd);
+            const int32_t back = *reinterpret_cast<const int32_t*>(A.MapReadAdd);
+            const int32_t reserve = static_cast<int32_t>(kMapReserve), extra = static_cast<int32_t>(kMapExtra);
+            if (alloc != 0x40000 + reserve || (back != reserve && back != -reserve))
+                return false;
+            const int32_t newBack = back > 0 ? back + extra : back - extra, newAlloc = alloc + extra;
+            if (!hooks::WriteMemory(reinterpret_cast<void*>(A.MapReadAdd), &newBack, 4) ||
+                !hooks::WriteMemory(reinterpret_cast<void*>(A.MapAllocAdd), &newAlloc, 4))
+                return false;
+            s_mapExtra = true;
+            s_mapExtraLevel = s_levelLoads;
+            return true;
+        }
+
+        int AddTramSigns()
+        {
+            MapHeader hdr;
+            uint8_t *columns, *blocks;
+            if (!LoadedMap(hdr, columns, blocks))
+                return -1;
+            uint32_t* offsets = *reinterpret_cast<uint32_t**>(A.MapBase);
+            if (reinterpret_cast<uint8_t*>(offsets + 65536) != columns)
+                return -1;
+            uint8_t* p = blocks + hdr.blockSize + kMapReserve;
+            uint8_t* const end = p + kMapExtra;
+            int added = 0;
+            for (const TramSign& s : kSanAndreasSigns)
+            {
+                uint32_t& offset = offsets[s.y * 256 + s.x];
+                const uint8_t* column = columns + offset;
+                const uint16_t height = *reinterpret_cast<const uint16_t*>(column);
+                if (height >= 6)
+                    continue;
+                const int count = 6 - height;
+                uint16_t list[6];
+                memcpy(list, column + 2, count * 2);
+                // Laufebene: oberste Blockart mit Fahrbahn, Gehweg oder Feld (der Boden ist der Deckel darunter)
+                const auto walkable = [&](int i) { const int type = (blocks[list[i] * 8] >> 4) & 7; return type >= 2 && type <= 4; };
+                int k = 0;
+                while (k < count && !walkable(k))
+                    ++k;
+                if (k == count)
+                    continue;
+                const uint8_t* old = blocks + list[k] * 8;
+                if (((old[0] >> 4) & 7) != 3 || old[1] || old[s.face] != s.before)   // Gehweg ohne Schräge
+                    continue;
+                const size_t need = 8 + 2 + count * 2 + 6;
+                if (p + need > end)
+                    break;
+                memcpy(p, old, 8);
+                p[0] |= 0x80;                       // flach
+                p[2] ^= s.flip;
+                p[s.face] = kTramSignTile;
+                list[k] = static_cast<uint16_t>((p - blocks) / 8);
+                p += 8;
+                memcpy(p, &height, 2);
+                memcpy(p + 2, list, count * 2);
+                offset = static_cast<uint32_t>(p - columns);
+                p += 2 + count * 2;
+                p = blocks + ((p - blocks + 7) & ~7);   // nächste Blockart auf 8 Byte
+                // BlockTypes bleibt: dort steht die Art ohne "flach" (Bit 7 heißt dort Schräge)
+                ++added;
+            }
+            return added;
+        }
+    }
+
+    static void PlaceTramSigns()
+    {
+        if (s_signLevel == s_levelLoads)
+            return;
+        s_signLevel = s_levelLoads;
+        if (s_trams && s_mapExtra && s_levelLoads != s_mapExtraLevel && IsTramMap())
+            LOG("Straßenbahn: %d von %d Haltestellenschildern aufgestellt", AddTramSigns(), (int)std::size(kSanAndreasSigns));
+    }
+
+    namespace
+    {
 
         bool SetJumpSkipped(uintptr_t site, bool skipped, uint8_t (&original)[6])
         {
@@ -1708,6 +1845,8 @@ namespace gta1
             if (!Redirect(A.BlockQueryCall, 0xE8, A.BlockQuery, reinterpret_cast<void*>(&BlockQueryHook)))
                 return false;
             s_hooked = true;
+            if (!EnlargeMapMemory())
+                LOG("Straßenbahn: Kartenlader passt nicht - keine Haltestellenschilder");
         }
         if (!SetJumpSkipped(A.TramSkipInit, on, s_init) || !SetJumpSkipped(A.TramSkipUpdate, on, s_update) ||
             !SetTramBrake(on) || !SetTramContact(on))

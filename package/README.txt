@@ -154,9 +154,9 @@ GAMEPLAY
     pause menu (GTA1Plus options, Gameplay); off = original behaviour.
   - Trams in San Andreas: the game has tram lines in the streets of San
     Andreas and the trams themselves, but they were switched off. Now four
-    trams run on two loops and stop at the crossings. From the next level
-    start; can be switched off in the pause menu (GTA1Plus options,
-    Gameplay).
+    trams run on two loops and stop at the crossings, each stop marked
+    with the game's unused tram stop sign. From the next level start;
+    can be switched off in the pause menu (GTA1Plus options, Gameplay).
   - Firebomb, the weapon cut from GTA1: some pistol and machine-gun crates
     hold a red petrol can - break the crate open and pick it up for five
     firebombs. In the weapon cycle the firebomb comes after the
