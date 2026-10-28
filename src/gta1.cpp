@@ -215,10 +215,10 @@ namespace gta1
         // ruft CrateOpenCreate(x, y, z, Objekt, 0) selbst (esi = Abstand in der Kistentabelle CrateTable, ebx = 0),
         // merkt den Griff und springt nach CrateOpenDone
         uintptr_t CrateOpenSlot = 0, CrateOpenJoin = 0, CrateOpenCreate = 0, CrateOpenDone = 0, CrateTable = 0;
-        // Berührt eine Figur ein Objekt, verteilt das Spiel nach Art (Art - 6 als Index in eine Bytetabelle). Den
-        // Kanister hat es dort aus dem Aufheben genommen: Byte für 0x52 an CanPickupIndex, die Waffen 0x4E..0x51
-        // stehen davor und haben den Wert des Aufheben-Falls
-        uintptr_t CanPickupIndex = 0;
+        // Berührt eine Figur bzw. ein Fahrzeug ein Objekt, verteilt das Spiel nach Art über eine Bytetabelle. Den
+        // Kanister hat es in beiden aus dem Aufheben genommen: Byte für 0x52 an CanPickupPed / CanPickupCar, die
+        // Waffen 0x4E..0x51 stehen davor und haben den Wert des Aufheben-Falls
+        uintptr_t CanPickupPed = 0, CanPickupCar = 0;
         uint8_t   TramContactReg = 0;
 
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
@@ -299,7 +299,8 @@ namespace gta1
         a.CratePickupType = 5; a.CratePickupAmount = 7; a.CratePickupPlayer = 6;   // ebp, edi, esi
         a.PlayerWeapon = 0x65771E;                                 // Waffenwechsel 0x462440 / 0x4623E0
         a.CrateOpenSlot = 0x40BF9C; a.CrateOpenJoin = 0x40BEF4;   // Kiste öffnen 0x40BE30, Tabelle 0x40BF8C
-        a.CanPickupIndex = 0x44D7A4;                               // Figur trifft Objekt 0x44D380, Index 0x44D758
+        a.CanPickupPed = 0x44D7A4;                                 // Figur trifft Objekt 0x44D380, Index 0x44D758
+        a.CanPickupCar = 0x43A016;                                 // Fahrzeug trifft Objekt 0x4399C9, Index 0x439FC4
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
@@ -542,7 +543,8 @@ namespace gta1
         a.PlayerWeapon = 0x74F2A8;                                 // Waffenwechsel 0x4619F0
         a.CrateOpenSlot = 0x46A470; a.CrateOpenCreate = 0x44CEF0; a.CrateOpenDone = 0x46A404;   // Tabelle 0x46A460
         a.CrateTable = 0x74F858;
-        a.CanPickupIndex = 0x4593C4;                               // Figur trifft Objekt 0x459130, Index 0x459378
+        a.CanPickupPed = 0x4593C4;                                 // Figur trifft Objekt 0x459130, Index 0x459378
+        a.CanPickupCar = 0x410DA2;                                 // Fahrzeug trifft Objekt 0x410880, Index 0x410D50
         // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
         // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
         a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
@@ -2142,15 +2144,22 @@ namespace gta1
             o.Byte(0xE9); o.Rel32(A.CrateOpenDone);
         }
         const uint32_t openTarget = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(openStub));
-        // Aufheben: der Kanister bekommt den Fall der Waffen (dieselben vier Bytes davor)
-        const uint8_t* index = reinterpret_cast<const uint8_t*>(A.CanPickupIndex);
-        const uint8_t weaponCase = index ? index[-4] : 0;
-        if (!index || index[-3] != weaponCase || index[-2] != weaponCase || index[-1] != weaponCase || *index == weaponCase)
+        // Aufheben zu Fuß und im Fahrzeug: der Kanister bekommt den Fall der Waffen (dieselben vier Bytes davor)
+        uint8_t pedCase = 0, carCase = 0;
+        const auto weaponCase = [](uintptr_t at, uint8_t& value) {
+            const uint8_t* b = reinterpret_cast<const uint8_t*>(at);
+            if (!b)
+                return false;
+            value = b[-4];
+            return b[-3] == value && b[-2] == value && b[-1] == value && b[0] != value;
+        };
+        if (!weaponCase(A.CanPickupPed, pedCase) || !weaponCase(A.CanPickupCar, carCase))
             return false;
         s_ok = PatchJump(A.CrateCreate, 0xE9, reinterpret_cast<const uint8_t*>(&CrateCreateHook), len) &&
                PatchJump(A.CratePickup, 0xE9, pickStub, plen) &&
                hooks::WriteMemory(reinterpret_cast<void*>(A.CrateOpenSlot), &openTarget, sizeof(openTarget)) &&
-               hooks::WriteMemory(reinterpret_cast<void*>(A.CanPickupIndex), &weaponCase, 1);
+               hooks::WriteMemory(reinterpret_cast<void*>(A.CanPickupPed), &pedCase, 1) &&
+               hooks::WriteMemory(reinterpret_cast<void*>(A.CanPickupCar), &carCase, 1);
         return s_ok;
     }
 
