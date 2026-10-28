@@ -1995,7 +1995,7 @@ namespace overlay
                     tiltcam::GameToOutput(b.x, b.y, ox, oy);
                     DrawSprite(v, bottle, w, h, ox, oy, 0.6f * b.scale);
                 }
-            if (!firebomb::Selected())
+            if (!firebomb::Selected() || firebomb::NativeHud())
                 return;
             const float k = (float)hudscale::Factor();
             const uint32_t* big = firebomb::Icon(true, w, h);

@@ -17,6 +17,7 @@ namespace firebomb
     Keys Filter(Keys in, bool onFoot);
 
     bool Selected();                // statt der Faust ist die Brandbombe gewählt
+    bool NativeHud();               // Symbol und Anzahl zeichnet das HUD des Spiels, sonst das Overlay
     int  Ammo();
     void SetAmmo(int n);            // Spielstände
 

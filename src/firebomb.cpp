@@ -25,6 +25,7 @@ namespace firebomb
 
         int s_ammo = 0;
         bool s_selected = false;
+        bool s_nativeHud = false;     // das Spiel zeichnet das Symbol samt Anzahl selbst
         bool s_lastFire = false, s_lastNext = false, s_lastPrev = false;
         bool s_holdFire = false, s_holdNext = false, s_holdPrev = false;   // Taste bis zum Loslassen zurückhalten
         bool s_pendingNext = false;                             // Wechsel ans Spiel gegeben, Ergebnis im nächsten Bild
@@ -227,6 +228,8 @@ namespace firebomb
             return;
         }
         LOG("Brandbombe: %s", gta1::HookCrates(&ConvertCrate, &CratePicked) ? "Kisten eingehängt" : "Spielcode passt nicht");
+        s_nativeHud = gta1::HookFirebombHud([](int& ammo) { ammo = s_ammo; return s_selected && s_ammo > 0; });
+        LOG("Brandbombe: Symbol %s", s_nativeHud ? "im HUD des Spiels" : "vom Mod gezeichnet");
     }
 
     void Tick()
@@ -331,6 +334,7 @@ namespace firebomb
     }
 
     bool Selected() { return s_selected; }
+    bool NativeHud() { return s_nativeHud; }
     int Ammo() { return s_ammo; }
     void SetAmmo(int n) { s_ammo = std::clamp(n, 0, kMaxAmmo); }
 

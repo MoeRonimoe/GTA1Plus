@@ -137,6 +137,8 @@ namespace gta1
     // Kisten: convert darf beim Aufstellen Typ und Menge ändern (x, y wie im Spiel), picked läuft, wenn ein Spieler
     // eine Kiste vom Typ 5 aufhebt (sonst passiert dabei nichts)
     bool HookCrates(void (*convert)(int& type, int& amount, int x, int y), void (*picked)(int player, int amount));
+    // Waffensymbol im HUD des Spiels: solange selected(ammo) true liefert, zeigt es statt der Faust den Kanister
+    bool HookFirebombHud(bool (*selected)(int& ammo));
     int  PlayerWeapon();           // Waffe des lokalen Spielers: 0 Faust, 1 Pistole .. 4 Flammenwerfer; -1 unbekannt
     bool PlayerHasWeapons();       // Munition für irgendeine Waffe 1..4
     int  LocalPlayerIndex();

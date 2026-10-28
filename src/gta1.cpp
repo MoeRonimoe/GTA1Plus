@@ -220,6 +220,13 @@ namespace gta1
         // ob ein Fahrzeug ein Objekt überhaupt berührt. CanPickup = Byte für 0x52, die Waffen 0x4E..0x51 stehen in
         // jeder Tabelle direkt davor und haben den Wert, den der Kanister bekommt
         uintptr_t CanPickup[4] = {};
+        // Waffensymbol im HUD: HudWeaponCall ruft HudWeaponGet(Spieler) (0 = Faust, kein Symbol), HudSwitch verteilt
+        // nach Waffe ("lea eax,[ebp-1] / cmp eax,3 / ja", HudSwitchLen Byte, danach jmp [Tabelle]). Jeder Fall setzt
+        // den Symbolindex (Waffe - 1, in ebx oder [esp+HudIndexStack]) und den Abstand der Munitionsziffern von der
+        // rechten unteren Ecke (edi, esi; Vielfache des Bytes HudScale) und springt nach HudJoin. Dort holt
+        // HudAmmoCall die Munition über HudAmmoGet(Spieler, Waffe). Danach rückt das Spiel Rüstung usw. nach unten
+        uintptr_t HudWeaponCall = 0, HudWeaponGet = 0, HudSwitch = 0, HudJoin = 0, HudScale = 0, HudAmmoCall = 0, HudAmmoGet = 0;
+        int       HudSwitchLen = 0, HudIndexStack = -1;
         uint8_t   TramContactReg = 0;
 
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
@@ -303,6 +310,8 @@ namespace gta1
         // Figur trifft Objekt 0x44D380 (Tabelle 0x44D758, Art - 6), Fahrzeug trifft Objekt 0x4399C9 (0x439FC4),
         // berühren sich zwei Dinge? 0x439180 (0x4392CC, Art - 1, und 0x439380)
         a.CanPickup[0] = 0x44D7A4; a.CanPickup[1] = 0x43A016; a.CanPickup[2] = 0x43931D; a.CanPickup[3] = 0x4393D2;
+        a.HudWeaponCall = 0x46EBAF; a.HudWeaponGet = 0x4624B0; a.HudSwitch = 0x46EBDE; a.HudSwitchLen = 8;   // HUD 0x46EB80
+        a.HudJoin = 0x46EC64; a.HudScale = 0x4C17D0; a.HudAmmoCall = 0x46EC6B; a.HudAmmoGet = 0x4624D0;   // Index in ebx
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
@@ -548,6 +557,9 @@ namespace gta1
         // Figur trifft Objekt 0x459130 (Tabelle 0x459378), Fahrzeug trifft Objekt 0x410880 (0x410D50), berühren
         // sich zwei Dinge? Tabellen 0x410188 (Art - 1) und 0x410214
         a.CanPickup[0] = 0x4593C4; a.CanPickup[1] = 0x410DA2; a.CanPickup[2] = 0x4101D9; a.CanPickup[3] = 0x410266;
+        a.HudWeaponCall = 0x4841B7; a.HudWeaponGet = 0x461AC0; a.HudSwitch = 0x4841E4; a.HudSwitchLen = 12;  // HUD 0x484190
+        a.HudJoin = 0x48428A; a.HudScale = 0x785160; a.HudAmmoCall = 0x484292; a.HudAmmoGet = 0x461AE0;
+        a.HudIndexStack = 0x10;
         // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
         // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
         a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
@@ -2163,6 +2175,79 @@ namespace gta1
                hooks::WriteMemory(reinterpret_cast<void*>(A.CrateOpenSlot), &openTarget, sizeof(openTarget));
         for (int i = 0; i < 4 && s_ok; ++i)
             s_ok = hooks::WriteMemory(reinterpret_cast<void*>(A.CanPickup[i]), &weaponCase[i], 1);
+        return s_ok;
+    }
+
+    namespace
+    {
+        bool (*s_hudFirebomb)(int&) = nullptr;
+
+        // Für das HUD steht die gewählte Brandbombe als Waffe 5 statt der Faust, die das Spiel weiter benutzt
+        int32_t __cdecl HudWeaponHook(int32_t player)
+        {
+            const int32_t weapon = reinterpret_cast<int32_t(__cdecl*)(int32_t)>(A.HudWeaponGet)(player);
+            int ammo;
+            return weapon == 0 && player == LocalPlayerIndex() && s_hudFirebomb && s_hudFirebomb(ammo) ? 5 : weapon;
+        }
+
+        int32_t __cdecl HudAmmoHook(int32_t player, int32_t weapon)
+        {
+            int ammo = 0;
+            if (weapon == 5)
+                return s_hudFirebomb && s_hudFirebomb(ammo) ? ammo : 0;
+            return reinterpret_cast<int32_t(__cdecl*)(int32_t, int32_t)>(A.HudAmmoGet)(player, weapon);
+        }
+    }
+
+    bool HookFirebombHud(bool (*selected)(int& ammo))
+    {
+        s_hudFirebomb = selected;
+        static bool s_tried = false, s_ok = false;
+        if (s_tried)
+            return s_ok;
+        s_tried = true;
+        if (!s_supported || !A.HudWeaponCall || !A.HudSwitch || !A.HudJoin || !A.HudScale || !A.HudAmmoCall)
+            return false;
+        // "lea eax,[ebp-1] / cmp eax,3", dann ja kurz (1.0.0.1) oder lang (Classics) und jmp [eax*4+Tabelle]
+        const uint8_t* sw = reinterpret_cast<const uint8_t*>(A.HudSwitch);
+        const int len = A.HudSwitchLen;
+        uintptr_t invalid = 0;
+        if (memcmp(sw, "\x8D\x45\xFF\x83\xF8\x03", 6) != 0)
+            return false;
+        if (len == 8 && sw[6] == 0x77)
+            invalid = A.HudSwitch + 8 + static_cast<int8_t>(sw[7]);
+        else if (len == 12 && sw[6] == 0x0F && sw[7] == 0x87)
+            invalid = A.HudSwitch + 12 + *reinterpret_cast<const int32_t*>(sw + 8);
+        if (!invalid || sw[len] != 0xFF || sw[len + 1] != 0x24)
+            return false;
+        uint8_t* stub = AllocStub(64);
+        if (!stub)
+            return false;
+        // Waffe 5: Symbol 4 (der Kanister folgt in der Style-Datei auf die vier Waffen), Ziffern an der rechten Kante
+        Emitter e{ stub };
+        const uint8_t canLen = A.HudIndexStack >= 0 ? 26 : 23;
+        e.Byte(0x83); e.Byte(0xFD); e.Byte(0x05);                         // cmp ebp,5
+        e.Byte(0x75); e.Byte(canLen);                                     // jne: wie das Spiel
+        if (A.HudIndexStack >= 0)
+        {
+            e.Byte(0xC7); e.Byte(0x44); e.Byte(0x24); e.Byte(static_cast<uint8_t>(A.HudIndexStack));
+            e.Dword(4);                                                   // mov dword ptr [esp+n],4
+        }
+        else
+        {
+            e.Byte(0xBB); e.Dword(4);                                     // mov ebx,4
+        }
+        e.Byte(0x0F); e.Byte(0xB6); e.Byte(0x05); e.Dword(static_cast<uint32_t>(A.HudScale));   // movzx eax,byte ptr [Maßstab]
+        e.Byte(0x8D); e.Byte(0x34); e.Byte(0xC0);                         // lea esi,[eax+eax*8]
+        e.Byte(0x8D); e.Byte(0x3C); e.Byte(0x00);                         // lea edi,[eax+eax]
+        e.Byte(0xE9); e.Rel32(A.HudJoin);
+        e.Bytes(sw, 6);                                                   // lea / cmp
+        e.Byte(0x0F); e.Byte(0x87); e.Rel32(invalid);                     // ja
+        e.Byte(0xE9); e.Rel32(A.HudSwitch + len);                         // jmp [eax*4+Tabelle]
+        // Erst die Verteilung, dann die Munition, zuletzt die Waffe: vorher sieht das HUD nie eine 5
+        s_ok = PatchJump(A.HudSwitch, 0xE9, stub, len) &&
+               Redirect(A.HudAmmoCall, 0xE8, A.HudAmmoGet, reinterpret_cast<void*>(&HudAmmoHook)) &&
+               Redirect(A.HudWeaponCall, 0xE8, A.HudWeaponGet, reinterpret_cast<void*>(&HudWeaponHook));
         return s_ok;
     }
 
