@@ -35,6 +35,8 @@ namespace options
             { Type::Bool, text::OptMinimapOnStart, &g_cfg.minimapOnStart },
             { Type::Choice, text::OptMinimapCorner, &g_cfg.minimapCorner, false, 0, 3, 1,
               { text::CornerBottomLeft, text::CornerBottomRight, text::CornerTopLeft, text::CornerTopRight } },
+            { Type::Int, text::OptMinimapSize, &g_cfg.minimapSize, false, 16, 40, 2 },
+            { Type::Int, text::OptMinimapZoom, &g_cfg.minimapZoom, false, 50, 200, 25 },
             { Type::Bool, text::OptGps, &g_cfg.gps },
             { Type::Bool, text::OptGpsArrow, &g_cfg.gpsArrow },
             { Type::Bool, text::OptWaypoints, &g_cfg.waypoints },

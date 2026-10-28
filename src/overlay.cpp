@@ -18,6 +18,7 @@
 #include "tiltcam.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstring>
 #include <cwchar>
@@ -118,6 +119,9 @@ namespace overlay
 
         bool  g_minimap = false;
         std::vector<uint32_t> g_miniBuf;
+        float g_miniY = 0;                 // Lage der Minimap (oberer Rand), gleitet zu g_miniGoal
+        int   g_miniGoal = 0, g_miniLayout = -1;
+        DWORD g_miniTick = 0, g_miniCalmSince = 0;
         DWORD g_hintStart = 0;
         bool  g_warnedFormat = false;
         int   g_screenW = 0, g_screenH = 0;
@@ -1696,6 +1700,75 @@ namespace overlay
             c.Composite(v, x, y, bw, bh);
         }
 
+        // Die Minimap weicht dem HUD des Spiels aus: in den oberen Ecken nach unten (Waffe, Rüstung, Zeitanzeigen),
+        // in den unteren nach oben (Missionstexte). Belegt ist, was das HUD im letzten Bild gezeichnet hat; bekannt
+        // nur, solange es über die HUD-Vergrößerung läuft, sonst bleibt sie in der Ecke. Ergebnis: oberer Rand.
+        int FreeMinimapY(const SurfaceView& v, int x, int home, int S, int m)
+        {
+            const bool down = home < v.height / 2;
+            const int gap = std::max(4, v.height / 100);
+            hudscale::Watch(x - 2 * gap, x + S + 2 * gap);   // für das nächste Bild
+            hudscale::Coverage hud;
+            if (!hudscale::LastCoverage(hud) || hud.width != v.width || hud.height != v.height)
+                return home;
+            const float R = S * 0.5f + gap, cell = (float)hud.cellPx;
+            int y = home;
+            for (int pass = 0; pass < 8; ++pass)
+            {
+                // Belegte Zellen, die den Kreis (samt Abstand) berühren: oberster und unterster Rand
+                const float cx = x + S * 0.5f, cy = y + S * 0.5f;
+                const int c0 = std::max(0, (int)((cx - R) / cell)), c1 = std::min(hud.cols - 1, (int)((cx + R) / cell));
+                const int r0 = std::max(0, (int)((cy - R) / cell)), r1 = std::min(hud.rows - 1, (int)((cy + R) / cell));
+                int top = INT_MAX, bottom = INT_MIN;
+                for (int r = r0; r <= r1; ++r)
+                    for (int c = c0; c <= c1; ++c)
+                    {
+                        if (!hud.cells[r * hud.cols + c])
+                            continue;
+                        const float dx = std::clamp(cx, c * cell, (c + 1) * cell) - cx;
+                        const float dy = std::clamp(cy, r * cell, (r + 1) * cell) - cy;
+                        if (dx * dx + dy * dy >= R * R)
+                            continue;
+                        top = std::min(top, (int)(r * cell));
+                        bottom = std::max(bottom, (int)((r + 1) * cell));
+                    }
+                if (top == INT_MAX)
+                    return y;
+                y = down ? bottom + gap : top - gap - S;
+                if (y < m || y > v.height - m - S)
+                    break;                          // kein Platz frei: in der Ecke bleiben
+            }
+            return home;
+        }
+
+        // Weg von der Ecke sofort, zurück erst nach einer Weile ohne Bedarf: sonst springt sie beim Waffenwechsel
+        int MinimapY(const SurfaceView& v, int x, int home, int S, int m)
+        {
+            const int goal = FreeMinimapY(v, x, home, S, m);
+            const DWORD now = GetTickCount();
+            const int layout = g_cfg.minimapCorner + 4 * (S + 4096 * v.height);
+            if (layout != g_miniLayout)
+            {
+                g_miniLayout = layout;
+                g_miniY = (float)(g_miniGoal = goal);
+                g_miniTick = g_miniCalmSince = now;
+                return goal;
+            }
+            if (std::abs(goal - home) >= std::abs(g_miniGoal - home))
+            {
+                g_miniGoal = goal;
+                g_miniCalmSince = now;
+            }
+            else if (now - g_miniCalmSince >= 1500)
+                g_miniGoal = goal;
+            const float dt = std::min(0.1f, (now - g_miniTick) / 1000.0f);
+            g_miniTick = now;
+            g_miniY += (g_miniGoal - g_miniY) * (1.0f - std::exp(-dt * 12.0f));
+            if (std::abs(g_miniGoal - g_miniY) < 0.5f)
+                g_miniY = (float)g_miniGoal;
+            return (int)std::lround(g_miniY);
+        }
+
         void DrawMinimap(SurfaceView& v, const gta1::Player& p)
         {
             EnsureMap();
@@ -1704,14 +1777,15 @@ namespace overlay
 
             Canvas& c = g_canvas;
             const int H = v.height, W = v.width;
-            const int S = std::max(64, H * 26 / 100);
+            const int S = std::max(64, H * g_cfg.minimapSize / 100);
             const int m = std::max(6, H / 30);
             const int x = (g_cfg.minimapCorner & 1) ? W - m - S : m;
-            int y = (g_cfg.minimapCorner & 2) ? m : H - m - S;
+            int home = (g_cfg.minimapCorner & 2) ? m : H - m - S;
             if (g_cfg.minimapCorner == 3 && g_cfg.hearts) // oben rechts: unter Punktestand und Herzen
-                y = std::max(y, (int)((kHeartTop + kHeartSize) * hudscale::Factor()) + 8);
+                home = std::max(home, (int)((kHeartTop + kHeartSize) * hudscale::Factor()) + 8);
+            const int y = MinimapY(v, x, home, S, m);
             const float R = S * 0.5f, cx = x + R, cy = y + R;
-            const float ppb = S / 30.0f;
+            const float ppb = S * g_cfg.minimapZoom / 3000.0f;   // 100 % = 30 Blöcke im Durchmesser
 
             c.BeginLayer(x - 2, y - 2, S + 4, S + 4);
             g_miniBuf.resize((size_t)S * S);

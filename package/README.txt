@@ -87,7 +87,10 @@ GPS AND MINIMAP
   - A route along the roads to your waypoint or the current mission target,
     on the map and on the minimap.
   - A blue arrow at the top of the screen points to the next turn.
-  - Round minimap (key N), in a screen corner of your choice.
+  - Round minimap (key N), in a screen corner of your choice; size and
+    zoom in the pause menu. It moves aside for the game's own display in
+    its corner (weapon and armour at the top, mission messages at the
+    bottom).
 
 SAVE GAMES
   - One save per level and character.

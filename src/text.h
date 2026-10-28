@@ -142,6 +142,8 @@ namespace text
         OptTrams,
         OptFirebomb,
         FirebombPicked,
+        OptMinimapSize,
+        OptMinimapZoom,
         Count
     };
 

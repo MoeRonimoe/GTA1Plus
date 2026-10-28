@@ -21,7 +21,7 @@ namespace text
             L"HintBurning", L"PadJumpButton", L"KeySpace",
             L"MenuBriefings", L"MenuSave", L"MenuLoad", L"MenuOptions", L"OptOn", L"OptOff", L"OptRestart", L"OptGroupDisplay", L"OptGroupControls", L"OptGroupCamera", L"OptGroupGameplay", L"OptGroupOther", L"OptMinimap", L"OptMinimapOnStart", L"OptHint", L"OptGps", L"OptGpsArrow", L"OptWaypoints", L"OptHearts", L"OptMapStyle", L"OptMinimapCorner", L"OptPauseGame", L"OptTwinStick", L"OptAlwaysAim", L"OptWasdDriving", L"OptController", L"OptCamera", L"OptCameraMouseVehicle", L"OptRangeFoot", L"OptRangeVehicle", L"OptDeadZone", L"OptSteady", L"OptKeepMultiplier", L"OptAllCharacters", L"OptQuickRetry", L"OptExtinguish", L"OptPortraitColors", L"OptAutosave", L"OptLanguage", L"OptShowInfo", L"CornerBottomLeft", L"CornerBottomRight", L"CornerTopLeft", L"CornerTopRight", L"LanguageAuto", L"HelpOptions", L"BriefingsEmpty", L"HelpBriefings", L"SaveDone", L"SaveBlocked", L"SaveFailed", L"LoadTitle", L"LoadText", L"LoadDone", L"LoadFailed", L"NoSave", L"AutoSaved", L"SaveSlotInfo", L"StartLoadTitle", L"StartLoadText", L"OptTilt", L"OptTiltAngle", L"OptTiltRotate", L"TiltAlways", L"OptVehicleView", L"OptTrafficRange", L"ViewGame", L"ViewHigh", L"ViewHigher", L"ViewMax", L"OptPois", L"PoiSpray", L"PoiBombShop", L"PoiCrane", L"OptPistolDamage", L"OptMachineGunDamage", L"OptPunchDamage", L"OptRumble", L"MenuProgress", L"HelpProgress", L"ProgScore", L"ProgMissions", L"ProgSecrets", L"ProgLives", L"ProgMultiplier", L"ProgUnavailable", L"OptHudScale", L"HudScaleAuto", L"OptNoPostCollision",
             L"OptSteerAssist", L"AssistGentle", L"AssistMedium", L"AssistStrong", L"OptFootView", L"LevelStarting", L"OptWalkToCrosshair", L"OptExtraMissionTime",
-            L"OnFootOnly", L"OptTrams", L"OptFirebomb", L"FirebombPicked",
+            L"OnFootOnly", L"OptTrams", L"OptFirebomb", L"FirebombPicked", L"OptMinimapSize", L"OptMinimapZoom",
         };
 
         struct LangTable
@@ -140,6 +140,7 @@ namespace text
                 L"Speichern und Laden nur zu Fuß – bitte erst aussteigen",
                 L"Straßenbahnen in San Andreas",
                 L"Brandbombe (gestrichene Waffe)", L"Brandbomben!",
+                L"Größe der Minimap", L"Zoom der Minimap",
             } },
             { L"en", {
                 L"PAUSED", L"Resume", L"Map & waypoints", L"Map", L"Quit level",
@@ -250,6 +251,7 @@ namespace text
                 L"Saving and loading only on foot – get out of the vehicle first",
                 L"Trams in San Andreas",
                 L"Firebomb (cut weapon)", L"Firebombs!",
+                L"Minimap size", L"Minimap zoom",
             } },
             { L"fr", {
                 L"PAUSE", L"Reprendre", L"Carte et repères", L"Carte", L"Quitter le niveau",
@@ -360,6 +362,7 @@ namespace text
                 L"Sauvegarde et chargement uniquement à pied – descendez d'abord du véhicule",
                 L"Tramways à San Andreas",
                 L"Bombe incendiaire (arme supprimée)", L"Bombes incendiaires !",
+                L"Taille mini-carte", L"Zoom mini-carte",
             } },
             { L"it", {
                 L"PAUSA", L"Riprendi", L"Mappa e segnaposti", L"Mappa", L"Esci dal livello",
@@ -470,6 +473,7 @@ namespace text
                 L"Salvare e caricare solo a piedi – scendi prima dal veicolo",
                 L"Tram a San Andreas",
                 L"Bomba incendiaria (arma tagliata)", L"Bombe incendiarie!",
+                L"Dimensione minimappa", L"Zoom minimappa",
             } },
         };
         constexpr int kBuiltinCount = sizeof(kBuiltin) / sizeof(kBuiltin[0]);

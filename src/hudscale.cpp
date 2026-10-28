@@ -26,6 +26,16 @@ namespace hudscale
         int      s_factor = 1;
         int      s_height = 0;           // Bildhöhe des Spiels, zuletzt gesehen
 
+        // Belegung durch das HUD: je Zelle von kCell x kCell Pixeln des kleinen Bilds, ob sich darin etwas geändert hat
+        constexpr int kCell = 8;
+        std::vector<uint8_t> s_cells;
+        int      s_cellCols = 0, s_cellRows = 0, s_coverWidth = 0, s_coverHeight = 0;
+        bool     s_covered = false;      // im letzten Bild ermittelt
+        // Ohne Vergrößerung nur im Streifen, den die Minimap braucht: vorher/nachher vergleichen
+        int      s_watchX0 = 0, s_watchX1 = 0;
+        DWORD    s_watchTick = 0;
+        std::vector<uint8_t> s_strip;
+
         int AutoFor(int height)
         {
             // So groß wie auf dem Bild, für das das HUD gemacht ist (640x480): nach dem Vergrößern soll es wieder
@@ -90,6 +100,9 @@ namespace hudscale
         {
             const int bytes = real.bytesPerPixel;
             const size_t rowBytes = (size_t)width * bytes;
+            s_cellCols = (width + kCell - 1) / kCell;
+            s_cellRows = (rows + kCell - 1) / kCell;
+            s_cells.assign((size_t)s_cellCols * s_cellRows, 0);
             for (int y = 0; y < rows; ++y)
             {
                 const uint8_t* src = s_layer + (size_t)y * s_layerPitch;
@@ -114,6 +127,9 @@ namespace hudscale
                     const int count = std::min((x - from) * factor, real.width - outX);
                     if (x == from || count <= 0)
                         continue;
+                    uint8_t* cellRow = &s_cells[(size_t)(y / kCell) * s_cellCols];
+                    for (int c = from / kCell; c <= (x - 1) / kCell; ++c)
+                        cellRow[c] = 1;
 
                     uint8_t* wide = s_wide.data();
                     if (bytes == 4)
@@ -141,9 +157,48 @@ namespace hudscale
             }
         }
 
+        // HUD in Originalgröße; dabei die Belegung im beobachteten Streifen festhalten
+        void DrawWatched(const gta1::DrawBuffer& real, void (*drawHud)())
+        {
+            const int x0 = std::clamp(s_watchX0, 0, real.width), x1 = std::clamp(s_watchX1, x0, real.width);
+            if (x1 <= x0 || GetTickCount() - s_watchTick > 500 || !ddhook::FastToRead(real.bits))
+            {
+                drawHud();
+                return;
+            }
+            const int bytes = real.bytesPerPixel;
+            const size_t span = (size_t)(x1 - x0) * bytes;
+            s_strip.resize(span * real.height);
+            for (int y = 0; y < real.height; ++y)
+                memcpy(&s_strip[y * span], real.bits + (size_t)y * real.pitch + (size_t)x0 * bytes, span);
+            drawHud();
+            s_cellCols = (real.width + kCell - 1) / kCell;
+            s_cellRows = (real.height + kCell - 1) / kCell;
+            s_cells.assign((size_t)s_cellCols * s_cellRows, 0);
+            for (int y = 0; y < real.height; ++y)
+            {
+                const uint8_t* before = &s_strip[y * span];
+                const uint8_t* after = real.bits + (size_t)y * real.pitch + (size_t)x0 * bytes;
+                if (memcmp(before, after, span) == 0)
+                    continue;
+                uint8_t* cellRow = &s_cells[(size_t)(y / kCell) * s_cellCols];
+                for (int c = x0 / kCell; c * kCell < x1; ++c)
+                {
+                    const int from = std::max(x0, c * kCell), to = std::min(x1, (c + 1) * kCell);
+                    const size_t at = (size_t)(from - x0) * bytes;
+                    if (!cellRow[c] && memcmp(before + at, after + at, (size_t)(to - from) * bytes) != 0)
+                        cellRow[c] = 1;
+                }
+            }
+            s_covered = true;
+            s_coverWidth = real.width;
+            s_coverHeight = real.height;
+        }
+
         void Draw(void (*drawHud)())
         {
             s_factor = 1;
+            s_covered = false;
             gta1::DrawBuffer real;
             if (!gta1::GetDrawBuffer(real))
             {
@@ -151,10 +206,10 @@ namespace hudscale
                 return;
             }
             s_height = real.height;
-            const int factor = g_cfg.hudScale > 0 ? g_cfg.hudScale : AutoFor(real.height);
+            const int factor = !gta1::CanRedirectHud() ? 1 : g_cfg.hudScale > 0 ? g_cfg.hudScale : AutoFor(real.height);
             if (factor < 2 || real.bytesPerPixel < 2 || real.bytesPerPixel > 4)
             {
-                drawHud();
+                DrawWatched(real, drawHud);
                 return;
             }
             // Die Kopie des Weltbilds liest aus dem Bild des Spiels; liegt es im Grafikspeicher, dauert das zu lange
@@ -170,7 +225,7 @@ namespace hudscale
             const int width = (real.width + factor - 1) / factor, rows = (real.height + factor - 1) / factor;
             if (!EnsureLayer(real, width, rows, factor))
             {
-                drawHud();
+                DrawWatched(real, drawHud);
                 return;
             }
 
@@ -187,6 +242,9 @@ namespace hudscale
             Composite(real, width, rows, factor);
             QueryPerformanceCounter(&t3);
             s_factor = factor;
+            s_covered = true;
+            s_coverWidth = real.width;
+            s_coverHeight = real.height;
 
             // Aufwand festhalten: einmal nach dem Start, mit der Debug-Anzeige laufend
             static LONGLONG s_spent = 0;
@@ -206,13 +264,28 @@ namespace hudscale
 
     void Init()
     {
+        gta1::SetHudDrawer(&Draw);   // auch ohne Vergrößerung: Belegung für die Minimap
         if (!gta1::CanRedirectHud())
             return;
-        gta1::SetHudDrawer(&Draw);
         LOG("HUD-Größe: einstellbar (%s)", g_cfg.hudScale > 0 ? "fester Faktor" : "automatisch nach Bildhöhe");
     }
 
     bool Available() { return gta1::CanRedirectHud(); }
     int Factor() { return s_factor; }
     int AutoFactor() { return s_height > 0 ? AutoFor(s_height) : 1; }
+
+    void Watch(int x0, int x1)
+    {
+        s_watchX0 = x0;
+        s_watchX1 = x1;
+        s_watchTick = GetTickCount();
+    }
+
+    bool LastCoverage(Coverage& out)
+    {
+        if (!s_covered || s_cells.empty())
+            return false;
+        out = { s_cells.data(), s_cellCols, s_cellRows, kCell * s_factor, s_coverWidth, s_coverHeight };
+        return true;
+    }
 }

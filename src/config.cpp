@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 27;
+static const int kConfigVersion = 28;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=27\r\n"
+    "Version=28\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -185,6 +185,10 @@ static const char kDefaultIni[] =
     "Style=0\r\n"
     "; Minimap position: 0 = bottom left, 1 = bottom right, 2 = top left, 3 = top right\r\n"
     "MinimapCorner=0\r\n"
+    "; Minimap diameter in percent of the screen height (16 to 40)\r\n"
+    "MinimapSize=26\r\n"
+    "; Minimap zoom in percent: 100 = 30 blocks across, 200 = 15, 50 = 60 (50 to 200)\r\n"
+    "MinimapZoom=100\r\n"
     "; Pause the game while the menu is open\r\n"
     "PauseGame=1\r\n"
     "\r\n"
@@ -294,6 +298,8 @@ namespace
         { L"Language", L"Language",       Kind::String, g_cfg.language,      nullptr, nullptr },
         { L"Map",      L"Style",          Kind::Int,  &g_cfg.mapStyle,       L"Overlay", L"MapStyle" },
         { L"Map",      L"MinimapCorner",  Kind::Int,  &g_cfg.minimapCorner,  L"Overlay", L"MinimapCorner" },
+        { L"Map",      L"MinimapSize",    Kind::Int,  &g_cfg.minimapSize,    nullptr, nullptr },
+        { L"Map",      L"MinimapZoom",    Kind::Int,  &g_cfg.minimapZoom,    nullptr, nullptr },
         { L"Map",      L"PauseGame",      Kind::Bool, &g_cfg.pauseGame,      L"Overlay", L"PauseGame" },
         { L"Display",  L"FrameBuffer",    Kind::Bool, &g_cfg.frameBuffer,    nullptr, nullptr },
         { L"Display",  L"ScaleMenu",      Kind::Bool, &g_cfg.scaleMenu,      nullptr, nullptr },
@@ -391,6 +397,8 @@ void LoadConfig(const wchar_t* ini)
             Parse(s, buf);
     }
     g_cfg.minimapCorner &= 3;
+    g_cfg.minimapSize = std::clamp(g_cfg.minimapSize, 16, 40);
+    g_cfg.minimapZoom = std::clamp(g_cfg.minimapZoom, 50, 200);
     g_cfg.mapStyle = g_cfg.mapStyle ? 1 : 0;
     g_cfg.cameraRangeFoot = std::clamp(g_cfg.cameraRangeFoot, 0, 90);
     g_cfg.cameraRangeVehicle = std::clamp(g_cfg.cameraRangeVehicle, 0, 90);

@@ -70,6 +70,8 @@ struct Config
     // [Map]
     int  mapStyle       = 0;     // 0 Texturen, 1 Schema
     int  minimapCorner  = 0;     // 0 unten links, 1 unten rechts, 2 oben links, 3 oben rechts
+    int  minimapSize    = 26;    // Durchmesser in Prozent der Bildhöhe
+    int  minimapZoom    = 100;   // 100 = 30 Blöcke im Durchmesser, 200 = halb so viele
     bool pauseGame      = true;
 
     // [Display]

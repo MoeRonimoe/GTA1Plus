@@ -10,7 +10,7 @@ A mod for the original **Grand Theft Auto** (1997, Windows) that adds modern com
 - **Progress**: one page in the pause menu with the figures the game otherwise only flips through one at a time on its own pause screen – score against the level's target, missions passed, secrets found – plus lives and multiplier.
 - **In-game options**: the "GTA1Plus options" page of the pause menu changes the settings and writes them to `GTA1Plus.ini`. Settings marked with * take effect after a restart.
 - **GPS**: a route to the waypoint or mission target on the map and minimap, plus a direction arrow at the top of the screen. Routes prefer roads.
-- **Minimap**: a round minimap in a screen corner of your choice.
+- **Minimap**: a round minimap in a screen corner of your choice, with adjustable size and zoom (`[Map] MinimapSize`, `MinimapZoom`, also in the pause menu). It makes way for the game's own HUD in its corner: below the weapon, armour and timers at the top, above mission messages at the bottom. It moves away at once and comes back once the space has been free for a moment, so it does not jump while you cycle weapons.
 - **Places on the map**: paint shops, bomb shops and car cranes are shown as icons on the map and minimap, with a legend. They are read from the level's mission script, so they also work in London.
 - **Twin-stick controls**: WASD movement and mouse aiming on foot, optional strafing (always face the crosshair), and WASD driving. Optionally the keys work from the character's point of view: W walks towards the crosshair, S away from it, A and D sideways around it (`[Features] WalkToCrosshair`, also in the pause menu).
 - **Controllers**: Xbox (XInput) and PS4/PS5 or other DirectInput pads, in levels and in the main menu.
