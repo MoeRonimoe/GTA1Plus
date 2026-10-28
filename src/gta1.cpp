@@ -190,6 +190,8 @@ namespace gta1
         // sie aber beim Anlegen und in jedem Bild mit je einem "je" (6 Byte, TramSkipInit / TramSkipUpdate). Die Gleis-
         // und Zuglogik fragt Blöcke über BlockQuery(x, y, z) ab (typeMap | typeMapExt << 16), Aufruf an BlockQueryCall.
         uintptr_t TramSkipInit = 0, TramSkipUpdate = 0, BlockQuery = 0, BlockQueryCall = 0;
+        // Byte 0x0C ("an Station angekommen"): Folgezustand, wenn die Bahn vor einem Hindernis bremst
+        uintptr_t TramObstacleNext = 0;
 
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
         uintptr_t TextBuffer = 0;     // char*: "[Schlüssel]Text\0..." bis "[]"
@@ -261,6 +263,7 @@ namespace gta1
         a.MapColumns = 0x5F395C; a.MapBlocks = 0x5F18E4;
         a.TramSkipInit = 0x45E173; a.TramSkipUpdate = 0x45EDCD;   // Züge anlegen 0x45E0A0, jedes Bild 0x45ED80
         a.BlockQuery = 0x428A20; a.BlockQueryCall = 0x437137;      // in der Abfrage 0x4370C0 (Gleis-Suchlauf 0x432A00)
+        a.TramObstacleNext = 0x4611E6;                             // mov ecx,0Ch in 0x461100
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
@@ -493,6 +496,7 @@ namespace gta1
         a.MapColumns = 0x5C2C70; a.MapBlocks = 0x5C0BFC;
         a.TramSkipInit = 0x46B2F7; a.TramSkipUpdate = 0x46BDA2;   // Züge anlegen, jedes Bild (Datensätze 0x7514A8)
         a.BlockQuery = 0x438900; a.BlockQueryCall = 0x44B387;      // in der Abfrage 0x44B310
+        a.TramObstacleNext = 0x46DE47;                             // mov byte [Bahn+9],0Ch
         // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
         // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
         a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
@@ -1556,6 +1560,10 @@ namespace gta1
     // mit eigenem Zug (Wert 7). Ein Zug fährt erst los, wenn die nächste Station frei ist: die linke Schleife hat vier
     // Stationen und vier Bahnen und stünde für immer. Die zweite der beiden dicht hintereinander liegenden Stationen
     // bekommt deshalb keinen eigenen Zug.
+    // Vor einem Fahrzeug auf dem Gleis bremst die Bahn wie vor einer Station: danach steigen Fahrgäste aus, und sie
+    // reserviert die nächste Station, obwohl sie die aktuelle gar nicht erreicht hat. Nach ein paar solchen Halten
+    // wartet sie auf eine Station, die eine andere Bahn hält, und beide stehen für immer. Der Mod lässt sie nach dem
+    // Bremsen stattdessen wieder fahren (Zustand 3): sie steht, solange das Hindernis zwei Blöcke voraus ist.
     namespace
     {
         bool s_trams = false;
@@ -1599,7 +1607,10 @@ namespace gta1
         }
     }
 
-    bool TramsAvailable() { return s_supported && A.TramSkipInit && A.TramSkipUpdate && A.BlockQuery && A.BlockQueryCall; }
+    bool TramsAvailable()
+    {
+        return s_supported && A.TramSkipInit && A.TramSkipUpdate && A.BlockQuery && A.BlockQueryCall && A.TramObstacleNext;
+    }
 
     bool SetTrams(bool on)
     {
@@ -1616,6 +1627,10 @@ namespace gta1
             s_hooked = true;
         }
         if (!SetJumpSkipped(A.TramSkipInit, on, s_init) || !SetJumpSkipped(A.TramSkipUpdate, on, s_update))
+            return false;
+        uint8_t* next = reinterpret_cast<uint8_t*>(A.TramObstacleNext);
+        const uint8_t state = on ? 3 : 0x0C;
+        if ((*next != 0x0C && *next != 3) || !hooks::WriteMemory(next, &state, 1))
             return false;
         s_trams = on;
         s_applied = true;
