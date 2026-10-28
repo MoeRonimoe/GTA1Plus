@@ -192,6 +192,16 @@ namespace gta1
         uintptr_t TramSkipInit = 0, TramSkipUpdate = 0, BlockQuery = 0, BlockQueryCall = 0;
         // Byte 0x0C ("an Station angekommen"): Folgezustand, wenn die Bahn vor einem Hindernis bremst
         uintptr_t TramObstacleNext = 0;
+        // Bremsen vor einem Hindernis: TramBrakeLen Byte ohne relative Operanden (Zustand, Folgezustand, Ende der
+        // Objektliste); TramBrakeReg = Register mit dem Abstand des Bahn-Datensatzes (Datensätze je TramStride Byte),
+        // eax = Eintrag der Objektliste (Byte 0: Art, 1 = Fahrzeug)
+        uintptr_t TramBrake = 0;
+        int       TramBrakeLen = 0, TramStride = 0;
+        uint8_t   TramBrakeReg = 0;
+        // Berührt ein Wagen ein Fahrzeug, halbiert das Spiel sein Tempo (Datensatz +4): "shr al,1 / mov [reg+..],al"
+        // (8 Byte) an TramContact, TramContactReg = Register mit dem Abstand des Datensatzes ab TramRecords
+        uintptr_t TramRecords = 0, TramContact = 0;
+        uint8_t   TramContactReg = 0;
 
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
         uintptr_t TextBuffer = 0;     // char*: "[Schlüssel]Text\0..." bis "[]"
@@ -264,6 +274,8 @@ namespace gta1
         a.TramSkipInit = 0x45E173; a.TramSkipUpdate = 0x45EDCD;   // Züge anlegen 0x45E0A0, jedes Bild 0x45ED80
         a.BlockQuery = 0x428A20; a.BlockQueryCall = 0x437137;      // in der Abfrage 0x4370C0 (Gleis-Suchlauf 0x432A00)
         a.TramObstacleNext = 0x4611E6;                             // mov ecx,0Ch in 0x461100
+        a.TramBrake = 0x4611F9; a.TramBrakeLen = 16; a.TramBrakeReg = 3; a.TramStride = 1407;   // ebx
+        a.TramRecords = 0x655450; a.TramContact = 0x46070C; a.TramContactReg = 7;               // edi, in 0x460630
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
@@ -497,6 +509,8 @@ namespace gta1
         a.TramSkipInit = 0x46B2F7; a.TramSkipUpdate = 0x46BDA2;   // Züge anlegen, jedes Bild (Datensätze 0x7514A8)
         a.BlockQuery = 0x438900; a.BlockQueryCall = 0x44B387;      // in der Abfrage 0x44B310
         a.TramObstacleNext = 0x46DE47;                             // mov byte [Bahn+9],0Ch
+        a.TramBrake = 0x46DE3A; a.TramBrakeLen = 17; a.TramBrakeReg = 6; a.TramStride = 1480;   // esi
+        a.TramRecords = 0x7514A8; a.TramContact = 0x46D3E4; a.TramContactReg = 6;               // esi
         // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
         // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
         a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
@@ -1564,6 +1578,14 @@ namespace gta1
     // reserviert die nächste Station, obwohl sie die aktuelle gar nicht erreicht hat. Nach ein paar solchen Halten
     // wartet sie auf eine Station, die eine andere Bahn hält, und beide stehen für immer. Der Mod lässt sie nach dem
     // Bremsen stattdessen wieder fahren (Zustand 3): sie steht, solange das Hindernis zwei Blöcke voraus ist.
+    // Die Gleise liegen auf der Randspur, wo das Spiel auch Autos abstellt; davor stünde die Bahn für immer. Steht ihr
+    // dasselbe Fahrzeug länger als kTramPatience im Weg, fährt sie hindurch und zerstört es (wie in Kurven, wo sie
+    // Fahrzeuge gar nicht sieht). An einer roten Ampel sind die Autos bis dahin weitergefahren.
+    // Ein Fahrzeug näher als zwei Blöcke (Stau, Einscherer) sieht die Prüfung nicht; berührt die Bahn es, halbiert das
+    // Spiel in jedem Bild ihr Tempo, und sie kommt nie wieder in Fahrt. Nach derselben Geduld halbiert der Mod nicht
+    // mehr: die Bahn beschleunigt und schiebt das Fahrzeug weg oder zerstört es.
+    static bool SetTramBrake(bool on);
+    static bool SetTramContact(bool on);
     namespace
     {
         bool s_trams = false;
@@ -1609,7 +1631,8 @@ namespace gta1
 
     bool TramsAvailable()
     {
-        return s_supported && A.TramSkipInit && A.TramSkipUpdate && A.BlockQuery && A.BlockQueryCall && A.TramObstacleNext;
+        return s_supported && A.TramSkipInit && A.TramSkipUpdate && A.BlockQuery && A.BlockQueryCall && A.TramObstacleNext &&
+               A.TramBrake && A.TramStride && A.TramRecords && A.TramContact;
     }
 
     bool SetTrams(bool on)
@@ -1626,11 +1649,8 @@ namespace gta1
                 return false;
             s_hooked = true;
         }
-        if (!SetJumpSkipped(A.TramSkipInit, on, s_init) || !SetJumpSkipped(A.TramSkipUpdate, on, s_update))
-            return false;
-        uint8_t* next = reinterpret_cast<uint8_t*>(A.TramObstacleNext);
-        const uint8_t state = on ? 3 : 0x0C;
-        if ((*next != 0x0C && *next != 3) || !hooks::WriteMemory(next, &state, 1))
+        if (!SetJumpSkipped(A.TramSkipInit, on, s_init) || !SetJumpSkipped(A.TramSkipUpdate, on, s_update) ||
+            !SetTramBrake(on) || !SetTramContact(on))
             return false;
         s_trams = on;
         s_applied = true;
@@ -1813,6 +1833,147 @@ namespace gta1
                HookAfterInstruction(A.PunchHit[1], 6, A.PunchReg[1], reinterpret_cast<void*>(&OnPunchHit)) &&
                HookAfterInstruction(A.NpcHit, n, A.NpcHitReg, reinterpret_cast<void*>(&OnNpcHit));
         return s_ok;
+    }
+
+    // ---- Straßenbahn: Geduld vor Hindernissen ----
+
+    namespace
+    {
+        constexpr DWORD kTramPatience = 10000;   // so lange wartet eine Bahn vor einem Fahrzeug
+        struct TramWait
+        {
+            DWORD since = 0, last = 0;
+            bool logged = false;
+            // true, solange der Fall seit kTramPatience ohne Unterbrechung (Lücke über 1 s) anhält
+            bool Expired()
+            {
+                const DWORD now = GetTickCount();
+                if (now - last > 1000)
+                {
+                    since = now;
+                    logged = false;
+                }
+                last = now;
+                return now - since >= kTramPatience;
+            }
+        };
+        TramWait s_tramWait[8], s_tramContact[8];
+
+        // Aus der Bewegung eines Wagens, wenn er ein Fahrzeug berührt: Tempo halbieren wie das Spiel, außer die Bahn
+        // steckt schon zu lange fest
+        void __cdecl TramCarContact(int recordOffset)
+        {
+            uint8_t& speed = *reinterpret_cast<uint8_t*>(A.TramRecords + recordOffset + 4);
+            const int i = recordOffset / A.TramStride;
+            if (i < 0 || i >= 8 || !s_tramContact[i].Expired())
+            {
+                speed >>= 1;
+                return;
+            }
+            if (!s_tramContact[i].logged)
+            {
+                s_tramContact[i].logged = true;
+                LOG("Straßenbahn %d: steckt seit %u s an einem Fahrzeug fest - schiebt", i, kTramPatience / 1000);
+            }
+        }
+
+        // Aus dem Bremsblock, in jedem Bild für jedes Objekt zwei Blöcke voraus (Art 1 oder 6 im Kollisionsraster):
+        // true = bremsen wie das Spiel
+        bool __cdecl TramMayBrake(int recordOffset, const int8_t* entry)
+        {
+            const int i = A.TramStride ? recordOffset / A.TramStride : -1;
+            if (i < 0 || i >= 8)
+                return true;
+            TramWait& w = s_tramWait[i];
+            if (!w.Expired())
+                return true;
+            if (!w.logged)
+            {
+                w.logged = true;
+                LOG("Straßenbahn %d: Hindernis (Art %d) seit %u s im Weg - fährt durch", i, entry[0], kTramPatience / 1000);
+            }
+            return false;
+        }
+    }
+
+    // Bremsblock durch "call Sprungstück" ersetzen; das Stück fragt TramMayBrake und führt den Block dann aus, mit
+    // "fahren" (3) als Folgezustand. Steht der Folgezustand außerhalb des Blocks (1.0.0.1: mov ecx,0Ch davor), wird
+    // er im Spielcode umgestellt.
+    static bool SetTramBrake(bool on)
+    {
+        static uint8_t s_orig[24];
+        static uint8_t* s_stub = nullptr;
+        uint8_t* site = reinterpret_cast<uint8_t*>(A.TramBrake);
+        uint8_t* next = reinterpret_cast<uint8_t*>(A.TramObstacleNext);
+        const int len = A.TramBrakeLen;
+        const bool nextInside = next >= site && next < site + len;
+        if (!s_stub)
+        {
+            if (len < 5 || len > (int)sizeof(s_orig) || site[0] != 0xC6 || site[len - 3] != 0x89 || *next != 0x0C)
+                return false;
+            memcpy(s_orig, site, len);
+            s_stub = AllocStub(len + 24);
+            if (!s_stub)
+                return false;
+            Emitter e{ s_stub };
+            e.Byte(0x60);                           // pushad
+            e.Byte(0x50);                           // push eax (Eintrag der Objektliste)
+            e.Byte(0x50 + A.TramBrakeReg);          // push Abstand des Datensatzes
+            e.Byte(0xE8); e.Rel32(reinterpret_cast<uintptr_t>(&TramMayBrake));
+            e.Byte(0x83); e.Byte(0xC4); e.Byte(0x08);
+            e.Byte(0x84); e.Byte(0xC0);             // test al,al
+            e.Byte(0x61);                           // popad (lässt die Flags)
+            e.Byte(0x74); e.Byte(static_cast<uint8_t>(len));   // jz: nicht bremsen
+            uint8_t* copy = e.p;
+            e.Bytes(s_orig, len);
+            if (nextInside)
+                copy[next - site] = 3;
+            e.Byte(0xC3);
+        }
+        if (!nextInside)
+        {
+            const uint8_t state = on ? 3 : 0x0C;
+            if (!hooks::WriteMemory(next, &state, 1))
+                return false;
+        }
+        if (!on)
+            return hooks::WriteMemory(site, s_orig, len);
+        uint8_t patch[24];
+        memset(patch, 0x90, sizeof(patch));
+        patch[0] = 0xE8;
+        const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(s_stub) - (A.TramBrake + 5));
+        memcpy(patch + 1, &rel, 4);
+        return hooks::WriteMemory(site, patch, len);
+    }
+
+    // "shr al,1 / mov [Datensatz+4],al" durch "call Sprungstück" ersetzen; das Stück ruft TramCarContact
+    static bool SetTramContact(bool on)
+    {
+        static uint8_t s_orig[8];
+        static uint8_t* s_stub = nullptr;
+        uint8_t* site = reinterpret_cast<uint8_t*>(A.TramContact);
+        if (!s_stub)
+        {
+            if (site[0] != 0xD0 || site[1] != 0xE8 || site[2] != 0x88)   // shr al,1 / mov [..],al
+                return false;
+            memcpy(s_orig, site, sizeof(s_orig));
+            s_stub = AllocStub(16);
+            if (!s_stub)
+                return false;
+            Emitter e{ s_stub };
+            e.Byte(0x60);                           // pushad
+            e.Byte(0x50 + A.TramContactReg);        // push Abstand des Datensatzes
+            e.Byte(0xE8); e.Rel32(reinterpret_cast<uintptr_t>(&TramCarContact));
+            e.Byte(0x83); e.Byte(0xC4); e.Byte(0x04);
+            e.Byte(0x61);                           // popad
+            e.Byte(0xC3);
+        }
+        if (!on)
+            return hooks::WriteMemory(site, s_orig, sizeof(s_orig));
+        uint8_t patch[8] = { 0xE8, 0, 0, 0, 0, 0x90, 0x90, 0x90 };
+        const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(s_stub) - (A.TramContact + 5));
+        memcpy(patch + 1, &rel, 4);
+        return hooks::WriteMemory(site, patch, sizeof(patch));
     }
 
     void SetDamage(int pistol, int machineGun, int punch)
