@@ -1571,9 +1571,14 @@ namespace gta1
 
     // ---- Straßenbahn in San Andreas ----
     // Die Karte sanb.cmp hat zwei Schleifen mit Gleisen auf der Fahrbahn und darauf Stationen (Wert 6) und Stationen
-    // mit eigenem Zug (Wert 7). Ein Zug fährt erst los, wenn die nächste Station frei ist: die linke Schleife hat vier
-    // Stationen und vier Bahnen und stünde für immer. Die zweite der beiden dicht hintereinander liegenden Stationen
-    // bekommt deshalb keinen eigenen Zug.
+    // mit eigenem Zug (Wert 7). Ein Zug fährt erst los, wenn die nächste Station frei ist, und der Abschnitt bis dahin
+    // gehört ihm allein: die linke Schleife mit vier Stationen und vier Bahnen stünde für immer, mit drei Bahnen warten
+    // sie minutenlang. Die beiden dicht hintereinander liegenden Stationen (97,60) und (99,60) bekommen deshalb keinen
+    // eigenen Zug (links fahren zwei Bahnen, rechts zwei). Dazu bekommt jede Kreuzung mit Haltemarken (Wert 1, je eine
+    // vor und hinter der Querstraße) eine Station auf der Gleiszelle vor der ersten Marke in Fahrtrichtung: kürzere
+    // Abschnitte, Halte wie bei einer Straßenbahn. Die Marken selbst bleiben: sie sind zugleich die Ampeln der
+    // Kreuzung, und ohne sie bricht die Ampel-Logik des Spiels ab ("too many traffic lights"); die liest nur die Werte
+    // 1 und 2, eine Station (6) statt 0 ändert für sie nichts.
     // Vor einem Fahrzeug auf dem Gleis bremst die Bahn wie vor einer Station: danach steigen Fahrgäste aus, und sie
     // reserviert die nächste Station, obwohl sie die aktuelle gar nicht erreicht hat. Nach ein paar solchen Halten
     // wartet sie auf eine Station, die eine andere Bahn hält, und beide stehen für immer. Der Mod lässt sie nach dem
@@ -1593,7 +1598,13 @@ namespace gta1
         bool s_tramMap = false;          // geladene Karte ist sanb.cmp
 
         struct RailOverride { int x, y; uint8_t code; };
-        constexpr RailOverride kSanAndreasRail[] = { { 99, 60, 6 } };
+        constexpr RailOverride kSanAndreasRail[] = {
+            { 97, 60, 6 }, { 99, 60, 6 },                                   // links: ohne eigenen Zug
+            { 64, 29, 6 }, { 64, 55, 6 },                                   // links: Kreuzungen (Bahn nach Süden)
+            { 141, 34, 6 },                                                 // rechts oben (nach Osten)
+            { 175, 55, 6 }, { 175, 81, 6 }, { 175, 95, 6 }, { 175, 118, 6 }, { 175, 129, 6 },   // rechts (nach Süden)
+            { 109, 136, 6 }, { 109, 105, 6 }, { 109, 88, 6 }, { 109, 62, 6 },                   // links (nach Norden)
+        };
 
         uint32_t __cdecl BlockQueryHook(int x, int y, int z)
         {

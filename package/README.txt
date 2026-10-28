@@ -153,9 +153,10 @@ GAMEPLAY
     is almost straight already. Strength (gentle, medium, strong) in the
     pause menu (GTA1Plus options, Gameplay); off = original behaviour.
   - Trams in San Andreas: the game has tram lines in the streets of San
-    Andreas and the trams themselves, but they were switched off. Now five
-    trams run on two loops. From the next level start; can be switched off
-    in the pause menu (GTA1Plus options, Gameplay).
+    Andreas and the trams themselves, but they were switched off. Now four
+    trams run on two loops and stop at the crossings. From the next level
+    start; can be switched off in the pause menu (GTA1Plus options,
+    Gameplay).
   - Quick retry: after "MISSION FAILED" the phone of the mission rings again
     right away. Rewards already paid in the failed attempt are not paid again.
   - Busted: the multiplier is not halved.
