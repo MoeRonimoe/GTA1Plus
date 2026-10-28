@@ -130,6 +130,23 @@ namespace gta1
     // abgeschaltet hat; wirkt ab dem nächsten Levelstart. false, wenn die Spielversion es nicht kann.
     bool SetTrams(bool on);
     bool TramsAvailable();         // GTA1-Städte (1.0.0.1, Classics); London hat kein San Andreas
+
+    // Brandbombe: die gestrichene fünfte Waffe (Symbol im Style, Kistentyp 5 ohne Wirkung). Das Spiel selbst kennt
+    // nur die Waffen 0 (Faust) bis 4 - Waffe 5 an der Spielfigur bricht es sofort ab -, alles Weitere macht der Mod.
+    bool FirebombAvailable();      // 1.0.0.1 und Classics
+    // Kisten: convert darf beim Aufstellen Typ und Menge ändern (x, y wie im Spiel), picked läuft, wenn ein Spieler
+    // eine Kiste vom Typ 5 aufhebt (sonst passiert dabei nichts)
+    bool HookCrates(void (*convert)(int& type, int& amount, int x, int y), void (*picked)(int player, int amount));
+    int  PlayerWeapon();           // Waffe des lokalen Spielers: 0 Faust, 1 Pistole .. 4 Flammenwerfer; -1 unbekannt
+    bool PlayerHasWeapons();       // Munition für irgendeine Waffe 1..4
+    int  LocalPlayerIndex();
+    // Spielfigur zu Fuß: Position in Weltpixeln (64 je Block, z wächst nach unten), Blickrichtung 0..1023
+    bool PlayerFoot(float& x, float& y, float& z, int& angle);
+    // Weltpixel <-> Pixel der Spielauflösung, mit der Projektion des letzten Bilds
+    bool WorldToScreen(float x, float y, float z, float& sx, float& sy);
+    bool ScreenToWorld(float sx, float sy, float z, float& x, float& y);
+    bool IsBuilding(float x, float y, float z);   // Block an dieser Stelle (Weltpixel) ist ein Gebäude
+    bool Explode(float x, float y, float z);      // Explosion wie eine Rakete des lokalen Spielers (Weltpixel)
     bool EnableAllCharacters();    // Hauptmenü: Frauen auch in nicht-englischen Sprachversionen wählbar
     bool EnableQuickRetry();       // nach "MISSION FEHLGESCHLAGEN" Skriptpausen bis zum Neuaufbau verkürzen
     bool EnableSteadyCamera();     // Kamera folgt enger statt zu schwimmen (Patch aus GTAforums: shl 5 -> shl 2)
@@ -150,6 +167,7 @@ namespace gta1
         int character = -1;
         int32_t score = 0;
         int16_t multiplier = 1, armor = -1;     // Rüstungen; -1 = nicht gespeichert (Stände bis Version 4)
+        int16_t firebombs = -1;                 // Brandbomben (vom Mod geführt); -1 = nicht gespeichert (bis Version 5)
         uint8_t jailCard = 0, lives = 0, ammo[4] = {};
         bool hasPos = false, hasAngle = false;
         int32_t x = 0, y = 0, z = 0;    // Festkomma wie im Spiel (22 Nachkommabits = 1 Block)

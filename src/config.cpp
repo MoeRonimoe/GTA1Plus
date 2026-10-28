@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 26;
+static const int kConfigVersion = 27;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=26\r\n"
+    "Version=27\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -86,6 +86,10 @@ static const char kDefaultIni[] =
     "; Trams in San Andreas: the map has tram lines on the streets and the game has the trams, but they were\r\n"
     "; switched off. 1 = let them run (from the next level start), 0 = as in the original game\r\n"
     "Trams=1\r\n"
+    "; Firebomb, the fifth weapon that was cut from the game: some pistol and machine-gun crates hold firebombs\r\n"
+    "; instead. In the weapon cycle it comes after the flamethrower; it is thrown at the crosshair or a few blocks\r\n"
+    "; ahead and bursts into flames. 1 = on, 0 = off\r\n"
+    "Firebomb=1\r\n"
     "; Extra seconds for every mission countdown (time to reach a place, to steal a car, kill frenzies ...),\r\n"
     "; to make hard levels such as London 1961 easier. 0 = as in the game, up to 300\r\n"
     "ExtraMissionTime=0\r\n"
@@ -249,6 +253,7 @@ namespace
         { L"Gameplay", L"NoTreeCollision", Kind::Bool, &g_cfg.noTreeCollision, nullptr, nullptr },
         { L"Gameplay", L"SteerAssist",    Kind::Int,  &g_cfg.steerAssist,    nullptr, nullptr },
         { L"Gameplay", L"Trams",          Kind::Bool, &g_cfg.trams,          nullptr, nullptr },
+        { L"Gameplay", L"Firebomb",       Kind::Bool, &g_cfg.firebomb,       nullptr, nullptr },
         { L"Gameplay", L"ExtraMissionTime", Kind::Int, &g_cfg.extraMissionTime, nullptr, nullptr },
         { L"Gameplay", L"QuickRetry",     Kind::Bool, &g_cfg.quickRetry,     nullptr, nullptr },
         { L"Gameplay", L"AllCharacters",  Kind::Bool, &g_cfg.allCharacters,  nullptr, nullptr },

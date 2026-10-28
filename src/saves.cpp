@@ -1,5 +1,6 @@
 #include "saves.h"
 #include "config.h"
+#include "firebomb.h"
 #include "gta1.h"
 #include "log.h"
 #include "text.h"
@@ -14,8 +15,9 @@ namespace saves
     namespace
     {
         constexpr uint32_t kMagic = 0x53503147;    // "G1PS"
-        constexpr uint32_t kVersion = 5;   // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen,
-                                           // 5: mit der Rüstung (vorher stand hier ein Zeitzähler daneben)
+        constexpr uint32_t kVersion = 6;   // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen,
+                                           // 5: mit der Rüstung (vorher stand hier ein Zeitzähler daneben),
+                                           // 6: mit den Brandbomben
         constexpr DWORD kAutosaveDelay = 2500;      // nach MISSION_END, bis Belohnung und Ansage durch sind
         constexpr DWORD kOfferDelay = 3000;         // frühestens so lange nach Levelstart anbieten
 
@@ -111,6 +113,7 @@ namespace saves
             w.Blob(s.triggers);
             w.Blob(s.doors);
             w.Blob(s.arrows);
+            w.Put(s.firebombs);
             return w.buf;
         }
 
@@ -149,6 +152,8 @@ namespace saves
                 r.Blob(s.doors);
             if (h.version >= 4)
                 r.Blob(s.arrows);
+            if (h.version >= 6)
+                r.Get(s.firebombs);
             return r.ok;
         }
 
@@ -248,6 +253,7 @@ namespace saves
         const std::wstring path = SlotPath();
         if (path.empty() || !gta1::CaptureGameState(state))
             return false;
+        state.firebombs = static_cast<int16_t>(firebomb::Ammo());
         CreateDirectoryW(g_dir.c_str(), nullptr);
         const std::vector<uint8_t> data = Serialize(state);
         const bool ok = WriteAll(path, data);
@@ -273,6 +279,8 @@ namespace saves
         if (!Parse(data, state, h))
             return "Datei beschädigt oder alte Version";
         const char* error = gta1::RestoreGameState(state);
+        if (!error && state.firebombs >= 0)
+            firebomb::SetAmmo(state.firebombs);
         g_autosaveAt = 0;
         LOG("Spielstand laden: %ls (%d Punkte) %s", path.c_str(), state.score, error ? error : "ok");
         return error;

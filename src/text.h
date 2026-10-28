@@ -140,6 +140,8 @@ namespace text
         OptExtraMissionTime,
         OnFootOnly,
         OptTrams,
+        OptFirebomb,
+        FirebombPicked,
         Count
     };
 

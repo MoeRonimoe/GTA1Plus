@@ -2,6 +2,7 @@
 #include "camera.h"
 #include "config.h"
 #include "fire.h"
+#include "firebomb.h"
 #include "gta1.h"
 #include "hooks.h"
 #include "log.h"
@@ -871,10 +872,15 @@ namespace controls
         g_renderAngle = in.renderAngle;
         gta1::SetPlayerFireAngle(in.renderAngle);
 
-        packet = WriteHeld(packet, kFire, kFireHeld, !lying && (kb.fire || in.fire), g_sentFire);
+        // Brandbombe: wählt sich in den Waffenwechsel ein und nimmt, solange sie gewählt ist, den Schuss
+        firebomb::Keys keys = { !lying && (kb.fire || in.fire), !lying && (kb.weaponNext || in.weaponNext),
+                                !lying && (kb.weaponPrev || in.weaponPrev) };
+        if (!menu)
+            keys = firebomb::Filter(keys, onFoot);
+        packet = WriteHeld(packet, kFire, kFireHeld, keys.fire, g_sentFire);
         packet = WriteHeld(packet, kJump, kJumpHeld, !jumpForFire && jumpHeld, g_sentJump);
-        packet = WriteHeld(packet, kWeaponNext, kWeaponNextHeld, !lying && (kb.weaponNext || in.weaponNext), g_sentWeaponNext);
-        packet = WriteHeld(packet, kWeaponPrev, kWeaponPrevHeld, !lying && (kb.weaponPrev || in.weaponPrev), g_sentWeaponPrev);
+        packet = WriteHeld(packet, kWeaponNext, kWeaponNextHeld, keys.next, g_sentWeaponNext);
+        packet = WriteHeld(packet, kWeaponPrev, kWeaponPrevHeld, keys.prev, g_sentWeaponPrev);
         packet = WriteHeld(packet, kHorn, kHornHeld, !lying && (kb.horn || in.horn), g_sentHorn);
         if (lying)
             packet &= ~kEnterExit;
@@ -937,6 +943,17 @@ namespace controls
         y = g_crossY;
         if (g_crossStick)
             tiltcam::GameToOutput(g_crossX, g_crossY, x, y);
+        return true;
+    }
+
+    bool AimPoint(float& x, float& y)
+    {
+        if (!g_crosshair)
+            return false;
+        x = g_crossX;
+        y = g_crossY;
+        if (!g_crossStick)
+            tiltcam::OutputToGame(g_crossX, g_crossY, x, y);   // ändert nur bei gekippter Kamera
         return true;
     }
 

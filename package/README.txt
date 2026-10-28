@@ -98,8 +98,8 @@ SAVE GAMES
     comes a few seconds after the level starts, once the game has set the
     level up (weapon crates, bomb shop doors, mission gates, car cranes).
   - A save keeps the mission progress, score, multiplier, lives, weapons,
-    armour and your position. Buildings destroyed by missions are back after
-    loading.
+    firebombs, armour and your position. Buildings destroyed by missions
+    are back after loading.
 
 CONTROLS
   - Twin-stick: walk with WASD in screen directions and aim with the mouse.
@@ -157,6 +157,11 @@ GAMEPLAY
     trams run on two loops and stop at the crossings. From the next level
     start; can be switched off in the pause menu (GTA1Plus options,
     Gameplay).
+  - Firebomb, the weapon cut from GTA1: some pistol and machine-gun crates
+    hold a red petrol can - break the crate open and pick it up for five
+    firebombs. In the weapon cycle the firebomb comes after the
+    flamethrower; fire throws it at the crosshair, where it explodes.
+    Can be switched off in the pause menu (GTA1Plus options, Gameplay).
   - Quick retry: after "MISSION FAILED" the phone of the mission rings again
     right away. Rewards already paid in the failed attempt are not paid again.
   - Busted: the multiplier is not halved.

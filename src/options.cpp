@@ -79,6 +79,7 @@ namespace options
             { Type::Choice, text::OptSteerAssist, &g_cfg.steerAssist, false, 0, 3, 1,
               { text::OptOff, text::AssistGentle, text::AssistMedium, text::AssistStrong } },
             { Type::Bool, text::OptTrams, &g_cfg.trams, false, 0, 0, 0, {}, &gta1::TramsAvailable },
+            { Type::Bool, text::OptFirebomb, &g_cfg.firebomb, false, 0, 0, 0, {}, &gta1::FirebombAvailable },
             { Type::Seconds, text::OptExtraMissionTime, &g_cfg.extraMissionTime, false, 0, 300, 15 },
             { Type::Bool, text::OptQuickRetry, &g_cfg.quickRetry, true },
             { Type::Bool, text::OptKeepMultiplier, &g_cfg.keepMultiplier, true },

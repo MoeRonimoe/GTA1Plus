@@ -95,6 +95,7 @@
     <ClInclude Include="src\log.h" />
     <ClInclude Include="src\camera.h" />
     <ClInclude Include="src\fire.h" />
+    <ClInclude Include="src\firebomb.h" />
     <ClInclude Include="src\missiontimers.h" />
     <ClInclude Include="src\pois.h" />
     <ClInclude Include="src\rumble.h" />
@@ -122,6 +123,7 @@
     <ClCompile Include="src\mod.cpp" />
     <ClCompile Include="src\camera.cpp" />
     <ClCompile Include="src\fire.cpp" />
+    <ClCompile Include="src\firebomb.cpp" />
     <ClCompile Include="src\missiontimers.cpp" />
     <ClCompile Include="src\pois.cpp" />
     <ClCompile Include="src\rumble.cpp" />

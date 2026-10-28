@@ -201,6 +201,24 @@ namespace gta1
         // Berührt ein Wagen ein Fahrzeug, halbiert das Spiel sein Tempo (Datensatz +4): "shr al,1 / mov [reg+..],al"
         // (8 Byte) an TramContact, TramContactReg = Register mit dem Abstand des Datensatzes ab TramRecords
         uintptr_t TramRecords = 0, TramContact = 0;
+        // Kisten (Waffen, Rüstung, ...): CrateCreate(Typ, Menge, x, y, z) stellt eine auf, die ersten CrateCreateLen
+        // Byte ohne relative Operanden. Beim Aufheben verteilt CratePickup nach Typ ("lea reg,[Typ-1] ... cmp reg,0Eh",
+        // CratePickupLen Byte ohne relative Operanden, danach ja rel32); Typ, Menge und Spieler stehen in Registern,
+        // CratePickupDone = Ende ohne Wirkung
+        uintptr_t CrateCreate = 0, CratePickup = 0, CratePickupDone = 0;
+        int       CrateCreateLen = 0, CratePickupLen = 0;
+        uint8_t   CratePickupType = 0, CratePickupAmount = 0, CratePickupPlayer = 0;
+        uintptr_t PlayerWeapon = 0;   // int32 aktuelle Waffe (Munition je Waffe w bei PlayerAmmo + w - 1)
+        // Zerstörte Kiste öffnen: Sprungtabelle nach Typ, Eintrag CrateOpenSlot für Typ 5 zeigt auf "kein Inhalt".
+        // Inhalt = Objekt (Pistole 0x4E .. Flammenwerfer 0x51, gestrichene Brandbombe 0x52: roter Kanister).
+        // 1.0.0.1: die Fälle legen "push 0 / push Objekt" ab und springen nach CrateOpenJoin. Classics: jeder Fall
+        // ruft CrateOpenCreate(x, y, z, Objekt, 0) selbst (esi = Abstand in der Kistentabelle CrateTable, ebx = 0),
+        // merkt den Griff und springt nach CrateOpenDone
+        uintptr_t CrateOpenSlot = 0, CrateOpenJoin = 0, CrateOpenCreate = 0, CrateOpenDone = 0, CrateTable = 0;
+        // Berührt eine Figur ein Objekt, verteilt das Spiel nach Art (Art - 6 als Index in eine Bytetabelle). Den
+        // Kanister hat es dort aus dem Aufheben genommen: Byte für 0x52 an CanPickupIndex, die Waffen 0x4E..0x51
+        // stehen davor und haben den Wert des Aufheben-Falls
+        uintptr_t CanPickupIndex = 0;
         uint8_t   TramContactReg = 0;
 
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
@@ -276,6 +294,12 @@ namespace gta1
         a.TramObstacleNext = 0x4611E6;                             // mov ecx,0Ch in 0x461100
         a.TramBrake = 0x4611F9; a.TramBrakeLen = 16; a.TramBrakeReg = 3; a.TramStride = 1407;   // ebx
         a.TramRecords = 0x655450; a.TramContact = 0x46070C; a.TramContactReg = 7;               // edi, in 0x460630
+        a.CrateCreate = 0x40BD60; a.CrateCreateLen = 6;            // push ebx / mov edx,-1; Tabelle 0x4CB8D8
+        a.CratePickup = 0x40C19B; a.CratePickupLen = 6; a.CratePickupDone = 0x40C458;   // in 0x40C0B0
+        a.CratePickupType = 5; a.CratePickupAmount = 7; a.CratePickupPlayer = 6;   // ebp, edi, esi
+        a.PlayerWeapon = 0x65771E;                                 // Waffenwechsel 0x462440 / 0x4623E0
+        a.CrateOpenSlot = 0x40BF9C; a.CrateOpenJoin = 0x40BEF4;   // Kiste öffnen 0x40BE30, Tabelle 0x40BF8C
+        a.CanPickupIndex = 0x44D7A4;                               // Figur trifft Objekt 0x44D380, Index 0x44D758
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
@@ -511,6 +535,14 @@ namespace gta1
         a.TramObstacleNext = 0x46DE47;                             // mov byte [Bahn+9],0Ch
         a.TramBrake = 0x46DE3A; a.TramBrakeLen = 17; a.TramBrakeReg = 6; a.TramStride = 1480;   // esi
         a.TramRecords = 0x7514A8; a.TramContact = 0x46D3E4; a.TramContactReg = 6;               // esi
+        a.CrateCreate = 0x46A0D0; a.CrateCreateLen = 7;            // push ecx, ebx, ebp, esi, edi / xor esi,esi
+        a.CratePickup = 0x46A633; a.CratePickupLen = 9; a.CratePickupDone = 0x46A8CD;   // in 0x46A560,
+                                                                   // lea / add esp,4 / cmp
+        a.CratePickupType = 7; a.CratePickupAmount = 5; a.CratePickupPlayer = 3;   // edi, ebp, ebx
+        a.PlayerWeapon = 0x74F2A8;                                 // Waffenwechsel 0x4619F0
+        a.CrateOpenSlot = 0x46A470; a.CrateOpenCreate = 0x44CEF0; a.CrateOpenDone = 0x46A404;   // Tabelle 0x46A460
+        a.CrateTable = 0x74F858;
+        a.CanPickupIndex = 0x4593C4;                               // Figur trifft Objekt 0x459130, Index 0x459378
         // Treffer: Kugel in der Geschossführung 0x4879C0 (wie London mit "mov ecx,89h"), Faustschlag und Gegenschlag in
         // 0x45A3B0 (esi = Angreifer, edi = Opfer), Angriff eines Passanten in 0x456FB0
         a.BulletHit = 0x488181; a.BulletHitSkip = 0x488228; a.BulletHitMovEcx = true;
@@ -2008,6 +2040,207 @@ namespace gta1
                 s_explosionCb(x / 4194304.0f, y / 4194304.0f);
             return s_explode(x, y, z, owner);
         }
+    }
+
+    // ---- Brandbombe ----
+
+    namespace
+    {
+        using CrateCreate_t = int32_t(__cdecl*)(int32_t, int32_t, int32_t, int32_t, int32_t);
+        CrateCreate_t s_crateCreate = nullptr;
+        void (*s_crateConvert)(int&, int&, int, int) = nullptr;
+        void (*s_cratePicked)(int, int) = nullptr;
+
+        int32_t __cdecl CrateCreateHook(int32_t type, int32_t amount, int32_t x, int32_t y, int32_t z)
+        {
+            if (s_crateConvert)
+                s_crateConvert(type, amount, x, y);
+            return s_crateCreate(type, amount, x, y, z);
+        }
+
+        void __cdecl CratePicked(int player, int amount)
+        {
+            if (s_cratePicked)
+                s_cratePicked(player, amount);
+        }
+    }
+
+    bool FirebombAvailable()
+    {
+        return s_supported && A.CrateCreate && A.CratePickup && A.PlayerWeapon && A.PlayerAmmo && A.Explode && A.Camera &&
+               A.BlockTypes;
+    }
+
+    bool HookCrates(void (*convert)(int& type, int& amount, int x, int y), void (*picked)(int player, int amount))
+    {
+        s_crateConvert = convert;
+        s_cratePicked = picked;
+        static bool s_tried = false, s_ok = false;
+        if (s_tried)
+            return s_ok;
+        s_tried = true;
+        if (!FirebombAvailable())
+            return false;
+        // Aufstellen: Anfang der Funktion in ein Sprungstück, die Funktion selbst springt in den Hook
+        const int len = A.CrateCreateLen;
+        uint8_t* site = reinterpret_cast<uint8_t*>(A.CrateCreate);
+        const bool prologOk = len == 6 ? site[0] == 0x53 && site[1] == 0xBA : len == 7 && site[0] == 0x51 && site[5] == 0x33;
+        // Aufheben: "lea reg,[Typ-1]" ... "cmp reg,0Eh", danach "ja rel32"
+        uint8_t* pick = reinterpret_cast<uint8_t*>(A.CratePickup);
+        const int plen = A.CratePickupLen;
+        const bool pickOk = plen >= 6 && plen <= 12 && pick[0] == 0x8D && pick[2] == 0xFF && pick[plen - 3] == 0x83 &&
+                            pick[plen - 1] == 0x0E && pick[plen] == 0x0F && pick[plen + 1] == 0x87;
+        uint8_t* createStub = prologOk && pickOk ? AllocStub(16) : nullptr;
+        uint8_t* pickStub = createStub ? AllocStub(64) : nullptr;
+        if (!pickStub)
+            return false;
+        Emitter c{ createStub };
+        c.Bytes(site, len);
+        c.Byte(0xE9); c.Rel32(A.CrateCreate + len);
+        s_crateCreate = reinterpret_cast<CrateCreate_t>(createStub);
+
+        // Typ 5: Rückruf, dann die Originalbefehle (Classics gleicht dazwischen den Stapel aus) und ans Ende ohne Wirkung
+        Emitter e{ pickStub };
+        e.Byte(0x83); e.Byte(0xF8 + A.CratePickupType); e.Byte(0x05);   // cmp Typ,5
+        e.Byte(0x75); e.Byte(static_cast<uint8_t>(17 + plen));          // jne: wie das Spiel
+        e.Byte(0x60);                                                   // pushad
+        e.Byte(0x50 + A.CratePickupAmount);                             // push Menge
+        e.Byte(0x50 + A.CratePickupPlayer);                             // push Spieler
+        e.Byte(0xE8); e.Rel32(reinterpret_cast<uintptr_t>(&CratePicked));
+        e.Byte(0x83); e.Byte(0xC4); e.Byte(0x08);
+        e.Byte(0x61);                                                   // popad
+        e.Bytes(pick, plen);
+        e.Byte(0xE9); e.Rel32(A.CratePickupDone);
+        e.Bytes(pick, plen);                                            // wie im Spiel
+        e.Byte(0xE9); e.Rel32(A.CratePickup + plen);                    // weiter mit dem ja
+        // Öffnen: statt "kein Inhalt" den Kanister (Objekt 0x52) hinlegen, wie die Waffen ihr Symbol
+        uint8_t* openStub = A.CrateOpenSlot ? AllocStub(48) : nullptr;
+        if (!openStub)
+            return false;
+        Emitter o{ openStub };
+        if (A.CrateOpenJoin)
+        {
+            o.Byte(0x6A); o.Byte(0x00);                     // push 0
+            o.Byte(0x6A); o.Byte(0x52);                     // push 52h
+            o.Byte(0xE9); o.Rel32(A.CrateOpenJoin);
+        }
+        else
+        {
+            const auto field = [&](uint8_t reg, uint32_t offset) {   // mov reg,[esi+CrateTable+offset]
+                o.Byte(0x8B); o.Byte(static_cast<uint8_t>(0x86 + reg * 8)); o.Dword(static_cast<uint32_t>(A.CrateTable + offset));
+            };
+            field(1, 8);                                    // ecx = z
+            field(2, 4);                                    // edx = y
+            field(0, 0);                                    // eax = x
+            o.Byte(0x53);                                   // push ebx (0)
+            o.Byte(0x6A); o.Byte(0x52);                     // push 52h
+            o.Byte(0x51); o.Byte(0x52); o.Byte(0x50);       // push z, y, x
+            o.Byte(0xE8); o.Rel32(A.CrateOpenCreate);
+            o.Byte(0x0F); o.Byte(0xBF); o.Byte(0xC8);       // movsx ecx,ax
+            o.Byte(0x83); o.Byte(0xC4); o.Byte(0x14);       // add esp,14h
+            o.Byte(0x89); o.Byte(0x8E); o.Dword(static_cast<uint32_t>(A.CrateTable + 0x0C));   // mov [esi+Griff],ecx
+            o.Byte(0xE9); o.Rel32(A.CrateOpenDone);
+        }
+        const uint32_t openTarget = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(openStub));
+        // Aufheben: der Kanister bekommt den Fall der Waffen (dieselben vier Bytes davor)
+        const uint8_t* index = reinterpret_cast<const uint8_t*>(A.CanPickupIndex);
+        const uint8_t weaponCase = index ? index[-4] : 0;
+        if (!index || index[-3] != weaponCase || index[-2] != weaponCase || index[-1] != weaponCase || *index == weaponCase)
+            return false;
+        s_ok = PatchJump(A.CrateCreate, 0xE9, reinterpret_cast<const uint8_t*>(&CrateCreateHook), len) &&
+               PatchJump(A.CratePickup, 0xE9, pickStub, plen) &&
+               hooks::WriteMemory(reinterpret_cast<void*>(A.CrateOpenSlot), &openTarget, sizeof(openTarget)) &&
+               hooks::WriteMemory(reinterpret_cast<void*>(A.CanPickupIndex), &weaponCase, 1);
+        return s_ok;
+    }
+
+    int LocalPlayerIndex()
+    {
+        const int idx = s_supported ? *reinterpret_cast<int*>(A.LocalPlayer) : -1;
+        return idx >= 0 && idx <= 3 ? idx : -1;
+    }
+
+    int PlayerWeapon()
+    {
+        const int idx = LocalPlayerIndex();
+        if (idx < 0 || !A.PlayerWeapon)
+            return -1;
+        const int w = *reinterpret_cast<int*>(A.PlayerWeapon + idx * L.PlayerStride);
+        return w >= 0 && w <= 4 ? w : -1;
+    }
+
+    bool PlayerHasWeapons()
+    {
+        const int idx = LocalPlayerIndex();
+        if (idx < 0 || !A.PlayerAmmo)
+            return false;
+        const uint8_t* ammo = reinterpret_cast<const uint8_t*>(A.PlayerAmmo + idx * L.PlayerStride);
+        return ammo[0] || ammo[1] || ammo[2] || ammo[3];
+    }
+
+    bool PlayerFoot(float& x, float& y, float& z, int& angle)
+    {
+        if (!InGame())
+            return false;
+        const int ped = PlayerPed();
+        if (ped < 0)
+            return false;
+        const uint8_t* pd = reinterpret_cast<const uint8_t*>(A.PedStruct + ped * L.PedStride);
+        int32_t pos[3];
+        memcpy(pos, pd + L.PedPos, sizeof(pos));
+        x = pos[0] / 65536.0f;
+        y = pos[1] / 65536.0f;
+        z = pos[2] / 65536.0f;
+        angle = *reinterpret_cast<const int16_t*>(A.PedAngle + ped * L.PedStride) & 1023;
+        return true;
+    }
+
+    bool WorldToScreen(float x, float y, float z, float& sx, float& sy)
+    {
+        const int idx = LocalPlayerIndex();
+        if (idx < 0 || !A.Camera || !InGame())
+            return false;
+        const CameraData& cam = CameraOf(idx);
+        const float depth = cam.height + z;
+        if (depth <= 0 || cam.focal <= 0)
+            return false;
+        const float k = cam.focal / depth;
+        sx = cam.centerX + (x - cam.x) * k;
+        sy = cam.centerY + (y - cam.y) * k * (cam.squash ? 5.0f / 6.0f : 1.0f);
+        return true;
+    }
+
+    bool ScreenToWorld(float sx, float sy, float z, float& x, float& y)
+    {
+        const int idx = LocalPlayerIndex();
+        if (idx < 0 || !A.Camera || !InGame())
+            return false;
+        const CameraData& cam = CameraOf(idx);
+        const float depth = cam.height + z;
+        if (depth <= 0 || cam.focal <= 0)
+            return false;
+        const float k = cam.focal / depth;
+        x = cam.x + (sx - cam.centerX) / k;
+        y = cam.y + (sy - cam.centerY) / (k * (cam.squash ? 5.0f / 6.0f : 1.0f));
+        return true;
+    }
+
+    bool IsBuilding(float x, float y, float z)
+    {
+        if (!A.BlockTypes || x < 0 || y < 0 || z < 0 || x >= 256 * 64 || y >= 256 * 64 || z >= 6 * 64)
+            return false;
+        const unsigned block = (unsigned(z / 64) << 16) | (unsigned(y / 64) << 8) | unsigned(x / 64);
+        return ((*reinterpret_cast<const uint8_t*>(A.BlockTypes + block) >> 4) & 7) == 5;
+    }
+
+    bool Explode(float x, float y, float z)
+    {
+        const int idx = LocalPlayerIndex();
+        if (idx < 0 || !A.Explode || !InGame())
+            return false;
+        // Auslöser = Spieler (wie bei seinen Raketen): Punkte und Fahndung gehen an ihn
+        reinterpret_cast<Explode_t>(A.Explode)((int32_t)(x * 65536), (int32_t)(y * 65536), (int32_t)(z * 65536), idx);
+        return true;
     }
 
     bool SetExplosionCallback(void (*cb)(float x, float y))

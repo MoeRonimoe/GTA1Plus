@@ -5,6 +5,7 @@
 #include "controls.h"
 #include "ddhook.h"
 #include "fire.h"
+#include "firebomb.h"
 #include "gta1.h"
 #include "hudscale.h"
 #include "log.h"
@@ -1958,6 +1959,60 @@ namespace overlay
 
         void Request(Page page);
 
+        // Sprite (ARGB, Alpha 0 = durchsichtig) mittig um (cx, cy), scale-fach vergrößert, Pixel scharf
+        void DrawSprite(SurfaceView& v, const uint32_t* px, int w, int h, float cx, float cy, float scale)
+        {
+            Canvas& c = g_canvas;
+            const int dw = std::max(1, (int)std::lround(w * scale)), dh = std::max(1, (int)std::lround(h * scale));
+            const int left = (int)std::lround(cx - dw * 0.5f), top = (int)std::lround(cy - dh * 0.5f);
+            if (left >= c.Width() || top >= c.Height() || left + dw <= 0 || top + dh <= 0)
+                return;
+            c.BeginLayer(left, top, dw, dh);
+            for (int y = 0; y < dh; ++y)
+            {
+                const uint32_t* row = px + std::min(h - 1, y * h / dh) * w;
+                for (int x = 0; x < dw; ++x)
+                {
+                    const uint32_t p = row[std::min(w - 1, x * w / dw)];
+                    if (p >> 24)
+                        c.BlendPixel(left + x, top + y, p & 0xFFFFFF, 255);
+                }
+            }
+            c.Composite(v, left, top, dw, dh);
+        }
+
+        // Brandbombe: fliegende Flaschen und, solange sie gewählt ist, ihr Symbol mit der Zahl oben links, wo das
+        // Spiel sonst die Waffe zeigt (bei gewählter Brandbombe hält die Figur die Faust, das Spiel zeigt dort nichts)
+        void DrawFirebomb(SurfaceView& v)
+        {
+            static std::vector<firebomb::Bomb> s_bombs;
+            int w, h;
+            firebomb::FlyingBombs(s_bombs);
+            if (const uint32_t* bottle = firebomb::Icon(false, w, h))   // "small" ist ein Makro der Windows-Header
+                for (const firebomb::Bomb& b : s_bombs)
+                {
+                    float ox = b.x, oy = b.y;   // GameToOutput ändert nur bei gekippter Kamera
+                    tiltcam::GameToOutput(b.x, b.y, ox, oy);
+                    DrawSprite(v, bottle, w, h, ox, oy, 0.6f * b.scale);
+                }
+            if (!firebomb::Selected())
+                return;
+            const float k = (float)hudscale::Factor();
+            const uint32_t* big = firebomb::Icon(true, w, h);
+            if (!big)
+                return;
+            const float left = 4 * k, top = 2 * k;
+            DrawSprite(v, big, w, h, left + w * k * 0.5f, top + h * k * 0.5f, k);
+            wchar_t count[8];
+            swprintf_s(count, L"%d", firebomb::Ammo());
+            Canvas& c = g_canvas;
+            const int tx = (int)(left + w * k + 3 * k), ty = (int)(top + h * k) - g_fonts.normalPx - (int)k;
+            const int tw = c.TextWidth(count, g_fonts.normalFont) + 4, th = g_fonts.normalPx + 6;
+            c.BeginLayer(tx - 2, ty - 2, tw + 4, th + 4);
+            c.Text(tx, ty, count, g_fonts.normalFont, 0xFFE34A);
+            c.Composite(v, tx - 2, ty - 2, tw + 4, th + 4);
+        }
+
         void DrawHud(SurfaceView& v)
         {
             if (!g_canvas.Resize(v.width, v.height))
@@ -1982,6 +2037,8 @@ namespace overlay
                 DrawHearts(v, health, gta1::IsPlayerBurning());
             if (havePlayer && fire::CanRoll())
                 DrawBurnHint(v);
+            if (inGame)
+                DrawFirebomb(v);
             float cx, cy;
             if (havePlayer && controls::Crosshair(cx, cy))
                 DrawCrosshair(v, cx, cy);
@@ -1991,6 +2048,8 @@ namespace overlay
             bool noticeError = false;
             if (saves::TakeNotice(notice, noticeError))
                 ShowToast(notice, noticeError);
+            if (firebomb::TakeNotice(notice))
+                ShowToast(notice);
             if (!g_toast.empty() && now - g_toastTick < kToastTime && inGame)
                 DrawToast(v);
             if (g_cfg.showInfo)

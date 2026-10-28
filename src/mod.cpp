@@ -8,6 +8,7 @@
 #include "controls.h"
 #include "ddhook.h"
 #include "fire.h"
+#include "firebomb.h"
 #include "gta1.h"
 #include "hooks.h"
 #include "hudscale.h"
@@ -78,7 +79,7 @@ namespace
     }
 
     // Debug: <asi>.burn anlegen -> Spielfigur anzünden, <asi>.douse -> löschen (zum Testen im Spiel)
-    std::wstring g_burnRequest, g_douseRequest, g_rumbleRequest;
+    std::wstring g_burnRequest, g_douseRequest, g_rumbleRequest, g_firebombRequest;
     DWORD g_debugCheck = 0;
 
     void CheckDebugRequests()
@@ -103,6 +104,13 @@ namespace
             DeleteFileW(g_rumbleRequest.c_str());
             rumble::Test(1000);
         }
+        // <asi>.firebomb: zehn Brandbomben
+        if (GetFileAttributesW(g_firebombRequest.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            DeleteFileW(g_firebombRequest.c_str());
+            firebomb::SetAmmo(firebomb::Ammo() + 10);
+            LOG("Debug: Brandbomben: %d", firebomb::Ammo());
+        }
     }
 
     void OnPreRender()
@@ -115,6 +123,7 @@ namespace
         gta1::SetTreeCollision(g_cfg.noTreeCollision);   // im Optionsmenü umschaltbar
         gta1::SetSteerAssist(g_cfg.steerAssist);
         gta1::SetTrams(g_cfg.trams);                     // wirkt ab dem nächsten Levelstart
+        firebomb::Tick();
         missiontimers::Tick();
     }
 
@@ -191,6 +200,7 @@ void ModInit(HMODULE self)
     g_burnRequest = SiblingPath(self, L".burn");
     g_douseRequest = SiblingPath(self, L".douse");
     g_rumbleRequest = SiblingPath(self, L".rumble");
+    g_firebombRequest = SiblingPath(self, L".firebomb");
     if (g_cfg.log)
         logx::Open(SiblingPath(self, L".log").c_str());
 
@@ -240,6 +250,7 @@ void ModInit(HMODULE self)
             LOG("Lenkhilfe (Stufe %d): %s", g_cfg.steerAssist, gta1::SetSteerAssist(g_cfg.steerAssist) ? "aktiv" : "für diese Version nicht verfügbar");
         if (g_cfg.trams)
             LOG("Straßenbahnen in San Andreas: %s", gta1::SetTrams(true) ? "aktiv" : "für diese Version nicht verfügbar");
+        firebomb::Init();
         if (g_cfg.keepMultiplier)
             LOG("Multiplikator bei Verhaftung behalten: %s", gta1::EnableKeepMultiplier() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.allCharacters)

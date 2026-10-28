@@ -17,6 +17,8 @@ namespace controls
 
     // Mausziel in Spielkoordinaten, solange zu Fuß mit der Maus gezielt wird
     bool Crosshair(float& x, float& y);
+    // Dasselbe Ziel im ungekippten Spielbild (für Rechnungen in der Welt)
+    bool AimPoint(float& x, float& y);
     // Mauszeiger zum Umschauen im Fahrzeug
     bool LookCursor(float& x, float& y);
 
