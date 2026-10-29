@@ -144,6 +144,8 @@ namespace text
         FirebombPicked,
         OptMinimapSize,
         OptMinimapZoom,
+        HeliName,
+        HeliHelp,
         Count
     };
 

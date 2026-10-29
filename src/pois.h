@@ -2,10 +2,11 @@
 
 #include <vector>
 
-// Orte für die Karte (Lackierereien, Bombenläden, Autokräne) aus dem Missionsskript des laufenden Levels
+// Orte für die Karte (Lackierereien, Bombenläden, Autokräne) aus dem Missionsskript des laufenden Levels, dazu die
+// Abstellplätze der Hubschrauber
 namespace pois
 {
-    enum class Kind { Spray, BombShop, Crane, Count };
+    enum class Kind { Spray, BombShop, Crane, Heli, Count };
 
     struct Poi
     {

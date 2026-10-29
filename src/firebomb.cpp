@@ -4,6 +4,7 @@
 #include "controls.h"
 #include "gta1.h"
 #include "log.h"
+#include "style.h"
 #include "text.h"
 
 #include <windows.h>
@@ -69,95 +70,16 @@ namespace firebomb
             LOG("Brandbombe: Kiste aufgehoben, jetzt %d", s_ammo);
         }
 
-        // ---- Symbol aus der Style-Datei (Aufbau wie im Lader 0x426A70, Sprites wie in citymap) ----
+        // ---- Symbol aus der Style-Datei ----
 
-        struct Icon_t
-        {
-            std::vector<uint32_t> px;
-            int w = 0, h = 0;
-        };
-        Icon_t s_icon[2];             // 0 klein (Sprite 9), 1 groß (Sprite 34)
+        style::Sprite s_icon[2];      // 0 klein (Sprite 9), 1 groß (Sprite 34)
         unsigned s_iconMapGen = ~0u;
-
-        bool ReadFile(const std::string& path, std::vector<uint8_t>& out)
-        {
-            FILE* f = nullptr;
-            if (fopen_s(&f, path.c_str(), "rb") || !f)
-                return false;
-            fseek(f, 0, SEEK_END);
-            const long size = ftell(f);
-            fseek(f, 0, SEEK_SET);
-            out.resize(size > 0 ? size : 0);
-            const bool ok = size > 0 && fread(out.data(), 1, out.size(), f) == out.size();
-            fclose(f);
-            return ok;
-        }
 
         // Die Pfeil-Sprites (HUD-Symbole) sind die ersten im Style: Nummer = Index der Sprite-Tabelle
         bool LoadIcons()
         {
-            s_icon[0] = s_icon[1] = Icon_t();
-            const std::string cmp = gta1::MapFile();
-            std::vector<uint8_t> head;
-            if (cmp.empty() || !ReadFile(cmp, head) || head.size() < 8)
-                return false;
-            char name[32];
-            sprintf_s(name, "style%03u.g24", head[4]);
-            const std::string stylePath = cmp.substr(0, cmp.find_last_of("\\/") + 1) + name;
-            std::vector<uint8_t> d;
-            if (!ReadFile(stylePath, d) || d.size() < 64)
-                return false;
-            uint32_t h[16];
-            memcpy(h, d.data(), sizeof(h));
-            if (h[0] != 336)
-                return false;
-            const size_t clutOff = 64 + ((size_t(h[1]) + h[2] + h[3] + 0x3FFF) & ~size_t(0x3FFF)) + h[4];
-            const size_t clutBytes = (size_t(h[5]) + 0xFFFF) & ~size_t(0xFFFF);
-            const size_t numCluts = clutBytes / 1024;
-            const size_t palOff = clutOff + clutBytes;
-            const size_t sprInfoOff = palOff + h[10] + h[11] + h[12];
-            const size_t sprGfxOff = sprInfoOff + h[13];
-            const size_t tileCluts = h[6] / 1024;
-            if (sprGfxOff + h[14] > d.size())
-                return false;
-            const auto u16 = [&](size_t o) { return uint16_t(d[o] | (d[o + 1] << 8)); };
-
-            size_t o = sprInfoOff;
-            for (int index = 0; index <= 34 && o + 12 <= sprGfxOff; ++index)
-            {
-                const int w = d[o], hgt = d[o + 1], deltas = d[o + 2];
-                const int clut = u16(o + 6), sx = d[o + 8], sy = d[o + 9], page = u16(o + 10);
-                const size_t next = o + 12 + size_t(deltas) * 6;
-                if (index == 9 || index == 34)
-                {
-                    const size_t logical = tileCluts + clut;
-                    if (logical >= h[10] / 2)
-                        return false;
-                    const size_t phys = u16(palOff + logical * 2);
-                    if (phys >= numCluts)
-                        return false;
-                    const size_t pageBase = clutOff + (phys / 64) * 65536 + (phys % 64) * 4;
-                    const size_t inPage = std::min<size_t>(64, numCluts - (phys / 64) * 64);
-                    Icon_t& icon = s_icon[index == 34];
-                    icon.w = w;
-                    icon.h = hgt;
-                    icon.px.assign(size_t(w) * hgt, 0);
-                    for (int j = 0; j < hgt; ++j)
-                        for (int i = 0; i < w; ++i)
-                        {
-                            const size_t src = sprGfxOff + size_t(page) * 65536 + size_t(sy + j) * 256 + sx + i;
-                            if (src >= d.size())
-                                return false;
-                            const uint8_t v = d[src];
-                            if (!v)
-                                continue;
-                            const uint8_t* e = d.data() + pageBase + v * inPage * 4;   // B, G, R, 0
-                            icon.px[size_t(j) * w + i] = 0xFF000000u | (e[2] << 16) | (e[1] << 8) | e[0];
-                        }
-                }
-                o = next;
-            }
-            return s_icon[0].w && s_icon[1].w;
+            style::File file;
+            return file.Load() && file.SpriteAt(9, s_icon[0]) && file.SpriteAt(34, s_icon[1]);
         }
 
         // ---- Wurf ----
@@ -361,7 +283,7 @@ namespace firebomb
             if (!LoadIcons())
                 LOG("Brandbombe: Symbol nicht im Style gefunden");
         }
-        const Icon_t& icon = s_icon[large];
+        const style::Sprite& icon = s_icon[large];
         w = icon.w;
         h = icon.h;
         return icon.w ? icon.px.data() : nullptr;

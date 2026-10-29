@@ -148,6 +148,30 @@ namespace gta1
     bool WorldToScreen(float x, float y, float z, float& sx, float& sy);
     bool ScreenToWorld(float sx, float sy, float z, float& x, float& y);
     bool IsBuilding(float x, float y, float z);   // Block an dieser Stelle (Weltpixel) ist ein Gebäude
+    int  SpawnCar(int model, int angle = 0);   // Fahrzeug neben der Spielfigur aufstellen (Test); Nummer oder -1
+    // Fahrzeug aufstellen wie PARKED in der Missionsdatei: Block x, y, Block des Bodens z; Nummer oder -1
+    int  CreateCar(int x, int y, int z, int model, int angle);
+    // Hubschrauber: Fahrzeug der Spielfigur (Nummer, Modell) oder false zu Fuß; Orte in Weltpixeln (z kleiner =
+    // höher, 0 = Oberkante der Karte); Boden unter einem Punkt ab Höhe z
+    bool PlayerCar(int& car, int& model);
+    // Texte, die in der Sprachdatei des Spiels fehlen (Name des Hubschraubers "car88"): lookup(Schlüssel) liefert
+    // einen eigenen Text oder nullptr, dann sucht das Spiel wie immer
+    bool SetExtraTexts(const char* (*lookup)(const char* key));
+    bool CarPlace(int car, float& x, float& y, float& z, int& angle);   // angle 0..1023, 0 = Süden, gegen den Uhrzeigersinn
+    void SetCarPlace(int car, float x, float y, float z, int angle);
+    void SetCarDamage(int car, int damage);                             // 100 = explodiert
+    void ScaleCarThrust(int car, float factor);                         // Schub des Modells (car_info) gegenüber dem Original
+    int  CarNear(float x, float y, float z, float radius, int exclude); // Fahrzeug im Umkreis (Weltpixel, Höhe ±48)
+    void KillPlayer();
+    float GroundBelow(float x, float y, float z);
+    bool IsSolidBlock(int x, int y, int level);   // Block x, y in Ebene level (0 = oben) ist Gebäude oder hat einen Deckel
+    // Ein Fahrzeug bewegt der Mod selbst (-1 = keins): die Physik des Spiels lässt es aus, beim Zeichnen fehlt es;
+    // beim Zurückgeben steht es still und die Physik übernimmt Ort und Richtung aus SetCarPlace
+    bool ModCarAvailable();
+    bool SetModCar(int car);
+    void SyncModCar();                                                  // nach SetCarPlace: Physik und Umriss nachziehen
+    void SetCameraFlight(float t);                                      // 0..1: Kamera wie bei schneller Fahrt
+    void SetModCarDrawn(bool byGame);                                   // doch vom Spiel zeichnen lassen
     bool Explode(float x, float y, float z);      // Explosion wie eine Rakete des lokalen Spielers (Weltpixel)
     bool EnableAllCharacters();    // Hauptmenü: Frauen auch in nicht-englischen Sprachversionen wählbar
     bool EnableQuickRetry();       // nach "MISSION FEHLGESCHLAGEN" Skriptpausen bis zum Neuaufbau verkürzen

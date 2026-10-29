@@ -186,6 +186,25 @@ namespace gta1
         // "lea reg,[a+b+44000h]". Die Lesegröße rechnet er daraus zurück: MapReadAdd = imm32 von "sub reg,4000h"
         // (1.0.0.1) bzw. "add reg,-4000h" (Classics)
         uintptr_t MapAllocAdd = 0, MapReadAdd = 0, MapBase = 0;
+        uintptr_t CarCreate = 0;      // int16 __cdecl(x, y, z Block des Bodens, Modell, Winkel 0..1023, 0), wie PARKED
+        int       CarModel = 0x22;    // int16 Modell im Fahrzeug
+        // Je Fahrzeug und Bild: CarUpdate(Fahrzeug*) = Fahrphysik, Bewegung, Wände (Aufruf an CarUpdateCall).
+        // CarPhysX: float-Ort der Physik, 0.0 = beim nächsten Mal aus CarPos neu holen; CarAngle: int16 Winkel, aus
+        // dem sie dann ihre Richtung nimmt (sonst nur bei Ereignissen nachgeführt); CarHeading: float Richtung der
+        // Physik = -Winkel * 2π/1024; CarStop: Bewegungsfelder (float), die das Spiel beim Anhalten nullt.
+        // CarPlaced(Fahrzeug*): übernimmt Ort und CarAngle in die Physik, wie nach dem Erzeugen; CarBounds(Fahrzeug*)
+        // rechnet daraus den Umriss für Zusammenstöße neu, CarBoundsCommit(Fahrzeug*) übernimmt ihn als gültig
+        uintptr_t CarUpdate = 0, CarUpdateCall = 0, CarPlaced = 0, CarBounds = 0, CarBoundsCommit = 0;
+        int       CarPhysX = 0x184, CarAngle = 0x252, CarHeading = 0x18C, CarDrawAngle = 0x90;
+        // CarUsed: int16, -1 = Platz frei (Erzeugen 0x494950); CarInfo: Zeiger auf die car_info des Modells, darin
+        // InfoThrust: float Schub, mit dem die Fahrphysik Gas gibt (0x494E3C)
+        int       CarUsed = 8, CarInfo = 0x294, InfoThrust = 0x80;
+        // Gezeichnet wird, was im Raster (128 x 128 Zellen zu 2 x 2 Blöcken) in einer sichtbaren Zelle steht.
+        // GridRemove(Besitzer, Positionssatz) trägt aus, GridAdd(Art, Nummer, Besitzer, Positionssatz, x, y) ein;
+        // die eingetragene Stelle steht im Positionssatz bei +0x1E/+0x22. Fahrzeuge: Art 6, Positionssatz = CarPos
+        uintptr_t GridRemove = 0, GridAdd = 0;
+        uint16_t  CarStop[10] = {};
+        uintptr_t GroundZ = 0;        // int32 __cdecl(x, y, z als GtaPos): Boden unter dem Punkt (sucht ab Ebene z abwärts)
         uintptr_t Explode = 0;        // __cdecl(x, y, z, Auslöser): Explosion erzeugen, alle Explosionen laufen hier durch
         uintptr_t ExplodeThunk = 0;   // London: jmp Explode
         uint8_t   ExplodeProlog[8] = { 0x83, 0xEC, 0x04, 0x33, 0xC9 };   // ohne Thunk: erste ganze Befehle der Funktion
@@ -236,6 +255,10 @@ namespace gta1
 
         uintptr_t TextReady = 0;      // int: FXT-Texte entschlüsselt
         uintptr_t TextBuffer = 0;     // char*: "[Schlüssel]Text\0..." bis "[]"
+        // const char* __cdecl GetText(Schlüssel): bricht mit "text identifier not found" ab, wenn er fehlt.
+        // Die ersten GetTextLen Byte (ohne relative Operanden) enden mit "mov eax,[TextReady]"
+        uintptr_t GetText = 0;
+        int       GetTextLen = 0;
         uintptr_t MglPrimary = 0;     // IDirectDrawSurface* (Primary von MGL)
         uintptr_t MglPageCount = 0;   // Anzahl Seiten der Flip-Kette
         uintptr_t IatGetProcAddress = 0, IatPeekMessageA = 0;
@@ -303,6 +326,14 @@ namespace gta1
         a.Cars = 0x73AF80; a.Straighten = 0x46AE99; a.BlockTypes = 0x590798;
         a.MapColumns = 0x5F395C; a.MapBlocks = 0x5F18E4;
         a.MapAllocAdd = 0x42824C; a.MapReadAdd = 0x4282B1; a.MapBase = 0x5F2904;   // Lader 0x428249 / 0x4282AF
+        a.CarCreate = 0x48B760;                                    // Missionsobjekt PARKED 0x480D26
+        a.GroundZ = 0x448460;                                      // Fahrzeug bewegen 0x410220
+        a.CarUpdate = 0x497690; a.CarUpdateCall = 0x4983C2;        // Physik 0x46A940, angehalten in 0x4978FE
+        a.CarPlaced = 0x492960;                                    // aus dem Erzeugen 0x494950
+        a.CarBounds = 0x4928A0; a.CarBoundsCommit = 0x492740;      // Zusammenstöße 0x43A069, Bewegung 0x497AF6
+        a.GridRemove = 0x40FD40; a.GridAdd = 0x40FB20;             // Fahrzeug bewegen 0x4105E9
+        { const uint16_t stop[10] = { 0x190, 0x194, 0x198, 0x1B4, 0x1B8, 0x1BC, 0x1C0, 0x1C4, 0x1C8, 0x17C };
+          memcpy(a.CarStop, stop, sizeof(stop)); }
         a.TramSkipInit = 0x45E173; a.TramSkipUpdate = 0x45EDCD;   // Züge anlegen 0x45E0A0, jedes Bild 0x45ED80
         a.BlockQuery = 0x428A20; a.BlockQueryCall = 0x437137;      // in der Abfrage 0x4370C0 (Gleis-Suchlauf 0x432A00)
         a.TramObstacleNext = 0x4611E6;                             // mov ecx,0Ch in 0x461100
@@ -320,6 +351,7 @@ namespace gta1
         a.HudJoin = 0x46EC64; a.HudScale = 0x4C17D0; a.HudAmmoCall = 0x46EC6B; a.HudAmmoGet = 0x4624D0;   // Index in ebx
         a.Explode = 0x404100;
         a.TextReady = 0x57EC60; a.TextBuffer = 0x57EC8C;   // aus GetText 0x4200D0
+        a.GetText = 0x4200D0; a.GetTextLen = 8;            // sub esp,4 / mov eax,[TextReady]
         a.MglPrimary = 0x4C2FEC; a.MglPageCount = 0x4C2FE8;
         a.IatGetProcAddress = 0x787474; a.IatPeekMessageA = 0x78754C;
         a.LoadGetProcAddress[0] = 0x49AFC3;
@@ -576,6 +608,7 @@ namespace gta1
         const uint8_t prolog[] = { 0x51, 0x33, 0xC9, 0x89, 0x4C, 0x24, 0x00 };
         memcpy(a.ExplodeProlog, prolog, sizeof(prolog));
         a.TextReady = 0x775550; a.TextBuffer = 0x775578;   // aus GetText 0x47D9A0
+        a.GetText = 0x47D9A0; a.GetTextLen = 6;            // push ecx / mov eax,[TextReady]
         a.MglPrimary = 0x4B5004; a.MglPageCount = 0x4B5000;
         a.DrawBits = 0x511904; a.DrawPitch = 0x503218; a.DrawBytes = 0x50321C; a.DrawWidth = 0x504CC0; a.DrawHeight = 0x504CC4; // 0x414B62
         a.DrawSetRows = 0x497BFA; a.DrawSetTarget = 0x486830;
@@ -662,6 +695,15 @@ namespace gta1
     static int s_footHeight = 0, s_footZoom = 0;       // dasselbe zu Fuß
     static float s_heightBlend = 0;                    // Anteil der festen Kamera am Bild
     static float s_fixedHeight = 0, s_fixedZoom = 0;   // feste Kamera, läuft ihrem Ziel nach
+    static float s_cameraFlight = 0;                   // Hubschrauber: 0..1 zur Kamera schneller Fahrt
+    // Hubschrauber: das Fahrzeug, das der Mod selbst bewegt und zeichnet. Für das Zeichnen des Spiels liegt es
+    // zwischen Kameraführung und Bild weit weg (x in s_hiddenX gemerkt), sonst überall da, wo es ist.
+    static int s_modCar = -1;
+    static bool s_modCarHidden = true;   // false: das Spiel zeichnet es selbst (unter einer Brücke)
+    static bool s_carHidden = false;
+    static int32_t s_hiddenX = 0;
+    static void HideModCar();
+    static void ShowModCar();
     static DWORD s_heightTick = 0;
     static void RestoreRenderCamera();
 
@@ -775,8 +817,20 @@ namespace gta1
     static void BeforeViewRect(int player)
     {
         RestoreRenderCamera(); // falls seit dem letzten Mal kein Bild gezeichnet wurde
+        ShowModCar();
         if (player == *reinterpret_cast<int*>(A.LocalPlayer))
+        {
             ApplyFixedHeight(player, CameraOf(player));
+            // Fliegen wie schnelle Fahrt (Höhe 268, zoom 90): weiter weg geht nicht, mehr zeichnet das Spiel nicht
+            CameraData& cam = CameraOf(player);
+            if (s_cameraFlight > 0 && cam.zoom > 0)
+            {
+                const float t = s_cameraFlight;
+                cam.height = (int)std::lround(cam.height + (std::max(cam.height, 268) - cam.height) * t);
+                cam.zoom = std::max(1, (int)std::lround(cam.zoom * std::pow(std::min(cam.zoom, 90) / (float)cam.zoom, t)));
+                cam.focal = cam.baseW * cam.zoom / 320;
+            }
+        }
         if (s_cameraFilter && player == *reinterpret_cast<int*>(A.LocalPlayer))
         {
             CameraData& cam = CameraOf(player);
@@ -799,6 +853,8 @@ namespace gta1
             s_cameraOverride();
             s_inViewRect = false;
         }
+        if (player == *reinterpret_cast<int*>(A.LocalPlayer))
+            HideModCar();
     }
 
     static void __cdecl ViewRectHook(int player)
@@ -1007,6 +1063,7 @@ namespace gta1
         if (s_preRender)
             s_preRender();
         reinterpret_cast<void(__cdecl*)()>(A.RenderFrame)();
+        ShowModCar();
         RestoreRenderCamera();
         EnlargeViewRectForLogic();
     }
@@ -1236,6 +1293,13 @@ namespace gta1
             return nullptr;
 
         const GtaPos* p = reinterpret_cast<GtaPos*(__cdecl*)(int)>(A.GetPlayerPos)(player);
+        if (p && s_carHidden && t == 0 && (object & 0xFFFF) == s_modCar)
+        {
+            static GtaPos s_real;   // der Hubschrauber liegt fürs Zeichnen woanders
+            s_real = *p;
+            s_real.x = s_hiddenX;
+            p = &s_real;
+        }
         if (p)
             type = t;
         return p;
@@ -2390,6 +2454,43 @@ namespace gta1
         return s_ok;
     }
 
+    namespace
+    {
+        const char* (*s_extraText)(const char*) = nullptr;
+        const char* (__cdecl* s_getText)(const char*) = nullptr;   // Sprungstück mit dem Anfang von GetText
+
+        const char* __cdecl GetTextHook(const char* key)
+        {
+            if (s_extraText && key)
+                if (const char* text = s_extraText(key))
+                    return text;
+            return s_getText(key);
+        }
+    }
+
+    bool SetExtraTexts(const char* (*lookup)(const char* key))
+    {
+        s_extraText = lookup;
+        static bool s_tried = false, s_ok = false;
+        if (s_tried)
+            return s_ok;
+        s_tried = true;
+        const int len = A.GetTextLen;
+        const uint8_t* site = reinterpret_cast<const uint8_t*>(A.GetText);
+        if (!s_supported || !site || len < 6 || len > 12 || site[len - 5] != 0xA1 ||
+            *reinterpret_cast<const uint32_t*>(site + len - 4) != static_cast<uint32_t>(A.TextReady))
+            return false;
+        uint8_t* stub = AllocStub(len + 5);
+        if (!stub)
+            return false;
+        Emitter e{ stub };
+        e.Bytes(site, len);
+        e.Byte(0xE9); e.Rel32(A.GetText + len);
+        s_getText = reinterpret_cast<const char*(__cdecl*)(const char*)>(stub);
+        s_ok = PatchJump(A.GetText, 0xE9, reinterpret_cast<const uint8_t*>(&GetTextHook), len);
+        return s_ok;
+    }
+
     int LocalPlayerIndex()
     {
         const int idx = s_supported ? *reinterpret_cast<int*>(A.LocalPlayer) : -1;
@@ -2467,6 +2568,251 @@ namespace gta1
             return false;
         const unsigned block = (unsigned(z / 64) << 16) | (unsigned(y / 64) << 8) | unsigned(x / 64);
         return ((*reinterpret_cast<const uint8_t*>(A.BlockTypes + block) >> 4) & 7) == 5;
+    }
+
+    bool PlayerCar(int& car, int& model)
+    {
+        const int idx = LocalPlayerIndex();
+        if (idx < 0 || !InGame() || !A.Cars || !A.PlayerCtrl)
+            return false;
+        const int type = *reinterpret_cast<int*>(A.PlayerCtrl + idx * L.PlayerStride);
+        const int object = *reinterpret_cast<int*>(A.PlayerObject + idx * L.PlayerStride) & 0xFFFF;
+        if (type != 0 || object >= 400)
+            return false;
+        car = object;
+        model = *reinterpret_cast<const int16_t*>(A.Cars + car * A.CarStride + A.CarModel);
+        return true;
+    }
+
+    static uint8_t* CarBase(int car) { return reinterpret_cast<uint8_t*>(A.Cars + car * A.CarStride); }
+    static GtaPos& CarGtaPos(int car) { return *reinterpret_cast<GtaPos*>(CarBase(car) + A.CarPos); }
+
+    // Aus dem Bild: für das Zeichnen ans andere Ende der Karte, danach wieder zurück
+    static void HideModCar()
+    {
+        if (s_modCar < 0 || s_carHidden || !s_modCarHidden || !A.Cars)
+            return;
+        GtaPos& p = CarGtaPos(s_modCar);
+        s_hiddenX = p.x;
+        p.x = p.x < (128 << 22) ? (250 << 22) : (5 << 22);
+        s_carHidden = true;
+    }
+
+    static void ShowModCar()
+    {
+        if (!s_carHidden)
+            return;
+        s_carHidden = false;
+        if (s_modCar >= 0)
+            CarGtaPos(s_modCar).x = s_hiddenX;
+    }
+
+    bool CarPlace(int car, float& x, float& y, float& z, int& angle)
+    {
+        if (!A.Cars || car < 0 || car >= 400)
+            return false;
+        const GtaPos& p = CarGtaPos(car);
+        x = (s_carHidden && car == s_modCar ? s_hiddenX : p.x) / 65536.0f;
+        y = p.y / 65536.0f;
+        z = p.z / 65536.0f;
+        const float heading = *reinterpret_cast<const float*>(CarBase(car) + A.CarHeading);
+        angle = (int)std::lround(-heading * 1024 / (2 * 3.14159265f)) & 1023;
+        return true;
+    }
+
+    void SetCarPlace(int car, float x, float y, float z, int angle)
+    {
+        if (!A.Cars || car < 0 || car >= 400)
+            return;
+        GtaPos& p = CarGtaPos(car);
+        const int32_t nx = (int32_t)std::lround(x * 65536.0f);
+        if (s_carHidden && car == s_modCar)
+            s_hiddenX = nx;
+        else
+            p.x = nx;
+        p.y = (int32_t)std::lround(y * 65536.0f);
+        p.z = (int32_t)std::lround(z * 65536.0f);
+        *reinterpret_cast<int16_t*>(CarBase(car) + A.CarAngle) = static_cast<int16_t>(angle & 1023);
+        *reinterpret_cast<int16_t*>(CarBase(car) + A.CarDrawAngle) = static_cast<int16_t>(angle & 1023);
+        *reinterpret_cast<float*>(CarBase(car) + A.CarHeading) = -(angle & 1023) * (2 * 3.14159265f / 1024);
+    }
+
+    void ScaleCarThrust(int car, float factor)
+    {
+        if (!A.Cars || car < 0 || car >= 400 || !A.CarInfo)
+            return;
+        uint8_t* info = *reinterpret_cast<uint8_t**>(CarBase(car) + A.CarInfo);
+        if (!info)
+            return;
+        // Den Wert des Modells einmal merken (neues Level: neue car_info, oder jemand anderes hat ihn geändert)
+        static const uint8_t* s_info = nullptr;
+        static float s_original = 0, s_written = 0;
+        float& thrust = *reinterpret_cast<float*>(info + A.InfoThrust);
+        if (info != s_info || thrust != s_written)
+        {
+            s_info = info;
+            s_original = thrust;
+        }
+        thrust = s_written = s_original * factor;
+    }
+
+    int CarNear(float x, float y, float z, float radius, int exclude)
+    {
+        if (!A.Cars)
+            return -1;
+        for (int car = 0; car < 400; ++car)
+        {
+            if (car == exclude || *reinterpret_cast<const int16_t*>(CarBase(car) + A.CarUsed) == -1)
+                continue;
+            const GtaPos& p = CarGtaPos(car);
+            const float dx = p.x / 65536.0f - x, dy = p.y / 65536.0f - y, dz = p.z / 65536.0f - z;
+            if (dx * dx + dy * dy < radius * radius && std::fabs(dz) < 48)
+                return car;
+        }
+        return -1;
+    }
+
+    void KillPlayer()
+    {
+        if (uint8_t* ped = PlayerPedStruct())
+            ped[L.PedHealth] = 0;   // 0 behandelt das Spiel als Tod
+    }
+
+    void SetCarDamage(int car, int damage)
+    {
+        if (A.CarDamage && car >= 0 && car < 400)
+            *reinterpret_cast<uint8_t*>(A.CarDamage + car * A.CarStride) = static_cast<uint8_t>(std::clamp(damage, 0, 100));
+    }
+
+    float GroundBelow(float x, float y, float z)
+    {
+        if (!A.GroundZ || x < 0 || y < 0 || x >= 256 * 64 || y >= 256 * 64)
+            return z;
+        const int32_t g = reinterpret_cast<int32_t(__cdecl*)(int32_t, int32_t, int32_t)>(A.GroundZ)(
+            (int32_t)(x * 65536), (int32_t)(y * 65536), (int32_t)(std::clamp(z, 0.0f, 383.0f) * 65536));
+        return g / 65536.0f;
+    }
+
+    // Physik und Umriss auf Ort und Winkel des Fahrzeugs bringen, wie es das Spiel nach dem Erzeugen tut. Sonst
+    // bleibt der Umriss eines vom Mod bewegten Fahrzeugs dort, wo es abgehoben hat: ein unsichtbares Hindernis, und
+    // nach der Landung rechnet die Physik von dort aus weiter.
+    static void SyncCar(int car)
+    {
+        if (!A.CarPlaced || !A.CarBounds || !A.CarBoundsCommit)
+            return;
+        GtaPos& p = CarGtaPos(car);
+        const bool hidden = s_carHidden && car == s_modCar;
+        const int32_t drawX = p.x;
+        if (hidden)
+            p.x = s_hiddenX;
+        uint8_t* b = CarBase(car);
+        reinterpret_cast<void(__cdecl*)(uint8_t*)>(A.CarPlaced)(b);
+        reinterpret_cast<void(__cdecl*)(uint8_t*)>(A.CarBounds)(b);
+        reinterpret_cast<void(__cdecl*)(uint8_t*)>(A.CarBoundsCommit)(b);
+        // In die Rasterzelle umtragen, in der es jetzt steht; sonst zeichnet das Spiel es nur dort, wo es abgehoben hat
+        uint8_t* rec = reinterpret_cast<uint8_t*>(&p);
+        const int32_t regX = *reinterpret_cast<int32_t*>(rec + 0x1E), regY = *reinterpret_cast<int32_t*>(rec + 0x22);
+        if (A.GridRemove && A.GridAdd && (regX == -1 || (regX >> 23) != (p.x >> 23) || (regY >> 23) != (p.y >> 23)))
+        {
+            reinterpret_cast<void(__cdecl*)(void*, void*)>(A.GridRemove)(b, rec);
+            reinterpret_cast<void(__cdecl*)(int32_t, int32_t, void*, void*, int32_t, int32_t)>(A.GridAdd)(
+                6, *reinterpret_cast<int16_t*>(b), b, rec, p.x, p.y);
+        }
+        if (hidden)
+            p.x = drawX;
+    }
+
+    void SyncModCar()
+    {
+        if (s_modCar >= 0)
+            SyncCar(s_modCar);
+    }
+
+    namespace
+    {
+        void __cdecl CarUpdateHook(uint8_t* car)
+        {
+            if (s_modCar >= 0 && car == CarBase(s_modCar))
+                return;   // bewegt der Mod
+            reinterpret_cast<void(__cdecl*)(uint8_t*)>(A.CarUpdate)(car);
+        }
+    }
+
+    bool ModCarAvailable()
+    {
+        return s_supported && A.Cars && A.CarUpdate && A.CarUpdateCall && A.CarStop[0] && A.GroundZ && A.BlockTypes;
+    }
+
+    bool SetModCar(int car)
+    {
+        static bool s_hooked = false;
+        if (!ModCarAvailable())
+            return false;
+        if (!s_hooked)
+        {
+            if (!Redirect(A.CarUpdateCall, 0xE8, A.CarUpdate, reinterpret_cast<void*>(&CarUpdateHook)))
+                return false;
+            s_hooked = true;
+        }
+        if (car == s_modCar)
+            return true;
+        ShowModCar();
+        // Zurück an die Physik: stehend, Ort und Richtung übernimmt sie wie beim Erzeugen aus CarPos und CarAngle
+        if (s_modCar >= 0)
+        {
+            uint8_t* b = CarBase(s_modCar);
+            for (uint16_t field : A.CarStop)
+                if (field)
+                    *reinterpret_cast<float*>(b + field) = 0.0f;
+            if (A.CarPlaced)
+                SyncCar(s_modCar);
+            else
+                *reinterpret_cast<float*>(b + A.CarPhysX) = 0.0f;
+        }
+        s_modCar = car >= 0 && car < 400 ? car : -1;
+        return true;
+    }
+
+    void SetCameraFlight(float t) { s_cameraFlight = std::clamp(t, 0.0f, 1.0f); }
+    void SetModCarDrawn(bool byGame) { s_modCarHidden = !byGame; }
+
+    bool IsSolidBlock(int x, int y, int level)
+    {
+        if (!A.BlockTypes || x < 0 || y < 0 || x > 255 || y > 255 || level < 0 || level > 5)
+            return false;
+        if (((*reinterpret_cast<const uint8_t*>(A.BlockTypes + (level << 16) + (y << 8) + x) >> 4) & 7) == 5)
+            return true;   // Gebäude
+        // Sonst zählt ein Deckel (Brücke, Dach, Boden): Spalte (Höhe h, Blockarten der Ebenen h..5) der Karte
+        if (!A.MapBase || !A.MapColumns || !A.MapBlocks)
+            return false;
+        const uint32_t* offsets = *reinterpret_cast<uint32_t* const*>(A.MapBase);
+        const uint8_t* columns = *reinterpret_cast<uint8_t* const*>(A.MapColumns);
+        const uint8_t* blocks = *reinterpret_cast<uint8_t* const*>(A.MapBlocks);
+        if (!offsets || !columns || !blocks || reinterpret_cast<const uint8_t*>(offsets + 65536) != columns)
+            return false;
+        const uint16_t* column = reinterpret_cast<const uint16_t*>(columns + offsets[(y << 8) + x]);
+        if (level < column[0])
+            return false;   // über der Spalte ist Luft
+        const uint8_t* block = blocks + column[1 + level - column[0]] * 8;
+        return block[7] != 0 && (block[1] & 0x3F) == 0;   // Rampen nicht: ihr Boden liegt im Block
+    }
+
+    int CreateCar(int x, int y, int z, int model, int angle)
+    {
+        if (!A.CarCreate || !InGame())
+            return -1;
+        return static_cast<int16_t>(reinterpret_cast<int32_t(__cdecl*)(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t)>(
+            A.CarCreate)(x, y, z, model, angle & 1023, 0));
+    }
+
+    int SpawnCar(int model, int angle)
+    {
+        float x, y, z;
+        int pedAngle;
+        if (!A.CarCreate || !PlayerFoot(x, y, z, pedAngle))
+            return -1;
+        // Zwei Blöcke neben der Figur, Höhe wie in der Missionsdatei: Block, auf dessen Deckel der Boden liegt
+        return CreateCar((int)(x / 64) + 2, (int)(y / 64), (int)(z / 64) + 1, model, angle);
     }
 
     bool Explode(float x, float y, float z)

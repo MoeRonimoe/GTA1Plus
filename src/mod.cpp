@@ -9,6 +9,7 @@
 #include "ddhook.h"
 #include "fire.h"
 #include "firebomb.h"
+#include "heli.h"
 #include "gta1.h"
 #include "hooks.h"
 #include "hudscale.h"
@@ -79,7 +80,7 @@ namespace
     }
 
     // Debug: <asi>.burn anlegen -> Spielfigur anzünden, <asi>.douse -> löschen (zum Testen im Spiel)
-    std::wstring g_burnRequest, g_douseRequest, g_rumbleRequest, g_firebombRequest;
+    std::wstring g_burnRequest, g_douseRequest, g_rumbleRequest, g_firebombRequest, g_heliRequest;
     DWORD g_debugCheck = 0;
 
     void CheckDebugRequests()
@@ -111,6 +112,20 @@ namespace
             firebomb::SetAmmo(firebomb::Ammo() + 10);
             LOG("Debug: Brandbomben: %d", firebomb::Ammo());
         }
+        // <asi>.heli: den gestrichenen Hubschrauber (Modell 88) neben die Spielfigur stellen
+        if (GetFileAttributesW(g_heliRequest.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            int angle = 0;   // Inhalt der Datei: Winkel (0 = Süden, 256 = Osten)
+            FILE* f = nullptr;
+            if (!_wfopen_s(&f, g_heliRequest.c_str(), L"r") && f)
+            {
+                if (fscanf_s(f, "%d", &angle) != 1)
+                    angle = 0;
+                fclose(f);
+            }
+            DeleteFileW(g_heliRequest.c_str());
+            LOG("Debug: Hubschrauber: Fahrzeug %d (Winkel %d)", gta1::SpawnCar(88, angle), angle);
+        }
     }
 
     void OnPreRender()
@@ -124,6 +139,7 @@ namespace
         gta1::SetSteerAssist(g_cfg.steerAssist);
         gta1::SetTrams(g_cfg.trams);                     // wirkt ab dem nächsten Levelstart
         firebomb::Tick();
+        heli::Tick();
         missiontimers::Tick();
     }
 
@@ -201,6 +217,7 @@ void ModInit(HMODULE self)
     g_douseRequest = SiblingPath(self, L".douse");
     g_rumbleRequest = SiblingPath(self, L".rumble");
     g_firebombRequest = SiblingPath(self, L".firebomb");
+    g_heliRequest = SiblingPath(self, L".heli");
     if (g_cfg.log)
         logx::Open(SiblingPath(self, L".log").c_str());
 
@@ -251,6 +268,7 @@ void ModInit(HMODULE self)
         if (g_cfg.trams)
             LOG("Straßenbahnen in San Andreas: %s", gta1::SetTrams(true) ? "aktiv" : "für diese Version nicht verfügbar");
         firebomb::Init();
+        heli::Init();
         if (g_cfg.keepMultiplier)
             LOG("Multiplikator bei Verhaftung behalten: %s", gta1::EnableKeepMultiplier() ? "aktiv" : "Spielcode passt nicht");
         if (g_cfg.allCharacters)

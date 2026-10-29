@@ -1,5 +1,6 @@
 #include "pois.h"
 #include "gta1.h"
+#include "heli.h"
 #include "log.h"
 
 #include <windows.h>
@@ -174,6 +175,10 @@ namespace pois
             g_current.clear();
             if (Load())
                 g_level = level;
+            std::vector<heli::Spot> spots;
+            heli::Spots(spots);
+            for (const heli::Spot& s : spots)
+                g_current.push_back({ Kind::Heli, s.x, s.y });
         }
         return g_current;
     }

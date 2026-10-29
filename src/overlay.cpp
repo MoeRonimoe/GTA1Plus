@@ -7,12 +7,14 @@
 #include "fire.h"
 #include "firebomb.h"
 #include "gta1.h"
+#include "heli.h"
 #include "hudscale.h"
 #include "log.h"
 #include "nav.h"
 #include "options.h"
 #include "pois.h"
 #include "saves.h"
+#include "style.h"
 #include "briefings.h"
 #include "text.h"
 #include "tiltcam.h"
@@ -412,7 +414,7 @@ namespace overlay
         }
 
         // Orte: Lackiererei grün mit Sprühdose, Bombenladen rot mit Bombe, Autokran gelb mit Kran
-        constexpr uint32_t kPoiColors[] = { 0x1F9D6B, 0xC62828, 0xE0A21A };
+        constexpr uint32_t kPoiColors[] = { 0x1F9D6B, 0xC62828, 0xE0A21A, 0x2F6FD0 };
 
         void FillRect(Canvas& c, float x0, float y0, float x1, float y1, uint32_t color)
         {
@@ -452,6 +454,17 @@ namespace overlay
                 c.Line(x + 4.5f * u, y - 6.0f * u, x + 4.5f * u, y + 0.8f * u, w * 0.7f, k);     // Seil
                 c.Ring(x + 4.5f * u, y + 2.2f * u, 1.4f * u, w * 0.7f, k);                       // Haken
                 FillRect(c, x - 6.0f * u, y + 5.8f * u, x, y + 7.6f * u, k);                     // Fuß
+                break;
+            }
+            case pois::Kind::Heli:
+            {
+                const float w = std::max(1.0f, 1.2f * u);
+                c.Circle(x - 1.0f * u, y + 1.0f * u, 3.6f * u, 0xFFFFFF);                           // Kabine
+                c.Line(x + 1.5f * u, y + 1.0f * u, x + 7.0f * u, y + 1.0f * u, w * 1.4f, 0xFFFFFF);  // Heck
+                c.Line(x + 7.0f * u, y - 1.2f * u, x + 7.0f * u, y + 3.2f * u, w, 0xFFFFFF);        // Heckrotor
+                c.Line(x - 7.0f * u, y - 4.5f * u, x + 5.0f * u, y - 4.5f * u, w, 0xFFFFFF);        // Rotor
+                c.Line(x - 1.0f * u, y - 4.5f * u, x - 1.0f * u, y - 2.0f * u, w, 0xFFFFFF);        // Mast
+                c.Line(x - 4.5f * u, y + 5.0f * u, x + 2.5f * u, y + 5.0f * u, w, 0xFFFFFF);        // Kufe
                 break;
             }
             default:
@@ -1546,7 +1559,7 @@ namespace overlay
                     bool present[(int)pois::Kind::Count] = {};
                     for (const pois::Poi& p : pois::Current())
                         present[(int)p.kind] = true;
-                    const text::Id names[] = { text::PoiSpray, text::PoiBombShop, text::PoiCrane };
+                    const text::Id names[] = { text::PoiSpray, text::PoiBombShop, text::PoiCrane, text::HeliName };
                     const float ir = g_fonts.smallPx * 0.55f;
                     const int gap = m / 2, itemGap = m;
                     int total = gap;
@@ -2055,6 +2068,100 @@ namespace overlay
             c.Composite(v, left, top, dw, dh);
         }
 
+        // Sprite um angle gedreht (Bogenmaß, gegen den Uhrzeigersinn) und um scale vergrößert, Mitte cx/cy; in
+        // Bildrichtung (tiltX, tiltY) um deren Länge gestaucht, als neige es sich dorthin;
+        // shadowAlpha > 0: nur die Form, schwarz und so deckend
+        void DrawSpriteRotated(SurfaceView& v, const style::Sprite& s, float cx, float cy, float scale, float angle,
+                               int shadowAlpha = 0, float tiltX = 0, float tiltY = 0)
+        {
+            if (s.w <= 0 || s.h <= 0 || scale <= 0)
+                return;
+            Canvas& c = g_canvas;
+            const float r = 0.5f * std::sqrt(float(s.w * s.w + s.h * s.h)) * scale;
+            const int left = (int)std::floor(cx - r), top = (int)std::floor(cy - r), size = (int)std::ceil(2 * r) + 1;
+            if (left >= c.Width() || top >= c.Height() || left + size <= 0 || top + size <= 0)
+                return;
+            const float co = std::cos(angle), si = std::sin(angle), inv = 1.0f / scale;
+            const float tilt = std::min(0.5f, std::sqrt(tiltX * tiltX + tiltY * tiltY));
+            const float ux = tilt > 0 ? tiltX / tilt : 0, uy = tilt > 0 ? tiltY / tilt : 0, stretch = tilt / (1 - tilt);
+            c.BeginLayer(left, top, size, size);
+            for (int y = 0; y < size; ++y)
+                for (int x = 0; x < size; ++x)
+                {
+                    // Bildpunkt zurück ins Sprite: Stauchung aufheben, zurückdrehen
+                    float dx = left + x + 0.5f - cx, dy = top + y + 0.5f - cy;
+                    const float along = (dx * ux + dy * uy) * stretch;
+                    dx += ux * along;
+                    dy += uy * along;
+                    const float u = (dx * co - dy * si) * inv + s.w * 0.5f, w = (dx * si + dy * co) * inv + s.h * 0.5f;
+                    if (u < 0 || w < 0 || u >= s.w || w >= s.h)
+                        continue;
+                    const uint32_t p = s.px[(size_t)w * s.w + (size_t)u];
+                    if (p >> 24)
+                        c.BlendPixel(left + x, top + y, shadowAlpha ? 0x000000 : p & 0xFFFFFF, shadowAlpha ? shadowAlpha : 255);
+                }
+            c.Composite(v, left, top, size, size);
+        }
+
+        // Hubschrauber in der Luft: das Spiel zeichnet ihn dann nicht (zu nah an der Kamera, unter tieferen Fahrzeugen),
+        // also hier: Schatten auf dem Boden, Rumpf (Fahrzeug 88) und darüber der drehende Rotor (Objektart 92)
+        style::Sprite g_heliBody;
+        std::vector<style::Sprite> g_heliRotor;
+        unsigned g_heliMapGen = ~0u;
+
+        void DrawHeli(SurfaceView& v)
+        {
+            heli::Visual h;
+            if (!heli::GetVisual(h))
+                return;
+            if (g_heliMapGen != gta1::MapGeneration())
+            {
+                g_heliMapGen = gta1::MapGeneration();
+                g_heliBody = style::Sprite();
+                g_heliRotor.clear();
+                style::File file;
+                int frames = 0;
+                const int rotor = file.Load() ? file.ObjectSprite(92, frames) : -1;
+                if (!file.SpriteAt(file.CarSprite(88), g_heliBody) || rotor < 0)
+                    LOG("Hubschrauber: Grafik nicht im Style gefunden");
+                for (int i = 0; rotor >= 0 && i < frames; ++i)
+                {
+                    g_heliRotor.emplace_back();
+                    file.SpriteAt(rotor + i, g_heliRotor.back());
+                }
+            }
+            // Weltpixel -> Bild: Ort und Maßstab in der jeweiligen Höhe, gedreht wie das Bild der Kippkamera
+            const auto place = [](float x, float y, float z, float& sx, float& sy, float& scale) {
+                float x1, y1;
+                if (!gta1::WorldToScreen(x, y, z, sx, sy) || !gta1::WorldToScreen(x + 64, y, z, x1, y1))
+                    return false;
+                scale = (x1 - sx) / 64;
+                float ox = sx, oy = sy;   // GameToOutput ändert nur bei gekippter Kamera
+                tiltcam::GameToOutput(sx, sy, ox, oy);
+                sx = ox;
+                sy = oy;
+                return scale > 0;
+            };
+            const float rotation = tiltcam::Rotation();
+            const float angle = h.heading * (2 * 3.14159265f / 1024) - rotation;
+            // Neigung in Flugrichtung: bis 15 % gestaucht, Rotor etwas nach vorn (Bildrichtung wie die Kippkamera)
+            const float tx = (h.vx * std::cos(rotation) - h.vy * std::sin(rotation)) * 0.15f;
+            const float ty = (h.vx * std::sin(rotation) + h.vy * std::cos(rotation)) * 0.15f;
+            float sx, sy, scale;
+            if (place(h.x, h.y, h.ground, sx, sy, scale))
+                DrawSpriteRotated(v, g_heliBody, sx, sy, scale, angle, 90);
+            if (!place(h.x, h.y, h.z, sx, sy, scale))
+                return;
+            DrawSpriteRotated(v, g_heliBody, sx, sy, scale, angle, 0, tx, ty);
+            if (!g_heliRotor.empty())
+            {
+                // Rotormast 17 Pixel vor der Mitte (wie beim gestrichenen Skript-Hubschrauber)
+                const float mx = sx + 17 * scale * std::sin(angle) + tx * 40 * scale;
+                const float my = sy + 17 * scale * std::cos(angle) + ty * 40 * scale;
+                DrawSpriteRotated(v, g_heliRotor[(GetTickCount() / 30) % g_heliRotor.size()], mx, my, scale, angle, 0, tx, ty);
+            }
+        }
+
         // Brandbombe: fliegende Flaschen und, solange sie gewählt ist, ihr Symbol mit der Zahl oben links, wo das
         // Spiel sonst die Waffe zeigt (bei gewählter Brandbombe hält die Figur die Faust, das Spiel zeigt dort nichts)
         void DrawFirebomb(SurfaceView& v)
@@ -2100,6 +2207,8 @@ namespace overlay
             if (inGame && g_cfg.hint && !g_hintStart)
                 g_hintStart = now;
 
+            if (inGame)
+                DrawHeli(v);
             if (havePlayer && g_cfg.gps && g_cfg.gpsArrow)
                 DrawGpsArrow(v, p);
             if (inGame && g_hintStart && now - g_hintStart < 8000)
@@ -2124,6 +2233,14 @@ namespace overlay
                 ShowToast(notice, noticeError);
             if (firebomb::TakeNotice(notice))
                 ShowToast(notice);
+            if (heli::TakeHelp())
+            {
+                wchar_t up[16], down[16], help[256];
+                KeyName(g_cfg.nextWeaponKey, up, 16);
+                KeyName(g_cfg.prevWeaponKey, down, 16);
+                swprintf_s(help, text::Get(text::HeliHelp), up, down);
+                ShowToast(help);
+            }
             if (!g_toast.empty() && now - g_toastTick < kToastTime && inGame)
                 DrawToast(v);
             if (g_cfg.showInfo)

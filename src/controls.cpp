@@ -3,6 +3,7 @@
 #include "config.h"
 #include "fire.h"
 #include "firebomb.h"
+#include "heli.h"
 #include "gta1.h"
 #include "hooks.h"
 #include "log.h"
@@ -875,6 +876,10 @@ namespace controls
         // Brandbombe: wählt sich in den Waffenwechsel ein und nimmt, solange sie gewählt ist, den Schuss
         firebomb::Keys keys = { !lying && (kb.fire || in.fire), !lying && (kb.weaponNext || in.weaponNext),
                                 !lying && (kb.weaponPrev || in.weaponPrev) };
+        // Hubschrauber: die Waffentasten steigen und sinken
+        heli::SetInput(!menu && heli::Active() && keys.next, !menu && heli::Active() && keys.prev);
+        if (heli::Active())
+            keys.next = keys.prev = false;
         if (!menu)
             keys = firebomb::Filter(keys, onFoot);
         packet = WriteHeld(packet, kFire, kFireHeld, keys.fire, g_sentFire);
@@ -886,6 +891,14 @@ namespace controls
             packet &= ~kEnterExit;
         else if (in.enterExit)
             packet |= kEnterExit;
+        // Hubschrauber: in der Luft lenkt und beschleunigt der Mod nach dem, was das Spiel bekommen hätte
+        {
+            const int steerBits = (int)((packet & kSteerBits) >> 9);
+            const int steer = (packet & kSteer) ? (steerBits & 8 ? steerBits - 16 : steerBits) : 0;
+            const int gas = (packet & kGas) ? (int)((packet & kGasBits) >> 15) : 0;
+            const int brake = (packet & kBrake) ? (int)((packet & kBrakeBits) >> 13) : 0;
+            heli::SetDrive(menu ? 0.0f : steer / 7.0f, menu ? 0.0f : (gas - brake) / 3.0f);
+        }
 
         if (g_cfg.showInfo)
         {
