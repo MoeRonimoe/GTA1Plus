@@ -27,6 +27,7 @@ struct Config
     int  steerAssist    = 2;     // Lenkhilfe: Wagen auf die Straßenrichtung ausrichten (0 aus, 1 leicht, 2 mittel, 3 stark)
     bool trams          = true;  // Straßenbahnen in San Andreas fahren lassen (das Spiel hat sie abgeschaltet)
     bool firebomb       = true;  // gestrichene Brandbombe: Kisten, Waffenwechsel, Wurf
+    bool helicopter     = true;  // gestrichener Hubschrauber: an vier Plätzen je Stadt abgestellt, fliegt
     int  extraMissionTime = 0;   // Sekunden mehr für jeden Countdown einer Mission (0 = wie im Spiel)
     bool quickRetry     = true;  // nach gescheiterter Mission ohne lange Wartezeit neu versuchen
     bool allCharacters  = true;  // Frauen im Hauptmenü auch in nicht-englischen Versionen wählbar

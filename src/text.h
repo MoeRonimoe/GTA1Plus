@@ -146,6 +146,8 @@ namespace text
         OptMinimapZoom,
         HeliName,
         HeliHelp,
+        OptGroupCutContent,
+        OptHelicopter,
         Count
     };
 

@@ -1,4 +1,5 @@
 #include "heli.h"
+#include "config.h"
 #include "gta1.h"
 #include "log.h"
 #include "text.h"
@@ -41,6 +42,7 @@ namespace heli
         DWORD s_jumpTick = 0;                        // Spielfigur aus der Höhe abgesprungen, fällt noch
         float s_steer = 0, s_throttle = 0;
         int   s_car = -1, s_limitedCar = -1;
+        float s_limitedThrust = 0;
         float s_x = 0, s_y = 0, s_z = 0;             // Weltpixel, z kleiner = höher (0 = Oberkante der Karte)
         float s_vx = 0, s_vy = 0, s_vz = 0;          // Weltpixel je Sekunde
         float s_heading = 0, s_turn = 0;             // Winkeleinheiten, 0 = Süden, gegen den Uhrzeigersinn
@@ -98,6 +100,11 @@ namespace heli
             }
             if (!s_levelTick || now - s_levelTick < 3000 || !gta1::InGame() || !gta1::ModCarAvailable())
                 return;
+            if (!g_cfg.helicopter)
+            {
+                s_levelTick = 0;   // abgeschaltet: in diesem Level keine
+                return;
+            }
             s_levelTick = 0;
             int placed = 0;
             for (const Place& p : kPlaces)
@@ -238,7 +245,7 @@ namespace heli
     void Spots(std::vector<Spot>& out)
     {
         out.clear();
-        if (gta1::ModCarAvailable())
+        if (g_cfg.helicopter && gta1::ModCarAvailable())
             for (const Place& p : kPlaces)
                 if (OnMap(p))
                     out.push_back({ p.x + 0.5f, p.y + 0.5f });
@@ -269,7 +276,17 @@ namespace heli
         s_tick = now;
         SpawnParked(now);
         int car = -1, model = -1;
-        s_active = gta1::PlayerCar(car, model) && model == kModel && gta1::ModCarAvailable();
+        const bool inHeli = gta1::PlayerCar(car, model) && model == kModel && gta1::ModCarAvailable();
+        // Abgeschaltet: ein Hubschrauber, der noch herumsteht, ist wieder ein Bus mit Hubschrauber-Grafik wie im
+        // Spiel; ein laufender Flug endet noch wie gewohnt
+        s_active = inHeli && (g_cfg.helicopter || s_flying);
+        const float groundThrust = g_cfg.helicopter ? kGroundThrust : 1.0f;
+        if (inHeli && (car != s_limitedCar || groundThrust != s_limitedThrust))
+        {
+            s_limitedCar = car;
+            s_limitedThrust = groundThrust;
+            gta1::ScaleCarThrust(car, groundThrust);
+        }
         if (s_active && !s_wasActive)
             s_help = true;
         s_wasActive = s_active;
@@ -304,11 +321,6 @@ namespace heli
         if (!gta1::CarPlace(car, x, y, z, angle))
             return;
         s_car = car;
-        if (s_limitedCar != car)
-        {
-            s_limitedCar = car;
-            gta1::ScaleCarThrust(car, kGroundThrust);
-        }
         if (!s_flying)
         {
             // Am Boden fährt ihn das Spiel; Steigen hebt ab, gleich mit etwas Auftrieb
