@@ -159,12 +159,19 @@ GAMEPLAY
     Andreas and the trams themselves, but they were switched off. Now four
     trams run on two loops and stop at the crossings, each stop marked
     with the game's unused tram stop sign. From the next level start;
-    can be switched off in the pause menu (GTA1Plus options, Gameplay).
+    can be switched off in the pause menu (GTA1Plus options, Cut Content).
   - Firebomb, the weapon cut from GTA1: some pistol and machine-gun crates
     hold a red petrol can - break the crate open and pick it up for five
     firebombs. In the weapon cycle the firebomb comes after the
     flamethrower; fire throws it at the crosshair, where it explodes.
-    Can be switched off in the pause menu (GTA1Plus options, Gameplay).
+    Can be switched off in the pause menu (GTA1Plus options, Cut Content).
+  - Helicopter, the vehicle cut from GTA1: four of them stand on open
+    squares in every city (marked on the map). On the ground it only
+    crawls; the weapon keys (E / Q, RB / LB) climb and descend, and it
+    keeps drifting, so brake in time. Below the rooftops it crashes into
+    buildings and bridges, and touching down too fast ends in a crash.
+    Plain building roofs are no landing pad. Bailing out high up is fatal.
+    Can be switched off in the pause menu (GTA1Plus options, Cut Content).
   - Quick retry: after "MISSION FAILED" the phone of the mission rings again
     right away. Rewards already paid in the failed attempt are not paid again.
   - Busted: the multiplier is not halved.

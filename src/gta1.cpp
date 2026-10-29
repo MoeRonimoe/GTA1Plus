@@ -593,6 +593,15 @@ namespace gta1
         a.PlayerWeapon = 0x74F2A8;                                 // Waffenwechsel 0x4619F0
         a.CrateOpenSlot = 0x46A470; a.CrateOpenCreate = 0x44CEF0; a.CrateOpenDone = 0x46A404;   // Tabelle 0x46A460
         a.CrateTable = 0x74F858;
+        // Hubschrauber: Fahrzeug erzeugen wie PARKED (0x445AC5), Boden 0x4544E0, Fahrzeug je Bild 0x40A640 (Physik 0x460BE0),
+        // aufstellen 0x405CA0, Umriss 0x405BE0 / 0x405A80. Die Bewegungsfelder liegen 0x0C weiter als in 1.0.0.1, der
+        // Winkel bei +0x268, car_info bei +0x2AC. Ein Raster wie in 1.0.0.1 hat diese Fassung nicht
+        a.CarCreate = 0x475840; a.GroundZ = 0x4544E0;
+        a.CarUpdate = 0x40A640; a.CarUpdateCall = 0x40B2F6;
+        { const uint16_t stop[10] = { 0x19C, 0x1A0, 0x1A4, 0x1C0, 0x1C4, 0x1C8, 0x1CC, 0x1D0, 0x1D4, 0x188 };
+          memcpy(a.CarStop, stop, sizeof(stop)); }
+        a.CarPhysX = 0x190; a.CarAngle = 0x268; a.CarHeading = 0x198; a.CarInfo = 0x2AC;
+        a.CarPlaced = 0x405CA0; a.CarBounds = 0x405BE0; a.CarBoundsCommit = 0x405A80;
         // Figur trifft Objekt 0x459130 (Tabelle 0x459378), Fahrzeug trifft Objekt 0x410880 (0x410D50), berühren
         // sich zwei Dinge? Tabellen 0x410188 (Art - 1) und 0x410214
         a.CanPickup[0] = 0x4593C4; a.CanPickup[1] = 0x410DA2; a.CanPickup[2] = 0x4101D9; a.CanPickup[3] = 0x410266;
