@@ -15,6 +15,11 @@ namespace saves
     bool Save(bool autosave);
     // nullptr = geladen, sonst Grund (für das Log)
     const char* Load();
+    // Laden mitten im Level: erst den Level neu starten, geladen wird, sobald er eingerichtet ist (wie das Angebot
+    // beim Levelstart). nullptr = Neustart läuft, sonst Grund; ohne Neustart (Spielversion) gleich laden wie Load()
+    const char* LoadWithRestart(bool& restarting);
+    // Der Neustart für das Laden läuft noch: Wartebild statt Spiel, keine Eingaben
+    bool Reloading();
     // Datum und Punkte des vorhandenen Stands für die Anzeige
     bool SlotInfo(std::wstring& text);
 

@@ -53,6 +53,7 @@ namespace gta1
     void Pause();
     void Resume();
     void QuitLevel();              // zurück ins Hauptmenü, wie die bestätigte Beenden-Abfrage
+    bool ReloadLevel();            // denselben Level ohne Hauptmenü neu starten; false, wenn die Spielversion es nicht kann
 
     // Läuft jeden Frame nach der Simulation direkt vor dem Zeichnen der Welt (Spiel-Thread)
     void SetPreRenderCallback(void (*cb)());
@@ -202,6 +203,13 @@ namespace gta1
         std::vector<uint8_t> triggers;          // leer bei Spielständen der Version 1
         std::vector<uint8_t> doors;             // je Tor 1 = aus; leer bei Spielständen bis Version 2
         std::vector<uint8_t> arrows;            // Missionspfeil und roter Pfeil; leer bis Version 3
+        std::vector<uint8_t> cars;              // Fahrzeuge der Skriptobjekte (Ort, Modell)
+        bool hasCars = false;                   // cars ist gespeichert (ab Version 7)
+        std::vector<uint8_t> peds;              // lebende Figuren der Skriptobjekte (Ort, Richtung)
+        bool hasPeds = false;                   // peds ist gespeichert (ab Version 8)
+        std::vector<uint8_t> crates;            // stehende Kisten (Lage, Typ, Menge)
+        bool hasCrates = false;                 // crates ist gespeichert (ab Version 9)
+        std::vector<uint8_t> procTriggers;      // je Skriptprozess der Auslöser, der ihn gestartet hat; ab Version 10
     };
     // Das Skript hat den Level fertig eingerichtet (Waffen, Tore, Kräne; dauert 4 bis 9 Sekunden). Vorher darf
     // kein Stand geladen oder gespeichert werden. msSinceLevelStart zählt nur, wenn der Skript-Hook fehlt.

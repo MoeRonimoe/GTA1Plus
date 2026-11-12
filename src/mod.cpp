@@ -282,7 +282,11 @@ void ModInit(HMODULE self)
         fire::Init();
         hudscale::Init();
         // Immer einhängen: Steuerung und Controller lassen sich im Optionsmenü während des Spiels umschalten
-        gta1::SetInputFilter(&controls::ProcessPacket);
+        // Während der Level für das Laden neu startet, bewegt sich die Figur nicht (das Bild ist verdeckt)
+        gta1::SetInputFilter([](uint32_t packet) -> uint32_t {
+            packet = controls::ProcessPacket(packet);
+            return saves::Reloading() ? 0 : packet;
+        });
         if (g_cfg.cameraSteady)
             LOG("Ruhigere Kamera: %s", gta1::EnableSteadyCamera() ? "aktiv" : "Spielcode passt nicht");
         if ((g_cfg.twinStick || g_cfg.controller) && g_cfg.camera)

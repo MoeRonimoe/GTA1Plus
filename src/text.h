@@ -148,6 +148,7 @@ namespace text
         HeliHelp,
         OptGroupCutContent,
         OptHelicopter,
+        LoadingSave,
         Count
     };
 

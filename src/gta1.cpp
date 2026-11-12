@@ -71,6 +71,19 @@ namespace gta1
         uintptr_t PauseAll = 0, ResumeAll = 0;       // London: Anzeige, RunState und Ton in einer Funktion
         uintptr_t QuitLevel = 0;      // wie Enter in der Beenden-Abfrage des Spiels
         uintptr_t ArrowResolve = 0;   // GtaPos* __cdecl(ArrowTarget*), Typ 0 Auto, 1 Position, 3 Fußgänger, 4 Spieler
+        // Telefone (aus MPHONE, 1.0.0.1: 0x4771B0): PhoneState(Objekt, Zustand) 1 = still, 2/3 = klingelt und blinkt;
+        // PhoneQuiet(Objekt) beendet den Klingelton; PhoneRinging: byte, MPHONE hat seine Gruppe klingeln lassen
+        uintptr_t PhoneState = 0, PhoneQuiet = 0, PhoneRinging = 0;
+        // Befehl PED_ON (Sprungtabelle, Befehl 31): stellt die Figur des Objekts in <obj> der aktuellen Zeile auf
+        // (ScriptLine = int Index der aktuellen Skriptzeile) und macht aus FUTUREPED den Typ 0x63 mit der Figur in +4
+        uintptr_t PedOn = 0, ScriptLine = 0;
+        // Kisten: eigene Tabelle des Spiels (CrateTable, 256 Einträge zu 0x1C Byte: x, y, z als GtaPos, +0x0C Objekt,
+        // -1 = frei, +0x14 Typ, +0x18 Menge). CrateAdd(Typ, Menge, x, y, z) wie POWERUP_ON, CrateRemove(x, y) wie
+        // POWERUP_OFF; das Skriptobjekt einer Kiste merkt sich keine Nummer
+        uintptr_t CrateAdd = 0, CrateRemove = 0;
+        // int16 je Skriptprozess: Auslöser, der ihn gestartet hat (-1 = keiner). Endet der Prozess, macht das Spiel diesen
+        // Auslöser wieder scharf (1.0.0.1: 0x4748F0); Prozesse startet ein Auslöser in 0x472E61
+        uintptr_t ProcTrigger = 0;
         uintptr_t ArrowMainOn = 0, ArrowMain = 0;    // Missionspfeil (ARROW/ARROWCAR/ARROWPED)
         uintptr_t ArrowRedOn = 0, ArrowRed = 0;      // roter Pfeil (RED_ARROW)
 
@@ -172,6 +185,11 @@ namespace gta1
         uintptr_t TargetScore = 0, MissionsTotal = 0, MissionsCounter = 0, SecretsTotal = 0, SecretsCounter = 0;
         uintptr_t CarDamage = 0;      // byte je Fahrzeug: Schaden 0..100 (bei 100 explodiert es)
         int       CarStride = 664;
+        // Fahrzeug eines Skriptobjekts (PARKED legt es an und trägt seine Nummer ins Objekt ein): CarScriptLine int16
+        // Zeile der mission.ini, -1 = keine. Daran erkennt CARTRIGGER sein Fahrzeug (1.0.0.1: 0x490D39); räumt das
+        // Spiel das Fahrzeug weg, setzt es den Verweis im Objekt dieser Zeile auf -1 (0x48CA3B -> 0x473520).
+        // CarScriptFlag: byte, das PARKED auf 0 setzt
+        int       CarScriptLine = 0, CarScriptFlag = 0;
         // Fahrzeuge und darin die Fahrphysik (1.0.0.1: 0x46A940): float Richtung der Vorderräder im Bogenmaß, dahinter
         // Ort x, y (+4, +8), Kurs der Karosserie (+0x0C) und Geschwindigkeit x, y (+0x10, +0x14); CarPos = Ort als
         // GtaPos. Die Physik richtet den Wagen der Spielfigur auf Fahrbahn selbst gerade: Straighten = das "jle" hinter
@@ -199,6 +217,7 @@ namespace gta1
         // CarUsed: int16, -1 = Platz frei (Erzeugen 0x494950); CarInfo: Zeiger auf die car_info des Modells, darin
         // InfoThrust: float Schub, mit dem die Fahrphysik Gas gibt (0x494E3C)
         int       CarUsed = 8, CarInfo = 0x294, InfoThrust = 0x80;
+        int       CarId = 0;          // int16 eigene Nummer des Fahrzeugs (London 1961: alles 4 Byte weiter hinten)
         // Gezeichnet wird, was im Raster (128 x 128 Zellen zu 2 x 2 Blöcken) in einer sichtbaren Zelle steht.
         // GridRemove(Besitzer, Positionssatz) trägt aus, GridAdd(Art, Nummer, Besitzer, Positionssatz, x, y) ein;
         // die eingetragene Stelle steht im Positionssatz bei +0x1E/+0x22. Fahrzeuge: Art 6, Positionssatz = CarPos
@@ -283,6 +302,10 @@ namespace gta1
         a.PauseOn = 0x46B9C0; a.PauseOff = 0x46B9E0; a.SoundPause = 0x4583B0; a.SoundResume = 0x4583E0;
         a.QuitLevel = 0x42EB60;   // wie Enter in der Beenden-Abfrage (0x46D701)
         a.ArrowResolve = 0x470A90;
+        a.PhoneState = 0x48EC10; a.PhoneQuiet = 0x48F0F0; a.PhoneRinging = 0x738184;
+        a.PedOn = 0x4799C0; a.ScriptLine = 0x6DB400;
+        a.CrateTable = 0x4CB8D8; a.CrateAdd = 0x40BD60; a.CrateRemove = 0x40BFD0;   // POWERUP_ON 0x47DEB0, _OFF 0x484B16
+        a.ProcTrigger = 0x736C80;
         a.ArrowMainOn = 0x677F0C; a.ArrowMain = 0x678418; a.ArrowRedOn = 0x678400; a.ArrowRed = 0x678DD8;
         a.RenderFrame = 0x42EFE0; a.RenderCall = 0x45D057;
         a.PedFire = 0x4470B0; a.PedFireCall = 0x451AA5;
@@ -327,6 +350,7 @@ namespace gta1
         a.MapColumns = 0x5F395C; a.MapBlocks = 0x5F18E4;
         a.MapAllocAdd = 0x42824C; a.MapReadAdd = 0x4282B1; a.MapBase = 0x5F2904;   // Lader 0x428249 / 0x4282AF
         a.CarCreate = 0x48B760;                                    // Missionsobjekt PARKED 0x480D26
+        a.CarScriptLine = 0x12B; a.CarScriptFlag = 0x130;          // dort gleich dahinter
         a.GroundZ = 0x448460;                                      // Fahrzeug bewegen 0x410220
         a.CarUpdate = 0x497690; a.CarUpdateCall = 0x4983C2;        // Physik 0x46A940, angehalten in 0x4978FE
         a.CarPlaced = 0x492960;                                    // aus dem Erzeugen 0x494950
@@ -390,6 +414,10 @@ namespace gta1
         a.PauseAll = 0x441EB0; a.ResumeAll = 0x441EE0;  // 0x441EB0: PauseOn, RunState = 2, Ton anhalten
         a.QuitLevel = 0x441F70;
         a.ArrowResolve = 0x4B0E30;
+        a.PhoneState = 0x40271B; a.PhoneQuiet = 0x4025EF; a.PhoneRinging = 0x832A9C;   // MPHONE 0x457610
+        a.PedOn = 0x4033D2; a.ScriptLine = 0x6DB3F8;                                   // PED_ON 0x4598A0
+        a.CrateTable = 0x80D730; a.CrateAdd = 0x4021AD; a.CrateRemove = 0x401F14;      // POWERUP_ON 0x45C7C0, _OFF 0x45C890
+        a.ProcTrigger = 0x736C78;                                                      // Prozess starten 0x451FA3
         a.ArrowMainOn = 0x847CF4; a.ArrowMain = 0x848200; a.ArrowRedOn = 0x8481E8; a.ArrowRed = 0x848BC0;
         // Hauptschleife 0x41F390: Eingabe (0x444AC0) und Zeichnen (0x442480) laufen über Thunks
         a.ReadInput = 0x401C12; a.ReadInputCall = 0x41F3A1;
@@ -429,6 +457,13 @@ namespace gta1
         a.SecretsTotal = 0x6FB92C; a.SecretsCounter = 0x7169B8;
         a.CarDamage = 0x5105D7;   // 0x4112A0
         a.Cars = 0x5104E0; a.Straighten = 0x4804C1; a.BlockTypes = 0x5C54E8;   // Fahrphysik 0x480110
+        // Fahrzeuge wie in 1.0.0.1 aufgebaut. Erzeugen wie PARKED (0x452D9C), darin Boden und Aufstellen (0x40D970);
+        // Umriss aus den Zusammenstößen 0x41A085, Übernahme 0x40B0C0; Raster aus dem Anlegen 0x40C823 und 0x44A7D0
+        a.CarCreate = 0x401654; a.GroundZ = 0x4016D1; a.CarPlaced = 0x4033F0;
+        a.CarBounds = 0x401C21; a.CarBoundsCommit = 0x40100A; a.GridRemove = 0x401857; a.GridAdd = 0x40224D;
+        a.CarScriptLine = 0x12B; a.CarScriptFlag = 0x130;
+        { const uint16_t stop[10] = { 0x190, 0x194, 0x198, 0x1B4, 0x1B8, 0x1BC, 0x1C0, 0x1C4, 0x1C8, 0x17C };
+          memcpy(a.CarStop, stop, sizeof(stop)); }
         a.MapColumns = 0x6286AC; a.MapBlocks = 0x626634;
         a.Explode = 0x433F50; a.ExplodeThunk = 0x40105F;
         a.TextReady = 0x8378A0; a.TextBuffer = 0x8378CC;   // aus GetText 0x4A6CB0
@@ -462,6 +497,10 @@ namespace gta1
         a.PauseAll = 0x442190; a.ResumeAll = 0x4421C0;
         a.QuitLevel = 0x442250;
         a.ArrowResolve = 0x4B1B30;
+        a.PhoneState = 0x402761; a.PhoneQuiet = 0x402635; a.PhoneRinging = 0x8346AC;   // MPHONE 0x457AF0
+        a.PedOn = 0x403431; a.ScriptLine = 0x6DD000;                                   // PED_ON 0x459D50
+        a.CrateTable = 0x80F340; a.CrateAdd = 0x4021F3; a.CrateRemove = 0x401F1E;      // POWERUP_ON 0x45CED0, _OFF 0x45CFA0
+        a.ProcTrigger = 0x738880;                                                      // Prozess starten 0x452363
         a.ArrowMainOn = 0x849904; a.ArrowMain = 0x849E10; a.ArrowRedOn = 0x849DF8; a.ArrowRed = 0x84A7D8;
         a.ReadInput = 0x401C17; a.ReadInputCall = 0x41F631;
         a.RenderFrame = 0x401B95; a.RenderCall = 0x41F6B5;
@@ -496,6 +535,15 @@ namespace gta1
         a.SecretsTotal = 0x6FD534; a.SecretsCounter = 0x7185C0;
         a.CarDamage = 0x511A63; a.CarStride = 668;   // 0x4114E0: die Fahrzeuge sind hier 4 Byte größer
         a.Cars = 0x511968; a.CarWheel = 0x184; a.CarPos = 0x240;   // Fahrphysik 0x4809B0
+        // Die 4 Byte stehen ganz vorn: alle Felder 4 weiter als in London 1969 (Nummer 0x40AE60, Belegt/Modell 0x40DA10).
+        // Erzeugen wie PARKED (0x45316C), Umriss 0x40B2F0, Übernahme 0x40B130, Raster 0x44AB10 / 0x44A7C0
+        a.CarId = 4; a.CarUsed = 0x0C; a.CarModel = 0x26;
+        a.CarPhysX = 0x188; a.CarAngle = 0x256; a.CarHeading = 0x190; a.CarDrawAngle = 0x94;
+        a.CarCreate = 0x401654; a.GroundZ = 0x4016D1; a.CarPlaced = 0x40344F;
+        a.CarBounds = 0x401C26; a.CarBoundsCommit = 0x40100A; a.GridRemove = 0x401857; a.GridAdd = 0x402293;
+        a.CarScriptLine = 0x12F; a.CarScriptFlag = 0x134;
+        { const uint16_t stop[10] = { 0x194, 0x198, 0x19C, 0x1B8, 0x1BC, 0x1C0, 0x1C4, 0x1C8, 0x1CC, 0x180 };
+          memcpy(a.CarStop, stop, sizeof(stop)); }
         a.Straighten = 0x480D61; a.BlockTypes = 0x5C70F0;
         a.MapColumns = 0x62A2B4; a.MapBlocks = 0x62823C;
         a.Explode = 0x434230; a.ExplodeThunk = 0x40105F;
@@ -542,6 +590,10 @@ namespace gta1
         a.PauseOn = 0x481510; a.PauseOff = 0x481530; a.SoundPause = 0x404DB0; a.SoundResume = 0x404DE0;
         a.QuitLevel = 0x430A00;
         a.ArrowResolve = 0x486180;
+        a.PhoneState = 0x478900; a.PhoneQuiet = 0x478D80; a.PhoneRinging = 0x7710F4;   // MPHONE 0x43FB20
+        a.PedOn = 0x441600; a.ScriptLine = 0x655E58;
+        a.CrateAdd = 0x46A0D0; a.CrateRemove = 0x46A4A0;                               // POWERUP_ON 0x4481CB, _OFF 0x44824A
+        a.ProcTrigger = 0x6B3DE8;                                                      // Prozess starten 0x43CCDD
         a.ArrowMainOn = 0x784234; a.ArrowMain = 0x784744; a.ArrowRedOn = 0x78472C; a.ArrowRed = 0x785108;
         a.RenderFrame = 0x430D40; a.RenderCall = 0x41499E;   // Hauptschleife 0x4148xx
         a.PedFire = 0x4532F0; a.PedFireCall = 0x45D040;
@@ -597,6 +649,7 @@ namespace gta1
         // aufstellen 0x405CA0, Umriss 0x405BE0 / 0x405A80. Die Bewegungsfelder liegen 0x0C weiter als in 1.0.0.1, der
         // Winkel bei +0x268, car_info bei +0x2AC. Ein Raster wie in 1.0.0.1 hat diese Fassung nicht
         a.CarCreate = 0x475840; a.GroundZ = 0x4544E0;
+        a.CarScriptLine = 0x134; a.CarScriptFlag = 0x139;          // PARKED 0x445B3A
         a.CarUpdate = 0x40A640; a.CarUpdateCall = 0x40B2F6;
         { const uint16_t stop[10] = { 0x19C, 0x1A0, 0x1A4, 0x1C0, 0x1C4, 0x1C8, 0x1CC, 0x1D0, 0x1D4, 0x188 };
           memcpy(a.CarStop, stop, sizeof(stop)); }
@@ -1364,6 +1417,24 @@ namespace gta1
     {
         if (s_supported)
             reinterpret_cast<void(__cdecl*)()>(A.QuitLevel)();
+    }
+
+    // Wie die Debug-Taste "reload" des Spiels (1.0.0.1: 0x42F4F3, London 0x442D68 / 0x443048, Classics 0x43117C):
+    // Level mit Ergebnis 3 beenden, die äußere Schleife (0x4273E6) startet ihn dann ohne Hauptmenü neu. Es ist dieselbe
+    // Variable, die QuitLevel mit seinem ersten Befehl auf 2 setzt ("mov dword ptr [Ende],2"); der Grund steht dahinter.
+    bool ReloadLevel()
+    {
+        if (!s_supported || !A.QuitLevel || !InGame())
+            return false;
+        const uint8_t* q = reinterpret_cast<const uint8_t*>(A.QuitLevel);
+        if (q[0] != 0xC7 || q[1] != 0x05 || q[6] != 2)
+            return false;
+        uint32_t end;
+        memcpy(&end, q + 2, 4);
+        *reinterpret_cast<int32_t*>(end + 4) = 0;
+        *reinterpret_cast<int32_t*>(end) = 3;
+        LOG("Level wird neu gestartet (wie \"reload\" des Spiels)");
+        return true;
     }
 
     bool GetArrowTarget(int which, float& x, float& y)
@@ -2725,7 +2796,7 @@ namespace gta1
         {
             reinterpret_cast<void(__cdecl*)(void*, void*)>(A.GridRemove)(b, rec);
             reinterpret_cast<void(__cdecl*)(int32_t, int32_t, void*, void*, int32_t, int32_t)>(A.GridAdd)(
-                6, *reinterpret_cast<int16_t*>(b), b, rec, p.x, p.y);
+                6, *reinterpret_cast<int16_t*>(b + A.CarId), b, rec, p.x, p.y);
         }
         if (hidden)
             p.x = drawX;
@@ -3270,7 +3341,7 @@ namespace gta1
             CmdCompare = 128, CmdReset = 129, CmdKeepThisProc = 130, CmdDeadArrested = 132,
             CmdStopFrenzy = 134, CmdKfCancelBriefing = 138, CmdKfCancelGeneral = 140,
             CmdResetWithBriefs = 145, CmdRedArrowOff = 146,
-            CmdMPhone = 16, CmdMissionEnd = 45, CmdBrief = 15, CmdSpeechBrief = 110,
+            CmdAnswer = 2, CmdMPhone = 16, CmdPedOn = 31, CmdMissionEnd = 45, CmdBrief = 15, CmdSpeechBrief = 110,
             CmdPBrief = 37, CmdPBriefTimed = 68, CmdFrenzyBrief = 135, CmdKfBriefTimed = 137, CmdKfBriefGeneral = 139,
         };
         // Objekttypen in der Objekttabelle (= Index der Namenstabelle 0x4C2580 minus 4)
@@ -3303,6 +3374,22 @@ namespace gta1
 
         DWORD s_failedAt[addr::ScriptProcs] = {}; // "MISSION FEHLGESCHLAGEN" je Skriptprozess, 0 = normal
         int   s_failedCount = 0;
+
+        // Telefone klingeln nur, wenn ein Prozess frisch auf ANSWER oder MPHONE kommt (Zustand 1; MPHONE außerdem nur, solange
+        // PhoneRinging aus ist). Ein geladener Stand steht schon dahinter: Das Telefon blieb still, bis man sich so weit
+        // entfernte, dass MPHONE von vorn begann. Nach dem Laden bekommt jeder Prozess, der als Erstes einen dieser Befehle
+        // ausführt, wieder den frischen Einstieg.
+        bool s_ringRefresh[addr::ScriptProcs] = {};
+
+        void RefreshRinging(int proc, uint32_t command)
+        {
+            s_ringRefresh[proc] = false;
+            if (command == CmdAnswer || command == CmdMPhone)
+            {
+                *reinterpret_cast<int16_t*>(A.ScriptState + proc * 2) = 1;
+                LOG("Spielstand: Telefon von Prozess %d klingelt wieder (%s)", proc, command == CmdAnswer ? "ANSWER" : "MPHONE");
+            }
+        }
 
         // Objekt aus der Zeile <line> von mission.ini: +0 Typ, +4 Wert (Zähler) bzw. Handle (Telefon)
         uint8_t* ScriptObject(int line)
@@ -3627,6 +3714,8 @@ namespace gta1
             const int proc = *reinterpret_cast<int16_t*>(A.ScriptProc);
             if (proc < 0 || proc >= addr::ScriptProcs)
                 return;
+            if (s_ringRefresh[proc])
+                RefreshRinging(proc, command);
             TrackSetup(command, proc);
             ExtendTimer(command, line, proc);
             // Einmal je Level festhalten, dass der Hook läuft (hilft bei Fehlerberichten und neuen Spielversionen)
@@ -4005,6 +4094,436 @@ namespace gta1
         return changed;
     }
 
+    // Fahrzeuge der Skriptobjekte (PARKED, umgewandeltes FUTURECAR): Das Objekt hält nur die Nummer des Fahrzeugs.
+    // Ohne ihren Ort stünde nach dem Laden die Nummer des gespeicherten Stands im Objekt, das Fahrzeug selbst aber
+    // nicht mehr da - etwa der Coach der Busbomben-Mission (Liberty City), nachdem er beim Fehlschlag explodiert ist:
+    // CARTRIGGER fand nichts mehr zum Einsteigen, CHECK_CAR und IS_GOAL_DEAD sahen ein fremdes oder kein Fahrzeug.
+    namespace
+    {
+        constexpr int32_t kObjCar = 0, kObjTelephone = 7, kObjFutureCar = 29;
+
+        struct ScriptCar
+        {
+            int16_t slot, line, model, angle;
+            int32_t x, y, z;        // GtaPos
+            uint8_t damage, pad[3];
+        };
+        static_assert(sizeof(ScriptCar) == 24, "Satz im Spielstand");
+
+        bool ScriptCarsAvailable()
+        {
+            return A.CarScriptLine && A.CarCreate && A.Cars && A.CarDamage && A.CarPlaced && A.CarBounds && A.CarBoundsCommit;
+        }
+
+        int16_t& CarLine(int car) { return *reinterpret_cast<int16_t*>(CarBase(car) + A.CarScriptLine); }
+        bool CarUsed(int car) { return car >= 0 && car < 400 && *reinterpret_cast<const int16_t*>(CarBase(car) + A.CarUsed) != -1; }
+        int CarDamageOf(int car) { return *reinterpret_cast<const uint8_t*>(A.CarDamage + car * A.CarStride); }
+        // Wie IS_GOAL_DEAD: weggeräumt oder Schaden 100 (Wrack)
+        bool CarAlive(int car) { return CarUsed(car) && CarDamageOf(car) < 100; }
+
+        // Zeile der mission.ini je Platz der Objekttabelle (Platz 0 lässt sich nicht zuordnen, siehe ObjectSlotCount)
+        std::vector<int> SlotLines(int slots)
+        {
+            std::vector<int> lines(slots, -1);
+            const int16_t* map = reinterpret_cast<const int16_t*>(A.ScriptObjSlot);
+            for (int line = 1; line < 32768; ++line)
+                if (map[line] > 0 && map[line] < slots)
+                    lines[map[line]] = line;
+            return lines;
+        }
+
+        int32_t ObjectCar(int slot) { int32_t car; memcpy(&car, ObjectSlot(slot) + 4, 4); return car; }
+        void SetObjectCar(int slot, int32_t car) { memcpy(ObjectSlot(slot) + 4, &car, 4); }
+
+        // Stehend an einen Ort (Weltpixel), Physik und Umriss nachziehen
+        void MoveCar(int car, float x, float y, float z, int angle)
+        {
+            SetCarPlace(car, x, y, z, angle);
+            for (uint16_t field : A.CarStop)
+                if (field)
+                    *reinterpret_cast<float*>(CarBase(car) + field) = 0.0f;
+            SyncCar(car);
+        }
+
+        void PlaceScriptCar(int car, const ScriptCar& r)
+        {
+            MoveCar(car, r.x / 65536.0f, r.y / 65536.0f, r.z / 65536.0f, r.angle);
+        }
+
+        // Ein Wrack auf dem Platz (etwa der Coach, der dort explodiert ist): Ein neues Fahrzeug darin finge Feuer bzw.
+        // stieße ständig mit ihm zusammen und explodierte ebenfalls. Es kommt weit weg vom Spieler in die andere Ecke
+        // der Karte und darf vom Spiel weggeräumt werden (wie Verkehr; PARKED setzt dieses byte auf 0).
+        int ClearSpot(const ScriptCar& r)
+        {
+            const float x = r.x / 65536.0f, y = r.y / 65536.0f, z = r.z / 65536.0f;
+            float px = x, py = y, pz;
+            int pa;
+            PlayerFoot(px, py, pz, pa);
+            const float fx = (px < 128 * 64 ? 240 : 15) * 64 + 32.0f, fy = (py < 128 * 64 ? 240 : 15) * 64 + 32.0f;
+            int cleared = 0;
+            for (int car = 0; car < 400; ++car)
+            {
+                if (!CarUsed(car) || CarDamageOf(car) < 100 || (CarLine(car) >= 0 && CarLine(car) != r.line))
+                    continue;
+                const GtaPos& p = CarGtaPos(car);
+                if (std::fabs(p.x / 65536.0f - x) > 128 || std::fabs(p.y / 65536.0f - y) > 128 || std::fabs(p.z / 65536.0f - z) > 48)
+                    continue;
+                CarLine(car) = -1;
+                CarBase(car)[A.CarScriptFlag] = 1;
+                MoveCar(car, fx, fy, GroundBelow(fx, fy, 0) - 1, 0);
+                ++cleared;
+            }
+            return cleared;
+        }
+    }
+
+    static void CaptureScriptCars(std::vector<uint8_t>& out)
+    {
+        out.clear();
+        if (!ScriptCarsAvailable())
+            return;
+        const int slots = ObjectSlotCount();
+        const std::vector<int> lines = SlotLines(slots);
+        for (int slot = 1; slot < slots; ++slot)
+        {
+            const int car = ObjectCar(slot);
+            if (SlotType(ObjectSlot(slot)) != kObjCar || lines[slot] < 0 || !CarAlive(car) || CarLine(car) != lines[slot])
+                continue;
+            ScriptCar r = {};
+            float x, y, z;
+            int angle;
+            CarPlace(car, x, y, z, angle);
+            const GtaPos& p = CarGtaPos(car);
+            r.slot = static_cast<int16_t>(slot);
+            r.line = static_cast<int16_t>(lines[slot]);
+            r.model = *reinterpret_cast<const int16_t*>(CarBase(car) + A.CarModel);
+            r.angle = static_cast<int16_t>(angle);
+            r.x = p.x;
+            r.y = p.y;
+            r.z = p.z;
+            r.damage = static_cast<uint8_t>(CarDamageOf(car));
+            const uint8_t* b = reinterpret_cast<const uint8_t*>(&r);
+            out.insert(out.end(), b, b + sizeof(r));
+        }
+    }
+
+    // Nach dem Zurückschreiben der Objekttabelle: jedes Fahrzeug-Objekt wieder mit seinem Fahrzeug verbinden.
+    // haveSaved: der Stand hat die Fahrzeuge (ab Version 7); ältere nur so weit, wie die Fahrzeuge noch da sind
+    static void RestoreScriptCars(const std::vector<uint8_t>& in, bool haveSaved)
+    {
+        if (!ScriptCarsAvailable())
+            return;
+        const int slots = ObjectSlotCount();
+        const std::vector<int> lines = SlotLines(slots);
+        std::vector<ScriptCar> saved(in.size() / sizeof(ScriptCar));
+        if (!saved.empty())
+            memcpy(saved.data(), in.data(), saved.size() * sizeof(ScriptCar));
+        int adopted = 0, moved = 0, created = 0, detached = 0, cleared = 0;
+        for (int slot = 1; slot < slots; ++slot)
+        {
+            const int line = lines[slot];
+            if (SlotType(ObjectSlot(slot)) != kObjCar || line < 0)
+                continue;
+            const ScriptCar* r = nullptr;
+            for (const ScriptCar& s : saved)
+                if (s.slot == slot && s.line == line)
+                    r = &s;
+            int car = ObjectCar(slot);
+            if (!r && (haveSaved || car < 0))
+                continue;   // beim Speichern schon zerstört oder weggeräumt
+            // Die gespeicherte Nummer gilt nur in der gespeicherten Sitzung: sonst das Fahrzeug mit dieser Zeile suchen
+            // (nach einem Neustart des Levels steht es unter Umständen unter einer anderen Nummer)
+            if (!CarAlive(car) || CarLine(car) != line)
+                for (int other = 0; other < 400; ++other)
+                    if (CarAlive(other) && CarLine(other) == line &&
+                        (!r || *reinterpret_cast<const int16_t*>(CarBase(other) + A.CarModel) == r->model))
+                    {
+                        car = other;
+                        ++adopted;
+                        break;
+                    }
+            if (r)
+            {
+                if (!CarAlive(car) || CarLine(car) != line)
+                {
+                    // Nicht mehr da oder ein Wrack: neu aufstellen wie PARKED (Höhe: Block, auf dessen Deckel es steht)
+                    cleared += ClearSpot(*r);
+                    const int fresh = CreateCar(r->x >> 22, r->y >> 22, ((r->z - 1) >> 22) + 1, r->model, r->angle);
+                    if (fresh < 0)
+                    {
+                        LOG("Spielstand: Fahrzeug %d der Zeile %d ließ sich nicht neu aufstellen", r->model, line);
+                        continue;
+                    }
+                    car = fresh;
+                    CarLine(car) = static_cast<int16_t>(line);
+                    CarBase(car)[A.CarScriptFlag] = 0;
+                    PlaceScriptCar(car, *r);
+                    ++created;
+                }
+                else
+                {
+                    float x, y, z;
+                    int angle;
+                    CarPlace(car, x, y, z, angle);
+                    const int turn = std::abs(((angle - r->angle) & 1023) - 512);   // 512 = gleiche Richtung
+                    if (std::fabs(x - r->x / 65536.0f) > 16 || std::fabs(y - r->y / 65536.0f) > 16 ||
+                        std::fabs(z - r->z / 65536.0f) > 16 || turn < 512 - 16)
+                    {
+                        PlaceScriptCar(car, *r);
+                        ++moved;
+                    }
+                }
+                SetCarDamage(car, r->damage);
+            }
+            if (car != ObjectCar(slot) && CarUsed(car) && CarLine(car) == line)
+                SetObjectCar(slot, car);
+        }
+        // Übrige Fahrzeuge mit Zeile, deren Objekt jetzt ein anderes Fahrzeug hält (das Wrack des neu aufgestellten)
+        // oder wieder auf seine Umwandlung wartet (FUTURECAR aus einer Mission nach dem Speichern): lösen. Sonst setzte
+        // das Spiel beim Wegräumen den Verweis des Objekts auf -1, und CARTRIGGER reagierte auf beide.
+        for (int car = 0; car < 400; ++car)
+        {
+            if (!CarUsed(car) || CarLine(car) < 0)
+                continue;
+            const int line = CarLine(car);
+            const int16_t slot = *reinterpret_cast<const int16_t*>(A.ScriptObjSlot + line * 2);
+            if (slot <= 0 || slot >= slots)
+                continue;
+            const int32_t type = SlotType(ObjectSlot(slot));
+            if ((type == kObjCar && ObjectCar(slot) != car) || type == kObjFutureCar)
+            {
+                CarLine(car) = -1;
+                ++detached;
+            }
+        }
+        if (!saved.empty() || adopted || detached)
+            LOG("Spielstand: Skriptfahrzeuge: %d gespeichert, %d neu zugeordnet, %d zurückgestellt, %d neu aufgestellt "
+                "(%d Wracks vom Platz geräumt), %d gelöst", (int)saved.size(), adopted, moved, created, cleared, detached);
+    }
+
+    // Figuren der Skriptobjekte (PED_ON macht aus FUTUREPED den Typ 0x63 mit der Nummer der Figur). Auch hier hält das
+    // Objekt nur die Nummer: In einem frisch gestarteten Level gab es die Figur nicht, und das Skript hielt sie für tot -
+    // etwa Sonettis rechte Hand (Liberty City 1, ab einer Million Punkten), deren Tod den Level scheitern lässt.
+    namespace
+    {
+        constexpr int32_t kObjFuturePed = 24, kObjPed = 0x63;
+        constexpr int kMaxPeds = 1000;   // Schutzgrenze für Nummern aus dem Spielstand
+
+        struct ScriptPed
+        {
+            int16_t slot, line;
+            int32_t x, y, z;        // GtaPos
+            int16_t angle, pad;
+        };
+        static_assert(sizeof(ScriptPed) == 20, "Satz im Spielstand");
+
+        bool ScriptPedsAvailable() { return A.PedOn && A.ScriptLine && A.PedStruct; }
+        uint8_t* PedAt(int ped) { return reinterpret_cast<uint8_t*>(A.PedStruct + ped * L.PedStride); }
+        bool PedAlive(int ped) { return ped >= 0 && ped < kMaxPeds && static_cast<int8_t>(PedAt(ped)[L.PedHealth]) > 0; }
+    }
+
+    static void CaptureScriptPeds(std::vector<uint8_t>& out)
+    {
+        out.clear();
+        if (!ScriptPedsAvailable())
+            return;
+        const int slots = ObjectSlotCount();
+        const std::vector<int> lines = SlotLines(slots);
+        for (int slot = 1; slot < slots; ++slot)
+        {
+            const int ped = ObjectCar(slot);
+            if (SlotType(ObjectSlot(slot)) != kObjPed || lines[slot] < 0 || !PedAlive(ped))
+                continue;
+            ScriptPed r = {};
+            r.slot = static_cast<int16_t>(slot);
+            r.line = static_cast<int16_t>(lines[slot]);
+            memcpy(&r.x, PedAt(ped) + L.PedPos, 12);
+            memcpy(&r.angle, PedAt(ped) + L.PedAngleOfs, 2);
+            const uint8_t* b = reinterpret_cast<const uint8_t*>(&r);
+            out.insert(out.end(), b, b + sizeof(r));
+        }
+    }
+
+    // Vor dem Zurückschreiben der Objekttabelle, solange sie noch die des laufenden Levels ist: Lebte die Figur beim
+    // Speichern und gibt es sie hier nicht, stellt sie PED_ON des Spiels neu auf - mit den Angaben ihres FUTUREPED
+    // (Art, Richtung, Ziel) wie im Skript. Dafür zeigt die aktuelle Skriptzeile kurz auf ein PED_ON dieses Objekts; was
+    // der Befehl sonst am Skriptzustand ändert, überschreibt gleich danach der Spielstand. Liefert Platz -> Figur.
+    // Ältere Stände (bis Version 7) kennen die Figuren nicht. Dort wird nur aufgestellt, was das Objekt als aufgestellt
+    // führt und dessen Tod das Skript irgendwo mit IS_GOAL_DEAD prüft - sonst stünden auch erledigte Missionsziele wieder
+    // da. Sie bleiben dort, wo PED_ON sie hinstellt (pos = false).
+    static std::vector<std::pair<int, int32_t>> PrepareScriptPeds(const GameState& in)
+    {
+        std::vector<std::pair<int, int32_t>> out;
+        if (!ScriptPedsAvailable())
+            return out;
+        const int slots = ObjectSlotCount();
+        std::vector<ScriptPed> saved(in.peds.size() / sizeof(ScriptPed));
+        if (!saved.empty())
+            memcpy(saved.data(), in.peds.data(), saved.size() * sizeof(ScriptPed));
+        const bool pos = in.hasPeds;
+        if (!in.hasPeds)
+        {
+            const std::vector<int> lines = SlotLines(slots);
+            for (int slot = 1; slot < slots && (slot + 1) * L.ScriptObjSize <= (int)in.objects.size(); ++slot)
+            {
+                int32_t type;
+                memcpy(&type, in.objects.data() + slot * L.ScriptObjSize, 4);
+                bool watched = false;
+                for (int i = 0; i < kScriptLines && !watched && type == kObjPed && lines[slot] >= 0; ++i)
+                    watched = LineCommand(LineAt(i)) == CmdIsGoalDead && Field(LineAt(i), FObj) == lines[slot];
+                if (watched)
+                {
+                    ScriptPed r = {};
+                    r.slot = static_cast<int16_t>(slot);
+                    r.line = static_cast<int16_t>(lines[slot]);
+                    saved.push_back(r);
+                }
+            }
+        }
+        if (saved.empty())
+            return out;
+        int adopted = 0, created = 0, missing = 0;
+        for (const ScriptPed& r : saved)
+        {
+            if (r.slot <= 0 || r.slot >= slots)
+                continue;
+            int32_t ped = -1;
+            const int32_t type = SlotType(ObjectSlot(r.slot));
+            if (type == kObjPed && PedAlive(ObjectCar(r.slot)))
+            {
+                ped = ObjectCar(r.slot);    // schon beim Einrichten des Levels aufgestellt
+                ++adopted;
+            }
+            else if (type == kObjFuturePed)
+            {
+                int index = -1;
+                for (int i = 0; i < kScriptLines && index < 0; ++i)
+                    if (LineCommand(LineAt(i)) == CmdPedOn && Field(LineAt(i), FObj) == r.line)
+                        index = i;
+                if (index >= 0)
+                {
+                    // Der Befehl schreibt am Ende in die Felder des laufenden Prozesses: einen gültigen nehmen (0)
+                    int32_t& current = *reinterpret_cast<int32_t*>(A.ScriptLine);
+                    int16_t& proc = *reinterpret_cast<int16_t*>(A.ScriptProc);
+                    const int32_t keepLine = current;
+                    const int16_t keepProc = proc;
+                    current = index;
+                    proc = 0;
+                    reinterpret_cast<void(__cdecl*)()>(A.PedOn)();
+                    current = keepLine;
+                    proc = keepProc;
+                    if (SlotType(ObjectSlot(r.slot)) == kObjPed && PedAlive(ObjectCar(r.slot)))
+                    {
+                        ped = ObjectCar(r.slot);
+                        ++created;
+                    }
+                }
+            }
+            if (ped < 0)
+            {
+                LOG("Spielstand: Figur aus Zeile %d ließ sich nicht neu aufstellen", r.line);
+                ++missing;
+                continue;
+            }
+            if (pos)
+            {
+                memcpy(PedAt(ped) + L.PedPos, &r.x, 12);
+                memcpy(PedAt(ped) + L.PedAngleOfs, &r.angle, 2);
+            }
+            out.emplace_back(r.slot, ped);
+        }
+        LOG("Spielstand: Skriptfiguren: %d %s, %d vorhanden, %d neu aufgestellt, %d fehlen", (int)saved.size(),
+            pos ? "gespeichert" : "laut altem Stand aufgestellt", adopted, created, missing);
+        return out;
+    }
+
+    // Kisten: Das Skript stellt sie mit POWERUP_ON auf und räumt sie mit POWERUP_OFF über ihre Lage ab; geöffnet und
+    // aufgehoben werden sie ohne Skript. Nach dem Laden in einen frischen Level fehlten deshalb Kisten, die Missionen erst
+    // später aufgestellt haben (Belohnungen), und schon geleerte standen wieder da. Der Stand merkt sich alle stehenden
+    // Kisten; beim Laden räumt der Mod die des Levels ab und stellt die gespeicherten über das Spiel neu auf.
+    namespace
+    {
+        constexpr int kCrates = 256, kCrateSize = 0x1C;
+
+        struct SavedCrate
+        {
+            int32_t x, y, z, type, amount;
+        };
+        static_assert(sizeof(SavedCrate) == 20, "Satz im Spielstand");
+
+        bool CratesAvailable() { return A.CrateTable && A.CrateAdd && A.CrateRemove; }
+        const int32_t* CrateEntry(int i) { return reinterpret_cast<const int32_t*>(A.CrateTable + i * kCrateSize); }
+    }
+
+    static void CaptureCrates(std::vector<uint8_t>& out)
+    {
+        out.clear();
+        if (!CratesAvailable())
+            return;
+        for (int i = 0; i < kCrates; ++i)
+        {
+            const int32_t* e = CrateEntry(i);
+            if (e[3] == -1)
+                continue;
+            const SavedCrate c = { e[0], e[1], e[2], e[5], e[6] };
+            const uint8_t* b = reinterpret_cast<const uint8_t*>(&c);
+            out.insert(out.end(), b, b + sizeof(c));
+        }
+    }
+
+    static void RestoreCrates(const std::vector<uint8_t>& in)
+    {
+        if (!CratesAvailable())
+            return;
+        int removed = 0, added = 0;
+        for (int i = 0; i < kCrates; ++i)
+        {
+            const int32_t* e = CrateEntry(i);
+            if (e[3] != -1 && reinterpret_cast<int(__cdecl*)(int32_t, int32_t)>(A.CrateRemove)(e[0], e[1]))
+                ++removed;
+        }
+        for (size_t k = 0; k + sizeof(SavedCrate) <= in.size(); k += sizeof(SavedCrate))
+        {
+            SavedCrate c;
+            memcpy(&c, in.data() + k, sizeof(c));
+            if (reinterpret_cast<int(__cdecl*)(int32_t, int32_t, int32_t, int32_t, int32_t)>(A.CrateAdd)(c.type, c.amount, c.x, c.y, c.z))
+                ++added;
+        }
+        LOG("Spielstand: Kisten: %d des Levels abgeräumt, %d von %d gespeicherten aufgestellt", removed, added,
+            (int)(in.size() / sizeof(SavedCrate)));
+    }
+
+    // Telefongruppen (MPHONES / PHONE_TOGG) sind Auslöser: Kommt die Figur in ihren Umkreis, starten sie einen Prozess
+    // auf MPHONE (Zustand 1 -> 3), der klingelt und endet; scharf (1) werden sie erst wieder, wenn man den Umkreis verlässt.
+    // Ein Stand neben den Telefonen lädt also einen Auslöser in Zustand 3, und es klingelte nichts, bis man weg- und
+    // wiederkam. Nach dem Laden wie frisch angekommen: Telefon-Auslöser, an denen kein laufender Prozess mehr hängt,
+    // wieder scharf.
+    static int RearmPhoneTriggers()
+    {
+        constexpr int32_t kTrigMPhones = 12, kTrigPhoneToggle = 13, kTrigFired = 3, kTrigArmed = 1;
+        constexpr int kTriggerCount = 210;
+        if (!A.ProcTrigger || !A.Triggers || !A.ScriptActive)
+            return 0;
+        bool busy[kTriggerCount] = {};
+        for (int p = 0; p < addr::ScriptProcs; ++p)
+        {
+            const int16_t t = *reinterpret_cast<const int16_t*>(A.ProcTrigger + p * 2);
+            if (*reinterpret_cast<const int16_t*>(A.ScriptActive + p * 2) != 0 && t >= 0 && t < kTriggerCount)
+                busy[t] = true;
+        }
+        int rearmed = 0;
+        for (int t = 0; t < kTriggerCount; ++t)
+        {
+            int32_t* e = reinterpret_cast<int32_t*>(A.Triggers + t * L.TriggerSize);
+            if (e[0] == kTrigFired && (e[1] == kTrigMPhones || e[1] == kTrigPhoneToggle) && !busy[t])
+            {
+                e[0] = kTrigArmed;
+                ++rearmed;
+            }
+        }
+        return rearmed;
+    }
+
     bool CaptureGameState(GameState& out)
     {
         if (!CanUseSaves())
@@ -4056,6 +4575,16 @@ namespace gta1
         }
         CaptureDoors(out.doors);
         CaptureArrows(out.arrows);
+        CaptureScriptCars(out.cars);
+        out.hasCars = true;
+        CaptureScriptPeds(out.peds);
+        CaptureCrates(out.crates);
+        out.hasCrates = true;
+        if (A.ProcTrigger)
+        {
+            const uint8_t* links = reinterpret_cast<const uint8_t*>(A.ProcTrigger);
+            out.procTriggers.assign(links, links + addr::ScriptProcs * 2);
+        }
         return true;
     }
 
@@ -4073,8 +4602,28 @@ namespace gta1
             in.procState.size() != addr::ScriptProcs * 2 || in.lines.size() != (size_t)kScriptLines * L.LineSize)
             return "Daten passen nicht";
 
+        // Alle Telefone erst still (wie das Spiel, wenn das Klingeln endet): Klingeln soll nur, was im geladenen Stand
+        // klingelt, nicht was der laufende Level gerade klingeln lässt (nach dem Abheben steht dort sonst kein Verweis mehr)
+        int silenced = 0;
+        if (A.PhoneState && A.PhoneQuiet && A.PhoneRinging)
+            for (int slot = 1, n = ObjectSlotCount(); slot < n; ++slot)
+            {
+                int32_t phone;
+                memcpy(&phone, ObjectSlot(slot) + 4, 4);
+                if (SlotType(ObjectSlot(slot)) != kObjTelephone || phone < 0)
+                    continue;
+                reinterpret_cast<void(__cdecl*)(int32_t, int32_t)>(A.PhoneState)(phone, 1);
+                reinterpret_cast<void(__cdecl*)(int32_t)>(A.PhoneQuiet)(phone);
+                ++silenced;
+            }
+
+        // Skriptfiguren, die es im laufenden Level nicht gibt, jetzt aufstellen (braucht noch dessen Skriptzustand)
+        const std::vector<std::pair<int, int32_t>> peds = PrepareScriptPeds(in);
+
         // Skript: Objekte (Zähler, Telefone, Missionsobjekte), Prozesse und Zeilen genau wie beim Speichern
         memcpy(reinterpret_cast<void*>(A.ScriptObjects), in.objects.data(), in.objects.size());
+        for (const auto& [slot, ped] : peds)
+            SetObjectCar(slot, ped);
         memcpy(reinterpret_cast<void*>(A.ScriptProcBlock), in.procBlock.data(), in.procBlock.size());
         memcpy(reinterpret_cast<void*>(A.ScriptState), in.procState.data(), in.procState.size());
         memcpy(reinterpret_cast<void*>(A.ScriptLines), in.lines.data(), in.lines.size());
@@ -4087,6 +4636,22 @@ namespace gta1
         if (doors)
             LOG("Spielstand: %d Tore umgeschaltet", doors);
         RestoreArrows(in.arrows);
+        RestoreScriptCars(in.cars, in.hasCars);
+        if (in.hasCrates)
+            RestoreCrates(in.crates);
+        // Welcher Auslöser welchen Prozess gestartet hat, gehört zum Skriptzustand (ab Version 10 im Stand). Ohne diese
+        // Angabe ließe sich nicht sagen, ob an einer Telefongruppe noch ein Prozess hängt: dann bleibt sie, wie sie ist,
+        // sonst liefen womöglich zwei MPHONE für dieselben Telefone
+        const bool links = A.ProcTrigger && in.procTriggers.size() == addr::ScriptProcs * 2;
+        if (links)
+            memcpy(reinterpret_cast<void*>(A.ProcTrigger), in.procTriggers.data(), in.procTriggers.size());
+        if (A.PhoneState && A.PhoneQuiet && A.PhoneRinging)
+        {
+            *reinterpret_cast<uint8_t*>(A.PhoneRinging) = 0;
+            std::fill(std::begin(s_ringRefresh), std::end(s_ringRefresh), true);
+            LOG("Spielstand: %d Telefone still, klingeln lässt sie das geladene Skript; %d Telefongruppen wieder bereit",
+                silenced, links ? RearmPhoneTriggers() : 0);
+        }
         s_mission = MissionLog();
         s_phones = PhoneGroup();
         memset(s_failedAt, 0, sizeof(s_failedAt));

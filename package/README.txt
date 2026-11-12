@@ -100,9 +100,20 @@ SAVE GAMES
   - When you start a level that has a save, the mod offers to load it. This
     comes a few seconds after the level starts, once the game has set the
     level up (weapon crates, bomb shop doors, mission gates, car cranes).
+  - Loading from the pause menu during a level first restarts the level
+    behind a loading screen and then loads the save, so nothing from the
+    current session stays behind (characters a mission has already placed,
+    wanted level). Crates are as they were when you saved, and a phone that
+    was ringing rings again right away.
   - A save keeps the mission progress, score, multiplier, lives, weapons,
     firebombs, armour and your position. Buildings destroyed by missions
     are back after loading.
+  - Vehicles that start a mission when you get in (such as the coach in
+    Liberty City) stand where they stood when you saved, even if they were
+    destroyed or driven away in a failed attempt. Characters the script has
+    placed (such as Sonetti's right-hand man in Liberty City) are back where
+    they stood. Saves from earlier GTA1Plus versions do not contain all of
+    this yet: save once more.
 
 CONTROLS
   - Twin-stick: walk with WASD in screen directions and aim with the mouse.

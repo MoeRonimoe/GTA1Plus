@@ -720,7 +720,10 @@ namespace overlay
 
         void LoadGame()
         {
-            if (const char* error = saves::Load())
+            // Das Angebot beim Levelstart lädt in den frischen Level; aus dem Pausenmenü wird der Level erst neu gestartet
+            bool restarting = false;
+            const char* error = g_confirmKind == Confirm::StartLoad ? saves::Load() : saves::LoadWithRestart(restarting);
+            if (error)
             {
                 LOG("Laden fehlgeschlagen: %s", error);
                 g_page = Page::List;
@@ -728,7 +731,8 @@ namespace overlay
                 return;
             }
             CloseMenu();
-            ShowToast(text::Get(text::LoadDone));
+            if (!restarting)
+                ShowToast(text::Get(text::LoadDone));
         }
 
         void ConfirmYes()
@@ -1968,6 +1972,25 @@ namespace overlay
             c.Composite(v, x, y, bw, bh);
         }
 
+        // Während der Level für das Laden neu startet: das ganze Bild verdeckt, bis der Stand geladen ist
+        void DrawLoading(SurfaceView& v)
+        {
+            if (!g_canvas.Resize(v.width, v.height))
+                return;
+            g_fonts.Update(v.height);
+            Canvas& c = g_canvas;
+            c.BeginLayer(0, 0, v.width, v.height);
+            c.Fill(0, 0, v.width, v.height, 0x0B0E12);
+            const int cx = v.width / 2, cy = v.height / 2;
+            c.Text(cx, cy - g_fonts.titlePx, text::Get(text::LoadingSave), g_fonts.titleFont, 0xFFFFFF, TA_CENTER | TA_TOP, false);
+            // Laufende Punkte, damit man sieht, dass es weitergeht
+            const int dot = std::max(6, v.height / 70), gap = dot * 3;
+            const int step = (int)((GetTickCount() / 300) % 3);
+            for (int i = 0; i < 3; ++i)
+                c.Fill(cx - gap + i * gap - dot / 2, cy + g_fonts.titlePx, dot, dot, i == step ? 0x4CC36B : 0x3A4048);
+            c.Composite(v, 0, 0, v.width, v.height);
+        }
+
         // Meldung im Spiel, z.B. "Automatisch gespeichert"
         void DrawToast(SurfaceView& v)
         {
@@ -2258,6 +2281,8 @@ namespace overlay
 
         void Request(Page page)
         {
+            if (saves::Reloading())
+                return;
             g_menu = Menu::Requested;
             g_requestPage = page;
             g_requestTick = GetTickCount();
@@ -2294,6 +2319,13 @@ namespace overlay
         g_screenW = v.width;
         g_screenH = v.height;
         MeasureReadback(v);
+
+        if (saves::Reloading())
+        {
+            DrawLoading(v);
+            MaybeDumpFrame(v);
+            return;
+        }
 
         if (g_menu == Menu::Requested)
             OpenNow(v);
@@ -2360,6 +2392,10 @@ namespace overlay
 
         const int vk = (int)(msg.wParam & 0xFF);
         const bool repeat = (msg.lParam & (1 << 30)) != 0;
+
+        // Während des Neustarts für das Laden nichts ans Spiel (Alt-Kombinationen wie Alt+F4 schon)
+        if (saves::Reloading())
+            return msg.message == WM_KEYDOWN;
 
         if (g_menu != Menu::Closed)
         {

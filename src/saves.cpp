@@ -15,9 +15,10 @@ namespace saves
     namespace
     {
         constexpr uint32_t kMagic = 0x53503147;    // "G1PS"
-        constexpr uint32_t kVersion = 6;   // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen,
+        constexpr uint32_t kVersion = 10;  // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen,
                                            // 5: mit der Rüstung (vorher stand hier ein Zeitzähler daneben),
-                                           // 6: mit den Brandbomben
+                                           // 6: mit den Brandbomben, 7: mit den Fahrzeugen der Skriptobjekte,
+                                           // 8: mit ihren Figuren, 9: mit den Kisten, 10: mit den Auslösern der Prozesse
         constexpr DWORD kAutosaveDelay = 2500;      // nach MISSION_END, bis Belohnung und Ansage durch sind
         constexpr DWORD kOfferDelay = 3000;         // frühestens so lange nach Levelstart anbieten
 
@@ -30,6 +31,16 @@ namespace saves
         unsigned g_offered = ~0u;                   // Levelstart, für den das Laden schon angeboten wurde
         std::wstring g_notice;
         bool     g_noticeError = false;
+        // Laden nach Neustart des Levels: angefordert in Levelstart g_reloadFrom, Stand g_reloadPath
+        bool     g_reloadPending = false;
+        unsigned g_reloadFrom = 0;
+        DWORD    g_reloadSince = 0;
+        std::wstring g_reloadPath;
+        constexpr DWORD kReloadTimeout = 90000;     // so lange darf der Neustart samt Einrichten dauern
+        // Nach dem Laden noch kurz das Wartebild: der Sprung an den gespeicherten Ort bleibt verdeckt (auch beim Laden
+        // über das Angebot am Levelstart, das ohne Neustart auskommt)
+        constexpr DWORD kCoverAfterLoad = 1200;
+        DWORD    g_coverUntil = 0;
 
         struct Header
         {
@@ -114,6 +125,10 @@ namespace saves
             w.Blob(s.doors);
             w.Blob(s.arrows);
             w.Put(s.firebombs);
+            w.Blob(s.cars);
+            w.Blob(s.peds);
+            w.Blob(s.crates);
+            w.Blob(s.procTriggers);
             return w.buf;
         }
 
@@ -154,6 +169,17 @@ namespace saves
                 r.Blob(s.arrows);
             if (h.version >= 6)
                 r.Get(s.firebombs);
+            if (h.version >= 7)
+                r.Blob(s.cars);
+            s.hasCars = h.version >= 7;
+            if (h.version >= 8)
+                r.Blob(s.peds);
+            s.hasPeds = h.version >= 8;
+            if (h.version >= 9)
+                r.Blob(s.crates);
+            s.hasCrates = h.version >= 9;
+            if (h.version >= 10)
+                r.Blob(s.procTriggers);
             return r.ok;
         }
 
@@ -281,9 +307,50 @@ namespace saves
         const char* error = gta1::RestoreGameState(state);
         if (!error && state.firebombs >= 0)
             firebomb::SetAmmo(state.firebombs);
+        if (!error)
+            g_coverUntil = (GetTickCount() + kCoverAfterLoad) | 1;
         g_autosaveAt = 0;
         LOG("Spielstand laden: %ls (%d Punkte) %s", path.c_str(), state.score, error ? error : "ok");
         return error;
+    }
+
+    // Der Stand wird in den laufenden Level geschrieben: Skript, Spielerwerte, Skriptfahrzeuge. Alles andere bliebe aus
+    // der laufenden Sitzung stehen - Figuren, die eine Mission schon aufgestellt hat (nach dem Laden stellt das Skript
+    // sie ein zweites Mal auf), aufgebrochene Kisten, die Fahndung. Daher erst den Level neu starten, dann laden.
+    const char* LoadWithRestart(bool& restarting)
+    {
+        restarting = false;
+        if (!Available())
+            return "nicht im Level";
+        if (!LevelReady())
+            return "Level wird noch eingerichtet";
+        if (!gta1::IsPlayerOnFoot())
+            return "Spieler sitzt in einem Fahrzeug";
+        std::vector<uint8_t> data;
+        const std::wstring path = SlotPath();
+        gta1::GameState state;
+        Header h;
+        if (path.empty() || !ReadAll(path, data))
+            return "kein Spielstand";
+        if (!Parse(data, state, h))
+            return "Datei beschädigt oder alte Version";
+        if (!gta1::ReloadLevel())
+            return Load();
+        restarting = true;
+        g_reloadPending = true;
+        g_reloadFrom = g_level;
+        g_reloadSince = GetTickCount();
+        g_reloadPath = path;
+        g_autosaveAt = 0;
+        LOG("Spielstand laden: Level wird dafür neu gestartet (%ls)", path.c_str());
+        return nullptr;
+    }
+
+    bool Reloading()
+    {
+        if (g_coverUntil && (int)(GetTickCount() - g_coverUntil) >= 0)
+            g_coverUntil = 0;
+        return g_reloadPending || g_coverUntil != 0;
     }
 
     bool SlotInfo(std::wstring& out)
@@ -319,9 +386,36 @@ namespace saves
             g_autosaveAt = 1;
     }
 
+    // Neustart für das Laden angekommen und der Level eingerichtet: jetzt laden, wie nach dem Angebot beim Levelstart
+    static void FinishReload()
+    {
+        const DWORD now = GetTickCount();
+        if (now - g_reloadSince > kReloadTimeout)
+        {
+            g_reloadPending = false;
+            LOG("Spielstand laden: der Neustart des Levels kam nicht an");
+            Notice(text::LoadFailed, true);
+            return;
+        }
+        if (g_level == g_reloadFrom || now - g_levelSince < kOfferDelay || !LevelReady() || !gta1::IsPlayerOnFoot())
+            return;
+        g_reloadPending = false;
+        g_offered = g_level;    // dieser Levelstart braucht kein Angebot mehr
+        if (SlotPath() != g_reloadPath)
+        {
+            LOG("Spielstand laden: nach dem Neustart läuft ein anderer Level oder Charakter");
+            Notice(text::LoadFailed, true);
+            return;
+        }
+        const char* error = Load();
+        Notice(error ? text::LoadFailed : text::LoadDone, error != nullptr);
+    }
+
     void Tick()
     {
         TrackLevel();
+        if (g_reloadPending)
+            FinishReload();
         if (!g_autosaveAt || (int)(GetTickCount() - g_autosaveAt) < 0)
             return;
         // Nach einer Mission sitzt der Spieler oft noch im Fahrzeug: erst speichern, wenn er ausgestiegen ist
@@ -348,7 +442,8 @@ namespace saves
     bool TakeLoadOffer()
     {
         TrackLevel();
-        if (g_level == g_offered || GetTickCount() - g_levelSince < kOfferDelay || !LevelReady() || !gta1::IsPlayerOnFoot())
+        if (g_reloadPending || g_level == g_offered || GetTickCount() - g_levelSince < kOfferDelay || !LevelReady() ||
+            !gta1::IsPlayerOnFoot())
             return false;
         g_offered = g_level;
         const std::wstring path = SlotPath();
