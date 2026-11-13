@@ -2802,6 +2802,23 @@ namespace gta1
             p.x = drawX;
     }
 
+    // Dasselbe für eine versetzte Figur (Art 1, Positionssatz = PedPos, eigene Nummer vorn; 1.0.0.1: 0x442CE9). Sonst
+    // zeichnete das Spiel sie erst wieder, wenn sie sich bewegt - und Fahrer sahen sie nicht und fuhren sie um.
+    static void RegridPed(int ped)
+    {
+        if (!A.GridRemove || !A.GridAdd || !A.PedStruct || ped < 0)
+            return;
+        uint8_t* b = reinterpret_cast<uint8_t*>(A.PedStruct + ped * L.PedStride);
+        uint8_t* rec = b + L.PedPos;
+        const GtaPos& p = *reinterpret_cast<const GtaPos*>(rec);
+        const int32_t regX = *reinterpret_cast<int32_t*>(rec + 0x1E), regY = *reinterpret_cast<int32_t*>(rec + 0x22);
+        if (regX != -1 && (regX >> 23) == (p.x >> 23) && (regY >> 23) == (p.y >> 23))
+            return;
+        reinterpret_cast<void(__cdecl*)(void*, void*)>(A.GridRemove)(b, rec);
+        reinterpret_cast<void(__cdecl*)(int32_t, int32_t, void*, void*, int32_t, int32_t)>(A.GridAdd)(
+            1, *reinterpret_cast<int16_t*>(b), b, rec, p.x, p.y);
+    }
+
     void SyncModCar()
     {
         if (s_modCar >= 0)
@@ -4039,7 +4056,9 @@ namespace gta1
         }
     }
 
-    static void RestoreArrows(const std::vector<uint8_t>& in)
+    static int32_t RemapArrowTarget(int32_t type, int16_t handle, const std::vector<uint8_t>& savedObjects);
+
+    static void RestoreArrows(const std::vector<uint8_t>& in, const std::vector<uint8_t>& savedObjects)
     {
         if (!A.ArrowMainOn || !A.ArrowMain || !A.ArrowRedOn || !A.ArrowRed)
             return;
@@ -4055,9 +4074,21 @@ namespace gta1
                 memcpy(&savedOn, saved, 4);
                 memcpy(&type, saved + 4, 4);
             }
-            if (savedOn && type != 0 && type != 3)
+            // Ziel Fahrzeug (0) oder Figur (3): die Nummer der gespeicherten Sitzung auf die jetzige umschreiben, wenn ein
+            // Skriptobjekt sie hielt (die Fahrzeuge und Figuren hat RestoreGameState da schon neu aufgestellt)
+            int32_t now = -1;
+            if (savedOn && (type == 0 || type == 3))
+            {
+                int16_t old;
+                memcpy(&old, saved + 4 + 4, 2);
+                now = RemapArrowTarget(type, old, savedObjects);
+            }
+            const bool keep = savedOn && ((type != 0 && type != 3) || now >= 0);
+            if (keep)
             {
                 memcpy(target, saved + 4, L.ArrowSize);
+                if (now >= 0)
+                    *reinterpret_cast<int16_t*>(target + 4) = static_cast<int16_t>(now);
                 *reinterpret_cast<int32_t*>(on) = savedOn;
             }
             else
@@ -4066,7 +4097,7 @@ namespace gta1
                 *reinterpret_cast<int32_t*>(on) = 0;
             }
             LOG("Spielstand: %s %s", k ? "roter Pfeil" : "Missionspfeil", !have ? "aus (Stand ohne Pfeil)" :
-                savedOn && type != 0 && type != 3 ? "wie beim Speichern" : "aus");
+                !keep ? "aus" : now >= 0 ? "auf das neu zugeordnete Ziel" : "wie beim Speichern");
             ++k;
         }
     }
@@ -4429,12 +4460,33 @@ namespace gta1
             {
                 memcpy(PedAt(ped) + L.PedPos, &r.x, 12);
                 memcpy(PedAt(ped) + L.PedAngleOfs, &r.angle, 2);
+                RegridPed(ped);
             }
             out.emplace_back(r.slot, ped);
         }
         LOG("Spielstand: Skriptfiguren: %d %s, %d vorhanden, %d neu aufgestellt, %d fehlen", (int)saved.size(),
             pos ? "gespeichert" : "laut altem Stand aufgestellt", adopted, created, missing);
         return out;
+    }
+
+    // Pfeil auf Fahrzeug (Art 0) oder Figur (Art 3): Skriptobjekt suchen, das im Spielstand diese Nummer hielt, und dessen
+    // jetzige Nummer liefern, wenn das Ziel lebt; sonst -1 (Pfeil aus)
+    static int32_t RemapArrowTarget(int32_t type, int16_t handle, const std::vector<uint8_t>& savedObjects)
+    {
+        const int32_t want = type == 0 ? kObjCar : kObjPed;
+        const int slots = ObjectSlotCount();
+        for (int slot = 1; slot < slots && (slot + 1) * L.ScriptObjSize <= (int)savedObjects.size(); ++slot)
+        {
+            int32_t savedType, savedHandle;
+            memcpy(&savedType, savedObjects.data() + slot * L.ScriptObjSize, 4);
+            memcpy(&savedHandle, savedObjects.data() + slot * L.ScriptObjSize + 4, 4);
+            if (savedType != want || static_cast<int16_t>(savedHandle) != handle || SlotType(ObjectSlot(slot)) != want)
+                continue;
+            const int32_t now = ObjectCar(slot);
+            if (type == 0 ? CarAlive(now) : PedAlive(now))
+                return now;
+        }
+        return -1;
     }
 
     // Kisten: Das Skript stellt sie mit POWERUP_ON auf und räumt sie mit POWERUP_OFF über ihre Lage ab; geöffnet und
@@ -4635,8 +4687,8 @@ namespace gta1
         const int doors = RestoreDoors(in.doors);
         if (doors)
             LOG("Spielstand: %d Tore umgeschaltet", doors);
-        RestoreArrows(in.arrows);
         RestoreScriptCars(in.cars, in.hasCars);
+        RestoreArrows(in.arrows, in.objects);   // nach Fahrzeugen und Figuren: Pfeile auf sie bekommen deren jetzige Nummer
         if (in.hasCrates)
             RestoreCrates(in.crates);
         // Welcher Auslöser welchen Prozess gestartet hat, gehört zum Skriptzustand (ab Version 10 im Stand). Ohne diese
@@ -4675,6 +4727,7 @@ namespace gta1
             memcpy(pd + L.PedPos + 8, &in.z, 4);
             if (in.hasAngle)
                 memcpy(pd + L.PedAngleOfs, &in.angle, 2);
+            RegridPed(ped);
             if (A.Camera)
             {
                 CameraData& cam = CameraOf(p);
