@@ -413,8 +413,10 @@ namespace overlay
             }
         }
 
-        // Orte: Lackiererei grün mit Sprühdose, Bombenladen rot mit Bombe, Autokran gelb mit Kran
-        constexpr uint32_t kPoiColors[] = { 0x1F9D6B, 0xC62828, 0xE0A21A, 0x2F6FD0 };
+        // Orte: Lackiererei grün mit Sprühdose, Bombenladen rot mit Bombe, Autokran gelb mit Kran, Hubschrauber blau;
+        // Missionsstarts: Telefon türkis, Auto mit Auftrag orange, Kill Frenzy magenta mit Totenkopf; Belohnung grün mit Paket
+        constexpr uint32_t kPoiColors[(int)pois::Kind::Count] = { 0x1F9D6B, 0xC62828, 0xE0A21A, 0x2F6FD0,
+                                                                  0x139DB3, 0xEF7417, 0xC8226A, 0x7CB342 };
 
         void FillRect(Canvas& c, float x0, float y0, float x1, float y1, uint32_t color)
         {
@@ -467,6 +469,58 @@ namespace overlay
                 c.Line(x - 4.5f * u, y + 5.0f * u, x + 2.5f * u, y + 5.0f * u, w, 0xFFFFFF);        // Kufe
                 break;
             }
+            case pois::Kind::Phone:
+            {
+                const uint32_t bg = kPoiColors[(int)kind];
+                c.Line(x - 5.5f * u, y - 4.2f * u, x + 5.5f * u, y - 4.2f * u, std::max(1.0f, 2.2f * u), 0xFFFFFF); // Hörer
+                FillRect(c, x - 7.5f * u, y - 5.4f * u, x - 4.0f * u, y - 1.8f * u, 0xFFFFFF);
+                FillRect(c, x + 4.0f * u, y - 5.4f * u, x + 7.5f * u, y - 1.8f * u, 0xFFFFFF);
+                const float base[8] = { x - 3.0f * u, y - 1.0f * u, x + 3.0f * u, y - 1.0f * u,          // Gehäuse
+                                        x + 6.5f * u, y + 6.2f * u, x - 6.5f * u, y + 6.2f * u };
+                c.Polygon(base, 4, 0xFFFFFF);
+                c.Circle(x, y + 2.8f * u, 1.8f * u, bg);                                                    // Wählscheibe
+                break;
+            }
+            case pois::Kind::CarMission:
+            {
+                const uint32_t bg = kPoiColors[(int)kind];
+                FillRect(c, x - 7.5f * u, y - 0.6f * u, x + 7.5f * u, y + 3.6f * u, 0xFFFFFF);            // Karosserie
+                const float cabin[8] = { x - 4.6f * u, y - 0.5f * u, x - 2.6f * u, y - 4.8f * u,
+                                         x + 3.0f * u, y - 4.8f * u, x + 5.0f * u, y - 0.5f * u };
+                c.Polygon(cabin, 4, 0xFFFFFF);
+                const float glass[8] = { x - 3.3f * u, y - 1.2f * u, x - 1.9f * u, y - 3.8f * u,
+                                         x + 2.4f * u, y - 3.8f * u, x + 3.8f * u, y - 1.2f * u };
+                c.Polygon(glass, 4, bg);                                                                    // Fenster
+                c.Line(x + 0.2f * u, y - 4.0f * u, x + 0.2f * u, y - 1.0f * u, std::max(1.0f, 0.9f * u), 0xFFFFFF);
+                for (float wx : { -4.2f, 4.2f })                                                            // Räder
+                {
+                    c.Circle(x + wx * u, y + 3.9f * u, 2.2f * u, 0x14181D);
+                    c.Circle(x + wx * u, y + 3.9f * u, 0.8f * u, 0xC9CFD6);
+                }
+                break;
+            }
+            case pois::Kind::Prize:
+            {
+                const uint32_t bg = kPoiColors[(int)kind];
+                FillRect(c, x - 6.0f * u, y - 1.5f * u, x + 6.0f * u, y + 6.5f * u, 0xFFFFFF);              // Paket
+                FillRect(c, x - 6.8f * u, y - 3.8f * u, x + 6.8f * u, y - 1.0f * u, 0xFFFFFF);              // Deckel
+                FillRect(c, x - 1.1f * u, y - 3.8f * u, x + 1.1f * u, y + 6.5f * u, bg);                   // Band
+                c.Ring(x - 2.4f * u, y - 5.6f * u, 1.9f * u, std::max(1.0f, 1.0f * u), 0xFFFFFF);          // Schleife
+                c.Ring(x + 2.4f * u, y - 5.6f * u, 1.9f * u, std::max(1.0f, 1.0f * u), 0xFFFFFF);
+                break;
+            }
+            case pois::Kind::Frenzy:
+            {
+                const uint32_t bg = kPoiColors[(int)kind];
+                c.Circle(x, y - 1.6f * u, 5.6f * u, 0xFFFFFF);                                              // Schädel
+                FillRect(c, x - 3.2f * u, y + 2.0f * u, x + 3.2f * u, y + 6.4f * u, 0xFFFFFF);              // Kiefer
+                c.Circle(x - 2.3f * u, y - 1.3f * u, 1.8f * u, bg);                                         // Augen
+                c.Circle(x + 2.3f * u, y - 1.3f * u, 1.8f * u, bg);
+                c.Triangle(x, y + 1.0f * u, x - 1.0f * u, y + 2.7f * u, x + 1.0f * u, y + 2.7f * u, bg);   // Nase
+                for (float tx : { -1.1f, 1.1f })                                                            // Zähne
+                    c.Line(x + tx * u, y + 4.0f * u, x + tx * u, y + 6.4f * u, std::max(1.0f, 0.6f * u), bg);
+                break;
+            }
             default:
                 break;
             }
@@ -479,9 +533,15 @@ namespace overlay
             auto Y = [&](float wy) { return oy + (wy - cy) * ppb; };
 
             // Orte zuunterst, darüber Route und Ziele
+            const float poiR = markerR * (numbers ? 1.75f : 1.35f); // numbers: große Karte
             if (g_cfg.pois)
                 for (const pois::Poi& p : pois::Current())
-                    DrawPoiIcon(c, X(p.x), Y(p.y), markerR * (numbers ? 1.75f : 1.35f), p.kind); // numbers: große Karte
+                    DrawPoiIcon(c, X(p.x), Y(p.y), poiR, p.kind);
+            for (const pois::Poi& p : pois::Missions(g_cfg.missions))
+                DrawPoiIcon(c, X(p.x), Y(p.y), poiR, p.kind);
+            float px, py;
+            if (pois::Prize(px, py))
+                DrawPoiIcon(c, X(px), Y(py), poiR * 1.15f, pois::Kind::Prize);
 
             const auto& route = nav::Route();
             if (g_cfg.gps && route.size() >= 2)
@@ -1477,7 +1537,8 @@ namespace overlay
                 const nav::TargetKind kind = nav::Kind();
                 const wchar_t* what = kind == nav::TargetKind::Waypoint ? text::Get(text::TargetWaypoint)
                                     : kind == nav::TargetKind::Mission ? text::Get(text::TargetMission)
-                                    : kind == nav::TargetKind::MissionRed ? text::Get(text::TargetMissionRed) : nullptr;
+                                    : kind == nav::TargetKind::MissionRed ? text::Get(text::TargetMissionRed)
+                                    : kind == nav::TargetKind::Prize ? text::Get(text::PoiPrize) : nullptr;
                 if (what)
                     swprintf_s(buf, text::Get(text::GpsTarget), what, (int)(nav::RemainingBlocks() * kMetersPerBlock + 0.5f));
                 else
@@ -1557,27 +1618,45 @@ namespace overlay
                     c.Text(mapX + m / 2, mapY + mapH - g_fonts.smallPx - m / 4, buf, g_fonts.smallFont, 0xE6E9ED, TA_LEFT | TA_TOP, false);
                 }
 
-                // Legende der Orte unten rechts
-                if (g_cfg.pois && !pois::Current().empty())
-                {
-                    bool present[(int)pois::Kind::Count] = {};
+                // Legende der Orte und Missionsstarts unten rechts, bei Platzmangel in mehreren Zeilen
+                bool present[(int)pois::Kind::Count] = {};
+                if (g_cfg.pois)
                     for (const pois::Poi& p : pois::Current())
                         present[(int)p.kind] = true;
-                    const text::Id names[] = { text::PoiSpray, text::PoiBombShop, text::PoiCrane, text::HeliName };
-                    const float ir = g_fonts.smallPx * 0.55f;
-                    const int gap = m / 2, itemGap = m;
-                    int total = gap;
-                    for (int k = 0; k < (int)pois::Kind::Count; ++k)
-                        if (present[k])
-                            total += (int)(ir * 2) + 4 + c.TextWidth(text::Get(names[k]), g_fonts.smallFont) + itemGap;
-                    const int lh = g_fonts.smallPx + m / 2;
-                    int lx = mapX + mapW - total, ly = mapY + mapH - lh;
-                    c.Blend(lx, ly, total, lh, 0x0B0E12, 170);
-                    lx += gap;
-                    for (int k = 0; k < (int)pois::Kind::Count; ++k)
+                for (const pois::Poi& p : pois::Missions(g_cfg.missions))
+                    present[(int)p.kind] = true;
+                float prizeX, prizeY;
+                present[(int)pois::Kind::Prize] = pois::Prize(prizeX, prizeY);
+                const text::Id names[(int)pois::Kind::Count] = { text::PoiSpray, text::PoiBombShop, text::PoiCrane, text::HeliName,
+                                                                 text::PoiPhone, text::PoiCarMission, text::PoiFrenzy, text::PoiPrize };
+                const float ir = g_fonts.smallPx * 0.55f;
+                const int gap = m / 2, itemGap = m, lh = g_fonts.smallPx + m / 2;
+                const int maxW = mapW * 3 / 4;
+                std::vector<std::vector<int>> rows(1);
+                std::vector<int> rowW(1, gap);
+                for (int k = 0; k < (int)pois::Kind::Count; ++k)
+                {
+                    if (!present[k])
+                        continue;
+                    const int w = (int)(ir * 2) + 4 + c.TextWidth(text::Get(names[k]), g_fonts.smallFont) + itemGap;
+                    if (!rows.back().empty() && rowW.back() + w > maxW)
                     {
-                        if (!present[k])
-                            continue;
+                        rows.emplace_back();
+                        rowW.push_back(gap);
+                    }
+                    rows.back().push_back(k);
+                    rowW.back() += w;
+                }
+                for (size_t r = 0; r < rows.size(); ++r)
+                {
+                    if (rows[r].empty())
+                        continue;
+                    int lx = mapX + mapW - rowW[r];
+                    const int ly = mapY + mapH - lh * (int)(rows.size() - r);
+                    c.Blend(lx, ly, rowW[r], lh, 0x0B0E12, 170);
+                    lx += gap;
+                    for (int k : rows[r])
+                    {
                         DrawPoiIcon(c, lx + ir, ly + lh * 0.5f, ir, (pois::Kind)k);
                         lx += (int)(ir * 2) + 4;
                         c.Text(lx, ly + (lh - g_fonts.smallPx) / 2 - 1, text::Get(names[k]), g_fonts.smallFont, 0xE6E9ED, TA_LEFT | TA_TOP, false);

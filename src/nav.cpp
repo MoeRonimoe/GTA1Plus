@@ -1,4 +1,5 @@
 #include "nav.h"
+#include "pois.h"
 #include "citymap.h"
 #include "config.h"
 #include "gta1.h"
@@ -194,7 +195,7 @@ namespace nav
 
     void Update(const CityMap& map, const gta1::Player* p)
     {
-        // Ziel wählen: eigener Wegpunkt vor Missionspfeil vor rotem Pfeil
+        // Ziel wählen: eigener Wegpunkt vor Belohnung (mit Frist) vor Missionspfeil vor rotem Pfeil
         TargetKind kind = TargetKind::None;
         Point target = {};
         float tx, ty;
@@ -208,6 +209,11 @@ namespace nav
                 g_waypoints.pop_back();
                 return Update(map, p);
             }
+        }
+        else if (pois::Prize(tx, ty))
+        {
+            kind = TargetKind::Prize;
+            target = { tx, ty };
         }
         else if (gta1::GetArrowTarget(0, tx, ty))
         {

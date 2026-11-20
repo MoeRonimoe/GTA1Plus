@@ -15,10 +15,11 @@ namespace saves
     namespace
     {
         constexpr uint32_t kMagic = 0x53503147;    // "G1PS"
-        constexpr uint32_t kVersion = 10;  // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen,
+        constexpr uint32_t kVersion = 11;  // 2: mit Trigger-Tabelle, 3: mit dem Schalter der Tore, 4: mit den Pfeilen,
                                            // 5: mit der Rüstung (vorher stand hier ein Zeitzähler daneben),
                                            // 6: mit den Brandbomben, 7: mit den Fahrzeugen der Skriptobjekte,
-                                           // 8: mit ihren Figuren, 9: mit den Kisten, 10: mit den Auslösern der Prozesse
+                                           // 8: mit ihren Figuren, 9: mit den Kisten, 10: mit den Auslösern der Prozesse,
+                                           // 11: mit dem erreichten Punkteziel
         constexpr DWORD kAutosaveDelay = 2500;      // nach MISSION_END, bis Belohnung und Ansage durch sind
         constexpr DWORD kOfferDelay = 3000;         // frühestens so lange nach Levelstart anbieten
 
@@ -129,6 +130,7 @@ namespace saves
             w.Blob(s.peds);
             w.Blob(s.crates);
             w.Blob(s.procTriggers);
+            w.Put(s.targetReached);
             return w.buf;
         }
 
@@ -180,6 +182,8 @@ namespace saves
             s.hasCrates = h.version >= 9;
             if (h.version >= 10)
                 r.Blob(s.procTriggers);
+            if (h.version >= 11)
+                r.Get(s.targetReached);
             return r.ok;
         }
 

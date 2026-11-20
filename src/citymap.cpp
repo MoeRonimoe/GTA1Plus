@@ -110,6 +110,11 @@ bool CityMap::Load(const std::string& cmpPath)
         m_type[i] = 0;
         m_z[i] = 6;
         m_road[i] = 0;
+        m_flat[i] = 0;
+        m_lid2[i] = 0;
+        m_remap2[i] = 0;
+        m_rot2[i] = 0;
+        m_z2[i] = 6;
 
         const uint32_t off = base[i];
         if (off + 2 > hdr->columnSize)
@@ -143,6 +148,15 @@ bool CityMap::Load(const std::string& cmpPath)
                 m_remap[i] = (bi.typeMapExt >> 3) & 3;
                 m_rot[i] = (uint8_t)(bi.typeMap >> 14);
                 m_z[i] = (uint8_t)(height + k);
+                m_flat[i] = flat;
+            }
+            else if (bi.lid && m_flat[i] && !m_lid2[i])
+            {
+                // Unter einem flachen Deckel scheint der nächste durch
+                m_lid2[i] = bi.lid;
+                m_remap2[i] = (bi.typeMapExt >> 3) & 3;
+                m_rot2[i] = (uint8_t)(bi.typeMap >> 14);
+                m_z2[i] = (uint8_t)(height + k);
             }
             if (typeDone || rail)
                 continue;
@@ -257,7 +271,10 @@ bool CityMap::LoadStyle(const std::string& path)
 
     bool used[256][4] = {};
     for (int i = 0; i < 65536; ++i)
+    {
         used[m_lid[i]][m_remap[i]] = true;
+        used[m_lid2[i]][m_remap2[i]] = true;
+    }
 
     int loaded = 0;
     for (int key = 4; key < (numLid + 1) * 4 && key < 256 * 4; ++key)
@@ -298,7 +315,7 @@ bool CityMap::LoadStyle(const std::string& path)
         {
             const uint8_t* src = d.data() + tileOff + ((tile / 4) * 64 + y) * 256 + (tile % 4) * 64;
             for (int x = 0; x < 64; ++x)
-                t.mip[0][y * 64 + x] = pal[src[x]];
+                t.mip[0][y * 64 + x] = src[x] ? pal[src[x]] : pal[0] | kClear;   // Farbe 0 merken
         }
         for (int level = 1; level < 7; ++level)
         {
@@ -309,11 +326,27 @@ bool CityMap::LoadStyle(const std::string& path)
             for (int y = 0; y < s; ++y)
                 for (int x = 0; x < s; ++x)
                 {
-                    const uint32_t a = prev[(2 * y) * (2 * s) + 2 * x], b = prev[(2 * y) * (2 * s) + 2 * x + 1];
-                    const uint32_t c = prev[(2 * y + 1) * (2 * s) + 2 * x], e = prev[(2 * y + 1) * (2 * s) + 2 * x + 1];
-                    const uint32_t rb = ((a & 0xFF00FF) + (b & 0xFF00FF) + (c & 0xFF00FF) + (e & 0xFF00FF)) >> 2;
-                    const uint32_t g = ((a & 0xFF00) + (b & 0xFF00) + (c & 0xFF00) + (e & 0xFF00)) >> 2;
-                    cur[y * s + x] = (rb & 0xFF00FF) | (g & 0xFF00);
+                    const uint32_t q[4] = { prev[(2 * y) * (2 * s) + 2 * x], prev[(2 * y) * (2 * s) + 2 * x + 1],
+                                            prev[(2 * y + 1) * (2 * s) + 2 * x], prev[(2 * y + 1) * (2 * s) + 2 * x + 1] };
+                    // Mittel der deckenden Texel; überwiegend durchsichtig bleibt durchsichtig (Farbe für den Fall,
+                    // dass der Deckel nicht flach ist: Mittel aller vier)
+                    uint32_t rb = 0, g = 0, rbAll = 0, gAll = 0;
+                    int opaque = 0;
+                    for (const uint32_t c : q)
+                    {
+                        rbAll += c & 0xFF00FF;
+                        gAll += c & 0xFF00;
+                        if (!(c & kClear))
+                        {
+                            rb += c & 0xFF00FF;
+                            g += c & 0xFF00;
+                            ++opaque;
+                        }
+                    }
+                    if (opaque >= 2)
+                        cur[y * s + x] = ((rb / opaque) & 0xFF00FF) | ((g / opaque) & 0xFF00);
+                    else
+                        cur[y * s + x] = (((rbAll >> 2) & 0xFF00FF) | ((gAll >> 2) & 0xFF00)) | kClear;
                 }
         }
         ++loaded;
@@ -331,6 +364,22 @@ void CityMap::BuildSchematic()
         const uint8_t type = m_type[i] == 0 && m_road[i] ? 2 : m_type[i]; // Überwege ohne eigenen Bodentyp
         m_schematic[i] = type == 5 ? Scale(kTypeColor[5], kHeightShade[z] - 66) : kTypeColor[type];
     }
+}
+
+bool CityMap::LidTexel(uint8_t lid, uint8_t remap, uint8_t rot, int level, int size, int u, int v, uint32_t& out) const
+{
+    const size_t key = lid * 4u + remap;
+    if (!lid || key >= m_tiles.size() || m_tiles[key].mip[0].empty())
+        return false;
+    // Deckel sind in 90°-Schritten im Uhrzeigersinn gedreht
+    switch (rot)
+    {
+    case 1: { const int t = u; u = v; v = size - 1 - t; break; }
+    case 2: u = size - 1 - u; v = size - 1 - v; break;
+    case 3: { const int t = u; u = size - 1 - v; v = t; break; }
+    }
+    out = m_tiles[key].mip[level][v * size + u];
+    return true;
 }
 
 void CityMap::Render(uint32_t* dst, int pitch, int w, int h, float cx, float cy, float ppb, int style) const
@@ -387,18 +436,15 @@ void CityMap::Render(uint32_t* dst, int pitch, int w, int h, float cx, float cy,
                 continue;
             }
             const int i = by * 256 + bx;
-            const size_t key = m_lid[i] * 4u + m_remap[i];
-            if (textured && m_lid[i] && key < m_tiles.size() && !m_tiles[key].mip[0].empty())
+            uint32_t c;
+            if (textured && LidTexel(m_lid[i], m_remap[i], m_rot[i], level, size, m_colTex[x], tv, c))
             {
-                // Deckel sind in 90°-Schritten im Uhrzeigersinn gedreht
-                int u = m_colTex[x], v = tv;
-                switch (m_rot[i])
-                {
-                case 1: { const int t = u; u = v; v = size - 1 - t; break; }
-                case 2: u = size - 1 - u; v = size - 1 - v; break;
-                case 3: { const int t = u; u = size - 1 - v; v = t; break; }
-                }
-                row[x] = Scale(m_tiles[key].mip[level][v * size + u], kHeightShade[m_z[i]]);
+                // Flacher Deckel (Zaun, Brückenträger, Überweg): durch seine Farbe 0 sieht man den Deckel darunter
+                uint32_t below;
+                if ((c & kClear) && m_flat[i] && LidTexel(m_lid2[i], m_remap2[i], m_rot2[i], level, size, m_colTex[x], tv, below))
+                    row[x] = Scale(below & ~kClear, kHeightShade[m_z2[i]]);
+                else
+                    row[x] = Scale(c & ~kClear, kHeightShade[m_z[i]]);
             }
             else
             {

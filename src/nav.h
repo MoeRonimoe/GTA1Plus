@@ -13,7 +13,7 @@ namespace nav
         float x, y; // Blockkoordinaten
     };
 
-    enum class TargetKind { None, Waypoint, Mission, MissionRed };
+    enum class TargetKind { None, Waypoint, Mission, MissionRed, Prize };
 
     // Pro Frame im Spiel aufrufen; berechnet die Route nur neu, wenn sich Start, Ziel oder Modus ändern
     void Update(const CityMap& map, const gta1::Player* player);

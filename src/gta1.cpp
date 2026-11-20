@@ -7,6 +7,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace gta1
@@ -45,6 +47,7 @@ namespace gta1
         int ScriptObjSize = 29;     // Objekte aus mission.ini: +0 Typ, +4 Wert/Handle
         int LineSize = 22, LineFields = 2;  // Skriptzeile: Befehl (uint16), ab LineFields fünf int32
         int TriggerSize = 29;       // Auslöser (ENABLE/DISABLE): +0 Zustand
+        int TriggerRadius = 0x13;   // int Umkreis in Blöcken (Lage: byte x, y, z ab +0x10)
         // Tore und Schranken (DOOR, BARRIER ...) liegen bei der Auslöser-Tabelle, Abstände ab A.Triggers
         // (1.0.0.1: Tor-Logik 0x4905A0, DOOR_ON 0x48A5F0, DOOR_OFF 0x48A5B0)
         int DoorCount = -0x520;     // int32 Anzahl der Tore
@@ -84,6 +87,17 @@ namespace gta1
         // int16 je Skriptprozess: Auslöser, der ihn gestartet hat (-1 = keiner). Endet der Prozess, macht das Spiel diesen
         // Auslöser wieder scharf (1.0.0.1: 0x4748F0); Prozesse startet ein Auslöser in 0x472E61
         uintptr_t ProcTrigger = 0;
+        // Meldung oben im Bild, wie beim Aufheben einer Waffe ("Pistol"): void __cdecl(const char* Text, int 0)
+        uintptr_t ShowMessage = 0;
+        // Fahrzeug mit Turm (Wasserwerfer, Panzer) zerstört: "mov r16,[edi+Turm] / push r32 / call ObjectDelete" ohne
+        // Prüfung auf -1 (TurretDelete, 10 Byte); ObjectDelete(-1) liest über eine ungültige Typnummer und stürzt ab
+        uintptr_t TurretDelete = 0, ObjectDeleteFn = 0;
+        // byte je Spieler: Punkteziel des Levels erreicht, die Punktzahl steht dann rot im HUD. Setzt SCORE_CHECK
+        // (1.0.0.1: 0x464CA0), steht direkt vor PlayerPedId
+        uintptr_t TargetReached = 0;
+        // DEAD_ARRESTED fragt die Lebensenergie eines Skriptobjekts ab (0 = tot, eine brennende Figur zählt als tot):
+        // Stelle des Aufrufs und Funktion bzw. ihr Thunk
+        uintptr_t DeadArrestedHealthCall = 0, ObjectHealth = 0;
         uintptr_t ArrowMainOn = 0, ArrowMain = 0;    // Missionspfeil (ARROW/ARROWCAR/ARROWPED)
         uintptr_t ArrowRedOn = 0, ArrowRed = 0;      // roter Pfeil (RED_ARROW)
 
@@ -306,6 +320,10 @@ namespace gta1
         a.PedOn = 0x4799C0; a.ScriptLine = 0x6DB400;
         a.CrateTable = 0x4CB8D8; a.CrateAdd = 0x40BD60; a.CrateRemove = 0x40BFD0;   // POWERUP_ON 0x47DEB0, _OFF 0x484B16
         a.ProcTrigger = 0x736C80;
+        a.ShowMessage = 0x46BFC0;                                  // Kiste aufheben 0x40C1D2
+        a.TurretDelete = 0x42E835; a.ObjectDeleteFn = 0x41D380;    // in der Fahrzeugwaffe 0x42D9A0
+        a.TargetReached = 0x6575C9;
+        a.DeadArrestedHealthCall = 0x487736; a.ObjectHealth = 0x474F20;   // DEAD_ARRESTED 0x487629
         a.ArrowMainOn = 0x677F0C; a.ArrowMain = 0x678418; a.ArrowRedOn = 0x678400; a.ArrowRed = 0x678DD8;
         a.RenderFrame = 0x42EFE0; a.RenderCall = 0x45D057;
         a.PedFire = 0x4470B0; a.PedFireCall = 0x451AA5;
@@ -418,6 +436,8 @@ namespace gta1
         a.PedOn = 0x4033D2; a.ScriptLine = 0x6DB3F8;                                   // PED_ON 0x4598A0
         a.CrateTable = 0x80D730; a.CrateAdd = 0x4021AD; a.CrateRemove = 0x401F14;      // POWERUP_ON 0x45C7C0, _OFF 0x45C890
         a.ProcTrigger = 0x736C78;                                                      // Prozess starten 0x451FA3
+        a.TargetReached = 0x80CF29;                                                    // SCORE_CHECK -> 0x483620
+        a.DeadArrestedHealthCall = 0x461288; a.ObjectHealth = 0x402FC2;                // DEAD_ARRESTED 0x461250
         a.ArrowMainOn = 0x847CF4; a.ArrowMain = 0x848200; a.ArrowRedOn = 0x8481E8; a.ArrowRed = 0x848BC0;
         // Hauptschleife 0x41F390: Eingabe (0x444AC0) und Zeichnen (0x442480) laufen über Thunks
         a.ReadInput = 0x401C12; a.ReadInputCall = 0x41F3A1;
@@ -501,6 +521,8 @@ namespace gta1
         a.PedOn = 0x403431; a.ScriptLine = 0x6DD000;                                   // PED_ON 0x459D50
         a.CrateTable = 0x80F340; a.CrateAdd = 0x4021F3; a.CrateRemove = 0x401F1E;      // POWERUP_ON 0x45CED0, _OFF 0x45CFA0
         a.ProcTrigger = 0x738880;                                                      // Prozess starten 0x452363
+        a.TargetReached = 0x80EB31;                                                    // SCORE_CHECK -> 0x483EF0
+        a.DeadArrestedHealthCall = 0x461A79; a.ObjectHealth = 0x403021;                // DEAD_ARRESTED 0x461A41
         a.ArrowMainOn = 0x849904; a.ArrowMain = 0x849E10; a.ArrowRedOn = 0x849DF8; a.ArrowRed = 0x84A7D8;
         a.ReadInput = 0x401C17; a.ReadInputCall = 0x41F631;
         a.RenderFrame = 0x401B95; a.RenderCall = 0x41F6B5;
@@ -581,6 +603,7 @@ namespace gta1
         l.PedTarget = 0x86;
         l.ObjectSize = 136; l.ObjNext = 0x24; l.ObjPos = 0x2C;
         l.PlayerStride = 444; l.ScriptObjSize = 32; l.LineSize = 24; l.LineFields = 4; l.TriggerSize = 32;
+        l.TriggerRadius = 0x14;   // Auslöser anlegen 0x4744A0: ausgerichtet
         l.DoorCount = -0x538; l.DoorsOn = -0x10; l.DoorTable = 0x1BF8;   // Tor-Logik 0x479E00, DOOR_ON 0x474840
         l.DoorSize = 40; l.DoorState = 4; l.DoorOff = 8;
         l.ArrowSize = 24;   // Pfeil 0x481907 ff.
@@ -594,6 +617,10 @@ namespace gta1
         a.PedOn = 0x441600; a.ScriptLine = 0x655E58;
         a.CrateAdd = 0x46A0D0; a.CrateRemove = 0x46A4A0;                               // POWERUP_ON 0x4481CB, _OFF 0x44824A
         a.ProcTrigger = 0x6B3DE8;                                                      // Prozess starten 0x43CCDD
+        a.ShowMessage = 0x481A40;                                                      // Kiste aufheben 0x46A664
+        a.TurretDelete = 0x43010E; a.ObjectDeleteFn = 0x44EB90;
+        a.TargetReached = 0x74F149;                                                    // SCORE_CHECK -> 0x463830
+        a.DeadArrestedHealthCall = 0x44A74E; a.ObjectHealth = 0x43E870;                // DEAD_ARRESTED 0x44A710
         a.ArrowMainOn = 0x784234; a.ArrowMain = 0x784744; a.ArrowRedOn = 0x78472C; a.ArrowRed = 0x785108;
         a.RenderFrame = 0x430D40; a.RenderCall = 0x41499E;   // Hauptschleife 0x4148xx
         a.PedFire = 0x4532F0; a.PedFireCall = 0x45D040;
@@ -854,9 +881,30 @@ namespace gta1
         if (s_heightBlend <= 0 || s_fixedZoom <= 0 || cam.zoom <= 0)
             return;
         const float t = s_heightBlend * s_heightBlend * (3 - 2 * s_heightBlend);
-        cam.height = (int)std::lround(cam.height + (s_fixedHeight - cam.height) * t);
+        // Die Werte gelten für eine Figur auf Straßenhöhe (Boden von Ebene 4, z = 255 Pixel). Die Kamerahöhe zählt
+        // aber von der Oberkante der Karte, der Abstand zur Figur ist Höhe + z: wie das Spiel (0x42B992 zieht die Höhe
+        // des Ziels ab) um den Höhenunterschied verschieben, sonst rückte die Kamera auf hohen Bauten heran und entfernte
+        // sich in Senken.
+        float fixed = s_fixedHeight;
+        int ctrl = -1;
+        if (const GtaPos* pos = ControlledPos(player, ctrl))
+        {
+            constexpr float kStreetZ = 255.0f;
+            fixed -= (pos->z / 65536.0f) - kStreetZ;
+            fixed = std::clamp(fixed, 16.0f, 716.0f);   // Grenzen wie in der Kameraführung des Spiels (0x42B9BB)
+        }
+        // Nach oben begrenzt: halbe Breite des Sichtbereichs (Höhe + 0x180) * 160 / zoom höchstens 1160 wie bei schneller
+        // Fahrt (268/90), es sei denn, das Spiel selbst geht gerade weiter. Darüber zeichnet es nicht mehr alles, und
+        // die Spielfigur verliert den Boden unter den Füßen: Max auf dem Startplateau von San Andreas (Höhe 457, halbe
+        // Breite 1490) ließ sie einsinken und sterben, 205/132 (Höhe 398, halbe Breite 950) nicht. Bei Max bleibt auf
+        // Anhöhen deshalb kein Spielraum für den Ausgleich.
+        constexpr int kMaxHalfWidth = 1160;
+        const int gameHalfWidth = (cam.height + 0x180) * 160 / cam.zoom;
+        cam.height = (int)std::lround(cam.height + (fixed - cam.height) * t);
         cam.zoom = std::max(1, (int)std::lround(cam.zoom * std::pow(s_fixedZoom / cam.zoom, t)));
         cam.focal = cam.baseW * cam.zoom / 320;
+        const int limit = std::max(kMaxHalfWidth, gameHalfWidth) * cam.zoom / 160 - 0x180;
+        cam.height = std::max(16, std::min(cam.height, limit));
     }
 
     // Kamera des Spielers als CameraView; false, solange sie nicht der Spielfigur bzw. ihrem Fahrzeug folgt
@@ -962,6 +1010,8 @@ namespace gta1
     static void RestoreTreeCollision();
     static void ForgetTreeChanges();
     static void PlaceTramSigns();
+    static void HolesIn();
+    static void HolesOut();
 
     // Lenkhilfe (wie in GTA2). Das Spiel führt je Fahrzeug die Richtung der Vorderräder: Lenken dreht sie je Bild um
     // einige Grad (Wert des Fahrzeugtyps, oft 12), die Karosserie läuft ihr weich nach. Das Spiel richtet den Wagen
@@ -1124,7 +1174,9 @@ namespace gta1
         }
         if (s_preRender)
             s_preRender();
+        HolesIn();
         reinterpret_cast<void(__cdecl*)()>(A.RenderFrame)();
+        HolesOut();
         ShowModCar();
         RestoreRenderCamera();
         EnlargeViewRectForLogic();
@@ -1624,6 +1676,241 @@ namespace gta1
         blocks = *reinterpret_cast<uint8_t**>(A.MapBlocks);
         return read && columns && blocks == columns + hdr.columnSize && hdr.blockSize % 8 == 0 &&
                hdr.blockSize <= 8 * 65536;
+    }
+
+    // ---- Löcher unter Brücken ----
+    // Unter Brückendecks und flachen Auflagen hat die Karte oft gar keinen Block, bis hinunter zum Boden der Nachbarn: von
+    // oben sah man das nie. Mit der höheren, schrägeren Kamera blickt man am Rand unter das Deck, und dort zeichnet das
+    // Spiel nichts - es bleibt stehen, was das Bild davor an dieser Stelle hatte (verschmiertes Wasser in Liberty City
+    // unter der Hochstraße beim Start). Solche Felder bekommen für das Zeichnen eine Kopie ihrer Spalte mit dem Boden der
+    // Nachbarn (Wasser, Wiese, Straße ...), bei breiten Brücken von außen nach innen weitergereicht. Nur für das Zeichnen:
+    // Physik und Skripte fragen dieselben Spalten nach Wänden und Deckeln ab (1.0.0.1: 0x4287xx) und sehen weiter das
+    // Original, auch Änderungen der Skripte (CHANGE_BLOCK schreibt neue Spalten) bleiben unberührt.
+    namespace
+    {
+        struct HoleCell
+        {
+            uint32_t index, original, filled;
+            bool swapped;
+        };
+        std::vector<HoleCell> s_holes;
+        std::vector<uint8_t> s_holeColumns;  // unsere Spalten; die Offsets dorthin rechnen mit 32-Bit-Überlauf
+        uint32_t* s_holeOffsets = nullptr;
+        unsigned s_holeLevel = ~0u;
+        DWORD s_holeTry = 0;
+    }
+
+    static bool FindHoles()
+    {
+        s_holes.clear();
+        s_holeOffsets = nullptr;
+        MapHeader hdr;
+        uint8_t *columns, *blocks;
+        if (!LoadedMap(hdr, columns, blocks))
+            return false;
+        // Die Offsets der Spalten (256 x 256, relativ zu den Spalten) liegen direkt davor
+        uint32_t* offsets = reinterpret_cast<uint32_t*>(columns) - 65536;
+        if (A.MapBase && *reinterpret_cast<uint32_t* const*>(A.MapBase) != offsets)
+            return false;
+        const uint32_t numBlocks = hdr.blockSize / 8;
+        // Spalten und Blockarten, die Skripte (CHANGE_BLOCK) oder der Mod später anlegen, liegen im Puffer hinter den
+        // Blockarten (0x4000 Byte des Spiels, 0x1000 von uns)
+        const uint32_t spare = 0x5000;
+        const uint32_t columnLimit = hdr.columnSize + hdr.blockSize + spare, blockLimit = (hdr.blockSize + spare) / 8;
+
+        struct Cell
+        {
+            int8_t height = 6, top = -1, floor = -1;
+            bool below = false, sides = false;   // unter dem obersten Deckel Wand oder Deckel / irgendwo eine Wand
+            uint16_t list[6] = {};
+        };
+        std::vector<Cell> cells(65536);
+        for (int i = 0; i < 65536; ++i)
+        {
+            Cell& c = cells[i];
+            const uint32_t off = offsets[i];
+            if (off + 2 > columnLimit)
+                return false;
+            uint16_t h;
+            memcpy(&h, columns + off, 2);
+            if (h > 6 || off + 2 + (6 - h) * 2 > columnLimit)
+                return false;
+            c.height = static_cast<int8_t>(h);
+            memcpy(c.list, columns + off + 2, (6 - h) * 2);
+            for (int level = h; level < 6; ++level)
+            {
+                const uint16_t b = c.list[level - h];
+                if (b >= blockLimit)
+                    return false;
+                const uint8_t* bi = blocks + b * 8;
+                const bool lid = bi[7] != 0, side = (bi[3] | bi[4] | bi[5] | bi[6]) != 0;
+                c.sides |= side;
+                if (c.top >= 0 && (lid || side))
+                    c.below = true;
+                if (lid)
+                {
+                    if (c.top < 0)
+                        c.top = static_cast<int8_t>(level);
+                    c.floor = static_cast<int8_t>(level);
+                }
+            }
+        }
+
+        // Leere Blockart (für Ebenen über einer Spalte, die erst tiefer beginnt) und zu jedem Boden eine Art ohne Wände
+        int empty = -1;
+        std::unordered_map<uint32_t, uint16_t> plain;   // Art (typeMap, typeMapExt, Deckel) -> Blockart ohne Wände
+        for (uint32_t b = 0; b < numBlocks; ++b)
+        {
+            const uint8_t* bi = blocks + b * 8;
+            if (!(bi[3] | bi[4] | bi[5] | bi[6]))
+            {
+                if (empty < 0 && !(bi[0] | bi[1] | bi[2] | bi[7]))
+                    empty = static_cast<int>(b);
+                const uint32_t key = bi[0] | bi[1] << 8 | bi[2] << 16 | static_cast<uint32_t>(bi[7]) << 24;
+                plain.emplace(key, static_cast<uint16_t>(b));
+            }
+        }
+        const auto plainOf = [&](uint16_t b) -> int {
+            const uint8_t* bi = blocks + b * 8;
+            if (!(bi[3] | bi[4] | bi[5] | bi[6]))
+                return b;
+            const auto it = plain.find(bi[0] | bi[1] << 8 | bi[2] << 16 | static_cast<uint32_t>(bi[7]) << 24);
+            return it == plain.end() ? -1 : it->second;
+        };
+
+        // Loch: unter dem obersten Deckel weder Wand noch Deckel, oder gar nichts in der Spalte
+        std::vector<int8_t> fillLevel(65536, -1);
+        std::vector<uint16_t> fillBlock(65536, 0);
+        std::vector<uint8_t> hole(65536, 0);
+        for (int i = 0; i < 65536; ++i)
+            hole[i] = cells[i].top >= 0 ? !cells[i].below : !cells[i].sides;
+        for (int pass = 0; pass < 32; ++pass)
+        {
+            bool changed = false;
+            std::vector<int8_t> nextLevel = fillLevel;
+            std::vector<uint16_t> nextBlock = fillBlock;
+            for (int i = 0; i < 65536; ++i)
+            {
+                if (!hole[i] || fillLevel[i] >= 0)
+                    continue;
+                const int x = i & 255, y = i >> 8;
+                struct Cand { int level, block, count; } cand[4];
+                int n = 0;
+                const int nx[4] = { x + 1, x - 1, x, x }, ny[4] = { y, y, y + 1, y - 1 };
+                for (int k = 0; k < 4; ++k)
+                {
+                    if (nx[k] < 0 || nx[k] > 255 || ny[k] < 0 || ny[k] > 255)
+                        continue;
+                    const int j = ny[k] * 256 + nx[k];
+                    int level, block;
+                    if (!hole[j] && cells[j].floor >= 0)
+                    {
+                        level = cells[j].floor;
+                        block = cells[j].list[level - cells[j].height];
+                    }
+                    else if (hole[j] && fillLevel[j] >= 0)
+                    {
+                        level = fillLevel[j];
+                        block = fillBlock[j];
+                    }
+                    else
+                        continue;
+                    if (level <= cells[i].top)
+                        continue;   // der Boden muss unter dem Deck liegen
+                    block = plainOf(static_cast<uint16_t>(block));
+                    if (block < 0)
+                        continue;
+                    int m = 0;
+                    while (m < n && (cand[m].level != level || cand[m].block != block))
+                        ++m;
+                    if (m == n)
+                        cand[n++] = { level, block, 0 };
+                    ++cand[m].count;
+                }
+                if (!n)
+                    continue;
+                // am häufigsten, bei Gleichstand der tiefere Boden
+                const Cand* best = &cand[0];
+                for (int m = 1; m < n; ++m)
+                    if (cand[m].count > best->count || (cand[m].count == best->count && cand[m].level > best->level))
+                        best = &cand[m];
+                if (best->level < cells[i].height && empty < 0)
+                    continue;
+                nextLevel[i] = static_cast<int8_t>(best->level);
+                nextBlock[i] = static_cast<uint16_t>(best->block);
+                changed = true;
+            }
+            fillLevel.swap(nextLevel);
+            fillBlock.swap(nextBlock);
+            if (!changed)
+                break;
+        }
+
+        // Neue Spalten: Höhe, dann die Blockarten der Ebenen ab dort; gleiche Spalten nur einmal
+        s_holeColumns.clear();
+        std::map<std::vector<uint16_t>, uint32_t> made;
+        std::vector<std::pair<int, uint32_t>> pending;   // Feld, Lage in s_holeColumns
+        for (int i = 0; i < 65536; ++i)
+        {
+            if (fillLevel[i] < 0)
+                continue;
+            const Cell& c = cells[i];
+            const int f = fillLevel[i], h = std::min<int>(c.height, f);
+            std::vector<uint16_t> col;
+            col.push_back(static_cast<uint16_t>(h));
+            for (int level = h; level < 6; ++level)
+                col.push_back(level == f ? fillBlock[i] : level >= c.height ? c.list[level - c.height] : static_cast<uint16_t>(empty));
+            auto it = made.find(col);
+            if (it == made.end())
+            {
+                it = made.emplace(col, static_cast<uint32_t>(s_holeColumns.size())).first;
+                const uint8_t* bytes = reinterpret_cast<const uint8_t*>(col.data());
+                s_holeColumns.insert(s_holeColumns.end(), bytes, bytes + col.size() * 2);
+            }
+            pending.push_back({ i, it->second });
+        }
+        // Erst jetzt, da s_holeColumns nicht mehr wächst, die Offsets dorthin ausrechnen
+        for (const auto& [i, pos] : pending)
+            s_holes.push_back({ static_cast<uint32_t>(i), offsets[i],
+                                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(s_holeColumns.data() + pos) -
+                                                      reinterpret_cast<uintptr_t>(columns)), false });
+        s_holeOffsets = offsets;
+        LOG("Karte: %u Felder ohne Boden unter einem Deck bekommen fürs Zeichnen den Boden der Nachbarn (%u neue Spalten)",
+            (unsigned)s_holes.size(), (unsigned)made.size());
+        return true;
+    }
+
+    static void HolesIn()
+    {
+        if (s_holeLevel != s_levelLoads && InGame() && GetTickCount() - s_holeTry > 1000)
+        {
+            s_holeTry = GetTickCount();
+            if (FindHoles())
+                s_holeLevel = s_levelLoads;
+        }
+        if (s_holeLevel != s_levelLoads || !s_holeOffsets || !A.MapColumns ||
+            reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t* const*>(A.MapColumns)) - 65536 != s_holeOffsets)
+            return;
+        for (HoleCell& c : s_holes)
+        {
+            // Hat ein Skript die Spalte inzwischen ersetzt (CHANGE_BLOCK), bleibt sie, wie das Skript sie will
+            c.swapped = s_holeOffsets[c.index] == c.original;
+            if (c.swapped)
+                s_holeOffsets[c.index] = c.filled;
+        }
+    }
+
+    static void HolesOut()
+    {
+        if (!s_holeOffsets)
+            return;
+        for (HoleCell& c : s_holes)
+            if (c.swapped)
+            {
+                if (s_holeOffsets[c.index] == c.filled)
+                    s_holeOffsets[c.index] = c.original;
+                c.swapped = false;
+            }
     }
 
     static int RemovePoleFaces()
@@ -2922,6 +3209,97 @@ namespace gta1
         return true;
     }
 
+    // Absturz beim Zerstören eines Löschfahrzeugs mit laufendem Wasserwerfer (Spielerbericht, Brandbombe): das Spiel löscht
+    // das Turm-Objekt hier ohne die Prüfung auf -1, die es an der anderen Stelle (1.0.0.1: 0x42CCD5) macht. Das Stück
+    // macht dasselbe wie das Original, ruft ObjectDelete aber nur mit gültiger Nummer; das push bleibt für den Stapel.
+    bool GuardTurretDelete()
+    {
+        static bool s_done = false;
+        if (s_done)
+            return true;
+        if (!s_supported || !A.TurretDelete || !A.ObjectDeleteFn)
+            return false;
+        const uint8_t* site = reinterpret_cast<const uint8_t*>(A.TurretDelete);
+        int32_t rel;
+        memcpy(&rel, site + 6, 4);
+        // mov r16,[edi+d8] (66 8B 47/4F d8) / push eax|ecx / call ObjectDelete
+        const uint8_t reg = (site[2] >> 3) & 7;
+        if (site[0] != 0x66 || site[1] != 0x8B || (site[2] & 0xC7) != 0x47 || reg > 1 || site[4] != 0x50 + reg ||
+            site[5] != 0xE8 || A.TurretDelete + 10 + rel != A.ObjectDeleteFn)
+            return false;
+        uint8_t* stub = AllocStub(32);
+        if (!stub)
+            return false;
+        Emitter e{ stub };
+        e.Bytes(site, 5);                                           // mov r16,[edi+Turm] / push r32
+        e.Byte(0x66); e.Byte(0x83); e.Byte(0xF8 + reg); e.Byte(0xFF); // cmp r16,-1
+        e.Byte(0x74); e.Byte(0x05);                                 // je: nicht löschen
+        e.Byte(0xE8); e.Rel32(A.ObjectDeleteFn);
+        e.Byte(0xE9); e.Rel32(A.TurretDelete + 10);
+        s_done = PatchJump(A.TurretDelete, 0xE9, stub, 10);
+        return s_done;
+    }
+
+    bool ShowPickupMessage(const wchar_t* text)
+    {
+        if (!A.ShowMessage || !InGame() || !text || !*text)
+            return false;
+        // Das Spiel kopiert den Text; die Namen sind ASCII, sonst UTF-8 wie die Texte des R2P-Pakets
+        static char buf[128];
+        if (!WideCharToMultiByte(CP_UTF8, 0, text, -1, buf, sizeof(buf), nullptr, nullptr))
+            return false;
+        reinterpret_cast<void(__cdecl*)(const char*, int32_t)>(A.ShowMessage)(buf, 0);
+        return true;
+    }
+
+    // Wurf einer Brandbombe wie ein Schuss für die Auslöser: GUN_TRIG (Art 0x1A) feuert, wenn die Spielfigur zu Fuß in
+    // seinem Umkreis schießt, GUN_SCREEN_TRIG (0x1B), wenn sein Ort dabei im Bild ist (1.0.0.1: 0x490D91 prüft das
+    // Schuss-Merkmal der Figur +0x41 und eine Waffe in der Hand). Ein Wurf setzt beides nicht: in Liberty City 1,
+    // Mission 4, ging es erst weiter, wenn man auf die Leiche des Bruders schoss. Wie bei einem Schuss wird ein scharfer
+    // Auslöser (1) dieser Art auf 0 gesetzt; das Spiel führt ihn dann aus (Umkreis wie dort: x - r .. x + r).
+    int TriggerGunTriggers()
+    {
+        constexpr int32_t kGunTrig = 0x1A, kGunScreenTrig = 0x1B;
+        float x, y, z;
+        int angle;
+        const int p = LocalPlayerIndex();
+        if (!A.Triggers || p < 0 || !PlayerFoot(x, y, z, angle))
+            return 0;
+        const int bx = (int)(x / 64), by = (int)(y / 64);
+        // Sichtbereich: Kamera - 0x14 (links, rechts, oben, unten in Weltpixeln)
+        const int32_t* view = A.Camera ? reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(&CameraOf(p)) - 0x14) : nullptr;
+        int fired = 0;
+        for (int t = 0; t < 210; ++t)
+        {
+            uint8_t* e = reinterpret_cast<uint8_t*>(A.Triggers + t * L.TriggerSize);
+            int32_t& state = *reinterpret_cast<int32_t*>(e);
+            const int32_t kind = *reinterpret_cast<const int32_t*>(e + 4);
+            if (state != 1 || (kind != kGunTrig && kind != kGunScreenTrig))
+                continue;
+            const int tx = e[0x10], ty = e[0x11];
+            bool hit;
+            if (kind == kGunTrig)
+            {
+                int32_t r;
+                memcpy(&r, e + L.TriggerRadius, 4);
+                hit = std::abs(bx - tx) <= r && std::abs(by - ty) <= r;
+            }
+            else
+            {
+                const int32_t px = tx * 64 + 32, py = ty * 64 + 32;
+                hit = view && px >= view[0] && px <= view[1] && py >= view[2] && py <= view[3];
+            }
+            if (hit)
+            {
+                state = 0;
+                ++fired;
+                LOG("Brandbombe: %s %d bei (%d, %d) ausgelöst wie durch einen Schuss", kind == kGunTrig ? "GUN_TRIG" : "GUN_SCREEN_TRIG",
+                    t, tx, ty);
+            }
+        }
+        return fired;
+    }
+
     bool SetExplosionCallback(void (*cb)(float x, float y))
     {
         s_explosionCb = cb;
@@ -3023,6 +3401,35 @@ namespace gta1
         e.Dword(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&s_noBurnPed)));
         e.Byte(0xC3);                                   // fertig: ret
         return PatchJump(A.BurnDamage, 0xE8, stub, 5);
+    }
+
+    // DEAD_ARRESTED (scheitern, wenn die Spielfigur tot oder verhaftet ist) fragt die Lebensenergie des Spielerobjekts ab,
+    // und die meldet eine brennende Figur als tot (1.0.0.1: 0x474F20 prüft die Flammen der Figur): im Original stirbt sie
+    // ja sicher. Mit dem Löschen am Boden überlebt man das Feuer, ein Amoklauf oder eine Mission war dann aber schon beim
+    // Anzünden gescheitert. Hier zählt die brennende Spielfigur deshalb als lebend, solange sie Lebensenergie hat und
+    // nicht im Sterben liegt; stirbt sie im Feuer, sieht DEAD_ARRESTED das wie gewohnt.
+    static int __cdecl DeadArrestedHealthHook(int obj)
+    {
+        const int health = reinterpret_cast<int(__cdecl*)(int)>(A.ObjectHealth)(obj);
+        if (static_cast<int16_t>(health) != 0)
+            return health;
+        uint8_t* ped = PlayerPedStruct();
+        int32_t type, handle;
+        if (!ped || PedFlames(ped) < 0 || !ScriptObjectHandle(static_cast<int16_t>(obj), type, handle) || handle < 0 ||
+            handle >= addr::PedCount || A.PedStruct + handle * L.PedStride != reinterpret_cast<uintptr_t>(ped))
+            return health;
+        const int32_t pose = *reinterpret_cast<const int32_t*>(ped + L.PedPose);
+        const int left = static_cast<int8_t>(ped[L.PedHealth]);
+        if (pose == 5 || pose == 0x17 || pose == 0x18 || left <= 0)
+            return health;
+        return left;
+    }
+
+    bool EnableBurningAlive()
+    {
+        if (!s_supported || !Redirect(A.DeadArrestedHealthCall, 0xE8, A.ObjectHealth, reinterpret_cast<void*>(&DeadArrestedHealthHook)))
+            return false;
+        return true;
     }
 
     void SetPlayerBurnPaused(bool paused)
@@ -3340,6 +3747,48 @@ namespace gta1
                 lines.push_back(line);
         return !lines.empty();
     }
+
+    bool ScriptObjectHandle(int line, int32_t& type, int32_t& handle)
+    {
+        if (!s_supported || !A.ScriptObjSlot || !A.ScriptObjects || line < 0 || line >= 32768 || !InGame())
+            return false;
+        // Unbenutzte Zeilen verweisen auf Platz 0, der gehört aber der Zeile 0 (in Vice City ein Telefon)
+        const int16_t slot = *reinterpret_cast<const int16_t*>(A.ScriptObjSlot + line * 2);
+        if (slot < 0 || slot >= 2000 || (slot == 0 && line != 0))
+            return false;
+        const uint8_t* o = reinterpret_cast<const uint8_t*>(A.ScriptObjects + slot * L.ScriptObjSize);
+        memcpy(&type, o, 4);
+        memcpy(&handle, o + 4, 4);
+        return true;
+    }
+
+    bool ScriptTrigger(int line, int& kind, int& state, float& x, float& y)
+    {
+        int32_t type, handle;
+        if (!A.Triggers || !ScriptObjectHandle(line, type, handle) || handle < 0 || handle >= 210)
+            return false;
+        const uint8_t* e = reinterpret_cast<const uint8_t*>(A.Triggers + handle * L.TriggerSize);
+        memcpy(&state, e, 4);
+        memcpy(&kind, e + 4, 4);
+        x = e[0x10] + 0.5f;
+        y = e[0x11] + 0.5f;
+        return true;
+    }
+
+    bool ScriptCarPos(int line, float& x, float& y)
+    {
+        constexpr int32_t kObjCar = 0;   // PARKED, auch nach PARKED_ON aus FUTURECAR
+        int32_t type, handle;
+        if (!A.Cars || !ScriptObjectHandle(line, type, handle) || type != kObjCar || handle < 0 || handle >= 400)
+            return false;
+        if (A.CarDamage && *reinterpret_cast<const uint8_t*>(A.CarDamage + handle * A.CarStride) >= 100)
+            return false;
+        const GtaPos& p = CarGtaPos(handle);
+        x = p.x / 4194304.0f;
+        y = p.y / 4194304.0f;
+        return x >= 0 && x < 256 && y >= 0 && y < 256;
+    }
+
     unsigned LevelLoads() { return s_levelLoads; }
 
     // ---- Spielregeln ([Gameplay]) ----
@@ -4350,7 +4799,47 @@ namespace gta1
 
         bool ScriptPedsAvailable() { return A.PedOn && A.ScriptLine && A.PedStruct; }
         uint8_t* PedAt(int ped) { return reinterpret_cast<uint8_t*>(A.PedStruct + ped * L.PedStride); }
-        bool PedAlive(int ped) { return ped >= 0 && ped < kMaxPeds && static_cast<int8_t>(PedAt(ped)[L.PedHealth]) > 0; }
+
+        // Platz belegt (Bildwort nicht 0, vgl. Suche nach einem freien Platz 1.0.0.1: 0x447D40) und lebendig wie für
+        // IS_GOAL_DEAD (keine Flammen, nicht erschossen/tot/im Wasser, Lebensenergie). Nur die Lebensenergie reichte nicht:
+        // ein freigegebener Platz behält sie, etwa der eines Fahrgasts, den das Spiel nach der Mission entfernt hat.
+        bool PedAlive(int ped)
+        {
+            if (ped < 0 || ped >= kMaxPeds)
+                return false;
+            const uint8_t* b = PedAt(ped);
+            int16_t anim, flames;
+            int32_t pose;
+            memcpy(&anim, b + L.PedAnim, 2);
+            memcpy(&flames, b + L.PedFlames, 2);
+            memcpy(&pose, b + L.PedPose, 4);
+            return anim != 0 && flames < 0 && pose != 5 && pose != 0x17 && pose != 0x18 && static_cast<int8_t>(b[L.PedHealth]) > 0;
+        }
+
+        // Ein laufender Skriptprozess steht gerade auf einer Zeile mit diesem Objekt. Im Prozessblock: +0 int16 aktiv je
+        // Prozess, +0x460 int16 aktuelle Zeile je Prozess (1.0.0.1: 0x6FB768 / 0x6FBBC8, so liest sie der Verteiler
+        // 0x48225C; in allen Fassungen gleich weit auseinander). Nur solche Figuren braucht das Skript noch - etwa Sonettis
+        // rechte Hand, die ein Nebenprozess mit IS_GOAL_DEAD bewacht -, nicht die Fahrgäste erledigter Missionen.
+        bool ProcessUses(const std::vector<uint8_t>& block, int line)
+        {
+            if (block.size() < 0x460 + addr::ScriptProcs * 2)
+                return false;
+            for (int p = 0; p < addr::ScriptProcs; ++p)
+            {
+                int16_t active, index;
+                memcpy(&active, block.data() + p * 2, 2);
+                memcpy(&index, block.data() + 0x460 + p * 2, 2);
+                if (active && index >= 0 && index < kScriptLines && Field(LineAt(index), FObj) == line)
+                    return true;
+            }
+            return false;
+        }
+
+        std::vector<uint8_t> CurrentProcBlock()
+        {
+            const uint8_t* b = reinterpret_cast<const uint8_t*>(A.ScriptProcBlock);
+            return std::vector<uint8_t>(b, b + kProcBlockSize);
+        }
     }
 
     static void CaptureScriptPeds(std::vector<uint8_t>& out)
@@ -4360,10 +4849,11 @@ namespace gta1
             return;
         const int slots = ObjectSlotCount();
         const std::vector<int> lines = SlotLines(slots);
+        const std::vector<uint8_t> block = CurrentProcBlock();
         for (int slot = 1; slot < slots; ++slot)
         {
             const int ped = ObjectCar(slot);
-            if (SlotType(ObjectSlot(slot)) != kObjPed || lines[slot] < 0 || !PedAlive(ped))
+            if (SlotType(ObjectSlot(slot)) != kObjPed || lines[slot] < 0 || !PedAlive(ped) || !ProcessUses(block, lines[slot]))
                 continue;
             ScriptPed r = {};
             r.slot = static_cast<int16_t>(slot);
@@ -4399,10 +4889,7 @@ namespace gta1
             {
                 int32_t type;
                 memcpy(&type, in.objects.data() + slot * L.ScriptObjSize, 4);
-                bool watched = false;
-                for (int i = 0; i < kScriptLines && !watched && type == kObjPed && lines[slot] >= 0; ++i)
-                    watched = LineCommand(LineAt(i)) == CmdIsGoalDead && Field(LineAt(i), FObj) == lines[slot];
-                if (watched)
+                if (type == kObjPed && lines[slot] >= 0 && ProcessUses(in.procBlock, lines[slot]))
                 {
                     ScriptPed r = {};
                     r.slot = static_cast<int16_t>(slot);
@@ -4413,11 +4900,17 @@ namespace gta1
         }
         if (saved.empty())
             return out;
-        int adopted = 0, created = 0, missing = 0;
+        int adopted = 0, created = 0, missing = 0, unused = 0;
         for (const ScriptPed& r : saved)
         {
             if (r.slot <= 0 || r.slot >= slots)
                 continue;
+            // Auch Stände, die noch jede lebende Skriptfigur festhielten (Version 8 bis 10 ohne diese Prüfung)
+            if (!ProcessUses(in.procBlock, r.line))
+            {
+                ++unused;
+                continue;
+            }
             int32_t ped = -1;
             const int32_t type = SlotType(ObjectSlot(r.slot));
             if (type == kObjPed && PedAlive(ObjectCar(r.slot)))
@@ -4464,8 +4957,8 @@ namespace gta1
             }
             out.emplace_back(r.slot, ped);
         }
-        LOG("Spielstand: Skriptfiguren: %d %s, %d vorhanden, %d neu aufgestellt, %d fehlen", (int)saved.size(),
-            pos ? "gespeichert" : "laut altem Stand aufgestellt", adopted, created, missing);
+        LOG("Spielstand: Skriptfiguren: %d %s, %d vorhanden, %d neu aufgestellt, %d fehlen, %d braucht kein Prozess mehr",
+            (int)saved.size(), pos ? "gespeichert" : "laut altem Stand aufgestellt", adopted, created, missing, unused);
         return out;
     }
 
@@ -4505,6 +4998,20 @@ namespace gta1
 
         bool CratesAvailable() { return A.CrateTable && A.CrateAdd && A.CrateRemove; }
         const int32_t* CrateEntry(int i) { return reinterpret_cast<const int32_t*>(A.CrateTable + i * kCrateSize); }
+    }
+
+    // Ort einer Kiste: x, y, z in Blöcken * 2^22 (Mitte des Blocks), +0xC Objekt, -1 = Platz frei
+    bool CrateAt(int bx, int by)
+    {
+        if (!s_supported || !A.CrateTable || !InGame())
+            return false;
+        for (int i = 0; i < kCrates; ++i)
+        {
+            const int32_t* e = CrateEntry(i);
+            if (e[3] != -1 && (e[0] >> 22) == bx && (e[1] >> 22) == by)
+                return true;
+        }
+        return false;
     }
 
     static void CaptureCrates(std::vector<uint8_t>& out)
@@ -4637,6 +5144,8 @@ namespace gta1
             const uint8_t* links = reinterpret_cast<const uint8_t*>(A.ProcTrigger);
             out.procTriggers.assign(links, links + addr::ScriptProcs * 2);
         }
+        if (A.TargetReached)
+            out.targetReached = static_cast<int8_t>(*reinterpret_cast<const uint8_t*>(A.TargetReached + po) != 0);
         return true;
     }
 
@@ -4716,6 +5225,15 @@ namespace gta1
         memcpy(reinterpret_cast<void*>(A.PlayerAmmo + po), in.ammo, 4);
         if (in.armor >= 0)
             *reinterpret_cast<int16_t*>(A.PlayerArmor + po) = in.armor;   // den Merker an der Figur zieht SyncArmorFlag nach
+        // Punkteziel erreicht (rote Punktzahl); ältere Stände ohne die Angabe: aus Punktzahl und Ziel des Levels
+        if (A.TargetReached)
+        {
+            int32_t target = 0;
+            if (A.TargetScore)
+                target = *reinterpret_cast<const int32_t*>(A.TargetScore);
+            const bool reached = in.targetReached >= 0 ? in.targetReached != 0 : target > 0 && in.score >= target;
+            *reinterpret_cast<uint8_t*>(A.TargetReached + po) = reached ? 1 : 0;
+        }
 
         // Position nur zu Fuß: Figur versetzen und die Kamera gleich mitnehmen
         const int ped = PlayerPed();

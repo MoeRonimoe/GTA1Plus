@@ -8,7 +8,7 @@
 
 Config g_cfg;
 
-static const int kConfigVersion = 29;
+static const int kConfigVersion = 30;
 
 static const char kDefaultIni[] =
     "; GTA1Plus - Settings\r\n"
@@ -16,7 +16,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[Info]\r\n"
     "; Managed by the mod, please do not change\r\n"
-    "Version=29\r\n"
+    "Version=30\r\n"
     "\r\n"
     "[Language]\r\n"
     "; Text language: auto = same as the game setting, otherwise de, en, fr, it\r\n"
@@ -67,6 +67,10 @@ static const char kDefaultIni[] =
     "Hearts=1\r\n"
     "; Show paint shops, bomb shops and car cranes as icons on the map and minimap\r\n"
     "POIs=1\r\n"
+    "; Show where missions can be started right now on the map and minimap: 0 = off, 1 = the phones of\r\n"
+    "; your employers and parked cars that come with a job, 2 = also kill frenzies (the secret missions).\r\n"
+    "; A mark disappears once its mission is done or while it cannot be started\r\n"
+    "Missions=0\r\n"
     "\r\n"
     "[Gameplay]\r\n"
     "; Do not halve the multiplier when you get busted\r\n"
@@ -257,6 +261,7 @@ namespace
         { L"Features", L"PortraitColors", Kind::Bool, &g_cfg.portraitColors, nullptr, nullptr },
         { L"Features", L"Hearts",         Kind::Bool, &g_cfg.hearts,         nullptr, nullptr },
         { L"Features", L"POIs",           Kind::Bool, &g_cfg.pois,           nullptr, nullptr },
+        { L"Features", L"Missions",       Kind::Int,  &g_cfg.missions,       nullptr, nullptr },
         { L"Gameplay", L"KeepMultiplier", Kind::Bool, &g_cfg.keepMultiplier, nullptr, nullptr },
         { L"Gameplay", L"NoTreeCollision", Kind::Bool, &g_cfg.noTreeCollision, nullptr, nullptr },
         { L"Gameplay", L"SteerAssist",    Kind::Int,  &g_cfg.steerAssist,    nullptr, nullptr },
@@ -417,6 +422,7 @@ void LoadConfig(const wchar_t* ini)
     g_cfg.hudScale = std::clamp(g_cfg.hudScale, 0, 4);
     g_cfg.steerAssist = std::clamp(g_cfg.steerAssist, 0, 3);
     g_cfg.extraMissionTime = std::clamp(g_cfg.extraMissionTime, 0, 300);
+    g_cfg.missions = std::clamp(g_cfg.missions, 0, 2);
 
     // Neue oder veraltete INI: kommentierte Vorlage schreiben und die aktuellen Werte übernehmen
     if (!exists || version < kConfigVersion)

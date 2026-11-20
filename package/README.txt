@@ -75,6 +75,13 @@ Your saves are in scripts\GTA1Plus_saves.
 PAUSE MENU (Esc)
   - City map with your position, mission targets and your own waypoints.
     Paint shops, bomb shops and car cranes are marked with icons.
+  - Missions on the map: a phone for your employer's phones, a car for
+    parked cars that come with a job when you get in, a skull for kill
+    frenzies (the secret missions). Done missions disappear. In the options
+    (Display) or with [Features] Missions: 0 = off (default), 1 = phones
+    and cars, 2 = also kill frenzies.
+  - Vice City: the prize crate after a kill frenzy is marked on the map
+    and the GPS leads you to it.
   - Briefings: read the last phone and pager messages of the level again.
   - Progress: score against the level's target, missions passed, secrets
     found, lives and multiplier on one page.
@@ -135,6 +142,8 @@ CAMERA
   - Optional fixed camera height in vehicles, e.g. always zoomed out.
   - Optional camera height on foot: three steps that show more of the
     surroundings, up to the view from a fast car.
+  - Ground under bridges: where the map has nothing under a bridge, the
+    ground of the neighbouring fields is drawn instead of smeared leftovers.
   - Optional larger traffic range: new cars appear further outside the
     screen, so you have more time to react.
   - Tilted camera (prototype, off by default): a view in the style of
@@ -144,6 +153,7 @@ CAMERA
 GAMEPLAY
   - Health shown as five hearts below the score.
   - Put out fires: when you burn, press jump to roll on the ground.
+    A kill frenzy or mission no longer fails just because you caught fire.
     In the original game burning is certain death.
   - Damage instead of instant death: a pistol or machine gun bullet costs
     your character part of the health (35 % and 20 %) instead of killing at

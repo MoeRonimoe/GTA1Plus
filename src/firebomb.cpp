@@ -66,7 +66,9 @@ namespace firebomb
             if (player != gta1::LocalPlayerIndex())
                 return;
             s_ammo = std::min(kMaxAmmo, s_ammo + std::max(1, amount));
-            s_notice = text::Get(text::FirebombPicked);
+            // Wie die Waffen: Name oben im Bild durch das Spiel; ohne diese Funktion die Meldung des Mods
+            if (!gta1::ShowPickupMessage(text::Get(text::FirebombPickup)))
+                s_notice = text::Get(text::FirebombPicked);
             LOG("Brandbombe: Kiste aufgehoben, jetzt %d", s_ammo);
         }
 
@@ -134,6 +136,7 @@ namespace firebomb
             f.duration = std::max<DWORD>(150, static_cast<DWORD>(reach / kSpeed * 1000.0f));
             s_flights.push_back(f);
             s_lastThrow = f.start;
+            gta1::TriggerGunTriggers();   // Auslöser, die auf einen Schuss warten, sehen den Wurf als Schuss
             if (--s_ammo <= 0)
             {
                 s_ammo = 0;

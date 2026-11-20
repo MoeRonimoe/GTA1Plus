@@ -149,6 +149,14 @@ namespace text
         OptGroupCutContent,
         OptHelicopter,
         LoadingSave,
+        FirebombPickup,
+        OptMissions,
+        MissionsMain,
+        MissionsAll,
+        PoiPhone,
+        PoiCarMission,
+        PoiFrenzy,
+        PoiPrize,
         Count
     };
 

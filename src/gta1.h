@@ -174,6 +174,9 @@ namespace gta1
     void SetCameraFlight(float t);                                      // 0..1: Kamera wie bei schneller Fahrt
     void SetModCarDrawn(bool byGame);                                   // doch vom Spiel zeichnen lassen
     bool Explode(float x, float y, float z);      // Explosion wie eine Rakete des lokalen Spielers (Weltpixel)
+    int  TriggerGunTriggers();                     // Brandbombenwurf: GUN_TRIG/GUN_SCREEN_TRIG wie bei einem Schuss
+    bool ShowPickupMessage(const wchar_t* text);   // roter Text oben wie beim Aufheben einer Waffe
+    bool GuardTurretDelete();                      // Absturz beim Zerstören eines Fahrzeugs ohne Turm-Objekt verhindern
     bool EnableAllCharacters();    // Hauptmenü: Frauen auch in nicht-englischen Sprachversionen wählbar
     bool EnableQuickRetry();       // nach "MISSION FEHLGESCHLAGEN" Skriptpausen bis zum Neuaufbau verkürzen
     bool EnableSteadyCamera();     // Kamera folgt enger statt zu schwimmen (Patch aus GTAforums: shl 5 -> shl 2)
@@ -210,6 +213,7 @@ namespace gta1
         std::vector<uint8_t> crates;            // stehende Kisten (Lage, Typ, Menge)
         bool hasCrates = false;                 // crates ist gespeichert (ab Version 9)
         std::vector<uint8_t> procTriggers;      // je Skriptprozess der Auslöser, der ihn gestartet hat; ab Version 10
+        int8_t targetReached = -1;              // Punkteziel erreicht (rote Punktzahl); -1 = nicht gespeichert (bis 10)
     };
     // Das Skript hat den Level fertig eingerichtet (Waffen, Tore, Kräne; dauert 4 bis 9 Sekunden). Vorher darf
     // kein Stand geladen oder gespeichert werden. msSinceLevelStart zählt nur, wenn der Skript-Hook fehlt.
@@ -243,6 +247,10 @@ namespace gta1
     bool IsPlayerBurning();
     // Flammen an der Spielfigur entfernen (nur im Spiel-Thread)
     bool ExtinguishPlayer();
+    // Brennen gilt für DEAD_ARRESTED nicht mehr als Tod (mit der Löschfunktion überlebt man es)
+    bool EnableBurningAlive();
+    // Steht eine Kiste auf dem Block (bx, by)?
+    bool CrateAt(int bx, int by);
     // Test: Spielfigur anzünden wie eine Flamme im Spiel (nur im Spiel-Thread)
     bool IgnitePlayer();
     // Spielfigur tot oder im Sterben
@@ -306,4 +314,12 @@ namespace gta1
     std::string MissionFile();     // zuletzt gelesenes Missionsskript (voller Pfad)
     // Zeilennummern der Objekte aus dem Missionsskript des laufenden Levels (ohne die erste)
     bool ScriptObjectLines(std::vector<int>& lines);
+    // Objekt aus der Zeile <line> des Missionsskripts: Typ und Handle (Auslöser: Platz in der Auslöser-Tabelle,
+    // Fahrzeug: Nummer, Telefon: -1 = abgenommen). Spiel-Thread.
+    bool ScriptObjectHandle(int line, int32_t& type, int32_t& handle);
+    // Auslöser aus der Objektzeile <line> (MPHONES, CARTRIGGER, TRIGGER ...): Art (12 Telefongruppe, 9 Einsteigen in
+    // ein Fahrzeug, 4 Ort), Zustand (1 scharf, 3 ausgelöst, 4 aus) und Ort in Blöcken (Mitte). false: keiner. Spiel-Thread.
+    bool ScriptTrigger(int line, int& kind, int& state, float& x, float& y);
+    // Fahrzeug aus der Objektzeile <line> (PARKED ...): Ort in Blöcken; false, solange es nicht da oder ein Wrack ist
+    bool ScriptCarPos(int line, float& x, float& y);
 }

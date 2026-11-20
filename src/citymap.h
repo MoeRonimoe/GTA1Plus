@@ -29,8 +29,12 @@ public:
 private:
     struct Tile
     {
-        std::vector<uint32_t> mip[7]; // 64x64 .. 1x1
+        std::vector<uint32_t> mip[7]; // 64x64 .. 1x1; kClear = Farbe 0 (bei flachen Deckeln durchsichtig)
     };
+    static constexpr uint32_t kClear = 0x01000000;
+
+    // Farbe eines Deckels an Texel u, v (Kachel, Drehung, Höhe); false, wenn es keine Kachel dafür gibt
+    bool LidTexel(uint8_t lid, uint8_t remap, uint8_t rot, int level, int size, int u, int v, uint32_t& out) const;
 
     bool LoadStyle(const std::string& path);
     void BuildSchematic();
@@ -46,6 +50,9 @@ private:
     uint8_t m_type[256 * 256] = {};  // 0 Luft, 1 Wasser, 2 Straße, 3 Gehweg, 4 Wiese, 5 Gebäude
     uint8_t m_z[256 * 256] = {};     // Höhe der Deckelfläche (0 = ganz oben, 5 = ganz unten)
     uint8_t m_road[256 * 256] = {};  // 1 Straße in der Spalte, 2 kurze Lücke zwischen Straßen
+    // Oberster Deckel ist flach (Zaun, Brückenträger, Überweg - Farbe 0 durchsichtig): der Deckel darunter
+    uint8_t m_flat[256 * 256] = {};
+    uint8_t m_lid2[256 * 256] = {}, m_remap2[256 * 256] = {}, m_rot2[256 * 256] = {}, m_z2[256 * 256] = {};
     std::vector<uint32_t> m_schematic;
     std::vector<Tile> m_tiles;       // Index lid * 4 + remap
 

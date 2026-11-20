@@ -19,6 +19,7 @@ struct Config
     bool wasdDriving    = true;  // Twin-Stick: auch im Auto mit WASD fahren
     bool portraitColors = true;  // Spielfigur passend zum Portrait einfärben
     bool pois           = true;  // Lackierereien, Bombenläden und Autokräne auf der Karte
+    int  missions       = 0;     // offene Missionsstarts auf der Karte: 0 aus, 1 Telefone und Autos, 2 auch Kill Frenzies
     bool hearts         = true;  // Lebensenergie als Herzen unter dem Punktestand
 
     // [Gameplay]

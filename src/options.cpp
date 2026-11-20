@@ -45,6 +45,7 @@ namespace options
             { Type::Bool, text::OptHearts, &g_cfg.hearts },
             { Type::HudScale, text::OptHudScale, &g_cfg.hudScale, false, 0, 4, 1, {}, &hudscale::Available },
             { Type::Bool, text::OptPois, &g_cfg.pois },
+            { Type::Choice, text::OptMissions, &g_cfg.missions, false, 0, 2, 1, { text::OptOff, text::MissionsMain, text::MissionsAll } },
             { Type::Choice, text::OptMapStyle, &g_cfg.mapStyle, false, 0, 1, 1, { text::StyleTextured, text::StyleSchematic } },
             { Type::Bool, text::OptPauseGame, &g_cfg.pauseGame },
             { Type::Bool, text::OptHint, &g_cfg.hint },

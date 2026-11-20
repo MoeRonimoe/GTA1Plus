@@ -80,7 +80,7 @@ namespace
     }
 
     // Debug: <asi>.burn anlegen -> Spielfigur anzünden, <asi>.douse -> löschen (zum Testen im Spiel)
-    std::wstring g_burnRequest, g_douseRequest, g_rumbleRequest, g_firebombRequest, g_heliRequest;
+    std::wstring g_burnRequest, g_douseRequest, g_rumbleRequest, g_firebombRequest, g_heliRequest, g_boomRequest;
     DWORD g_debugCheck = 0;
 
     void CheckDebugRequests()
@@ -110,6 +110,7 @@ namespace
         {
             DeleteFileW(g_firebombRequest.c_str());
             firebomb::SetAmmo(firebomb::Ammo() + 10);
+            gta1::ShowPickupMessage(text::Get(text::FirebombPickup));
             LOG("Debug: Brandbomben: %d", firebomb::Ammo());
         }
         // <asi>.heli: den gestrichenen Hubschrauber (Modell 88) neben die Spielfigur stellen
@@ -125,6 +126,21 @@ namespace
             }
             DeleteFileW(g_heliRequest.c_str());
             LOG("Debug: Hubschrauber: Fahrzeug %d (Winkel %d)", gta1::SpawnCar(88, angle), angle);
+        }
+        // <asi>.boom: Explosion wie eine Brandbombe; Inhalt "x y" in Blöcken (Boden darunter)
+        if (GetFileAttributesW(g_boomRequest.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            float x = 0, y = 0;
+            FILE* f = nullptr;
+            if (!_wfopen_s(&f, g_boomRequest.c_str(), L"r") && f)
+            {
+                if (fscanf_s(f, "%f %f", &x, &y) != 2)
+                    x = y = 0;
+                fclose(f);
+            }
+            DeleteFileW(g_boomRequest.c_str());
+            const float z = gta1::GroundBelow(x * 64, y * 64, 0) - 1;
+            LOG("Debug: Explosion bei (%.1f, %.1f): %s", x, y, gta1::Explode(x * 64, y * 64, z) ? "ok" : "nicht möglich");
         }
     }
 
@@ -218,6 +234,7 @@ void ModInit(HMODULE self)
     g_rumbleRequest = SiblingPath(self, L".rumble");
     g_firebombRequest = SiblingPath(self, L".firebomb");
     g_heliRequest = SiblingPath(self, L".heli");
+    g_boomRequest = SiblingPath(self, L".boom");
     if (g_cfg.log)
         logx::Open(SiblingPath(self, L".log").c_str());
 
@@ -277,6 +294,8 @@ void ModInit(HMODULE self)
             LOG("Schneller neuer Versuch nach Fehlschlag: %s", gta1::EnableQuickRetry() ? "aktiv" : "Spielcode passt nicht");
         saves::Init(SiblingPath(self, L"").c_str());
         LOG("Briefings und Spielstände: %s", gta1::SetScriptEventCallback(&OnScriptEvent) ? "aktiv" : "Spielcode passt nicht");
+        if (gta1::GuardTurretDelete())
+            LOG("Zerstörtes Fahrzeug mit Wasserwerfer/Turm: Löschen ohne Turm-Objekt abgesichert");
         controls::Init(); // auch für die Maus im Pausemenü
         rumble::Init();
         fire::Init();

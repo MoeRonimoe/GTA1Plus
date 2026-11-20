@@ -72,6 +72,8 @@ namespace fire
             return;
         g_enabled = gta1::EnableBurnPause();
         LOG("Feuer löschen mit der Sprungtaste: %s", g_enabled ? "aktiv" : "Spielcode passt nicht");
+        if (g_enabled)
+            LOG("Brennen zählt für DEAD_ARRESTED nicht als Tod: %s", gta1::EnableBurningAlive() ? "aktiv" : "Spielcode passt nicht");
     }
 
     bool CanRoll()
