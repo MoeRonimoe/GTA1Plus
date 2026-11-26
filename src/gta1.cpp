@@ -1172,10 +1172,13 @@ namespace gta1
             else
                 RestoreTreeCollision();
         }
+        logx::HeapCheck("Zeichnen: Anfang");
         if (s_preRender)
             s_preRender();
         HolesIn();
+        logx::HeapCheck("Zeichnen: vor dem Spiel");
         reinterpret_cast<void(__cdecl*)()>(A.RenderFrame)();
+        logx::HeapCheck("Zeichnen: nach dem Spiel");
         HolesOut();
         ShowModCar();
         RestoreRenderCamera();
@@ -1228,20 +1231,27 @@ namespace gta1
     {
         s_lastHud = GetTickCount();
         ++s_hudCount;
+        logx::HeapCheck("HUD des Spiels: Anfang");
         if (s_beforeHud)
             s_beforeHud(); // Weltbild ist fertig, das HUD kommt erst noch
         if (s_hudDrawer)
             s_hudDrawer(&DrawGameHud);
         else
             DrawGameHud();
+        logx::HeapCheck("HUD des Spiels: gezeichnet");
         if (s_hudCallback)
             s_hudCallback();
+        logx::HeapCheck("HUD des Spiels: Ende");
     }
 
     static uint32_t __cdecl InputHook()
     {
+        logx::HeapCheck("Eingabe: Anfang");
         const uint32_t packet = reinterpret_cast<uint32_t(__cdecl*)()>(A.ReadInput)();
-        return s_inputFilter ? s_inputFilter(packet) : packet;
+        logx::HeapCheck("Eingabe: vom Spiel gelesen");
+        const uint32_t out = s_inputFilter ? s_inputFilter(packet) : packet;
+        logx::HeapCheck("Eingabe: Ende");
+        return out;
     }
 
     // Merkt sich, welche Stadtkarte das Spiel lädt
@@ -3880,6 +3890,7 @@ namespace gta1
         // Zähler, umgewandelte Objekte und das Telefon wieder her.
         constexpr int32_t kObjCounter = 12;
         constexpr DWORD   kGroupWindow = 5000;       // so lange nach dem Abheben gilt ein DISABLE als die eigene Telefongruppe
+        constexpr DWORD   kOtherGroupWait = 3000;    // so lange nach einer fremden Telefongruppe auf die eigene warten
         struct PhoneGroup { int line = -1, count = 0; int32_t handles[8] = {}; };
         // Eine Telefonmission vom Abheben, bis das Skript ihre Telefongruppe wieder einschaltet. Liberty City tut das
         // nach jeder Mission, San Andreas erst am Ende einer Kette aus mehreren Missionen: dort meldet jeder Teil
@@ -3894,6 +3905,8 @@ namespace gta1
             std::vector<uint8_t> start;      // Objekttabelle beim Abheben
             std::vector<int> groups;         // Telefongruppen (MPHONES/PHONE_TOGG), die das Skript beim Abheben abschaltet
             std::vector<int> paid;           // Zeilen, die in diesem Versuch schon Punkte ausgezahlt haben
+            DWORD otherGroupTick = 0;        // das Skript hat eine andere Telefongruppe eingeschaltet (0 = nicht)
+            int otherGroup = -1;
         };
         PhoneGroup s_phones;
         MissionLog s_mission;
@@ -4221,6 +4234,18 @@ namespace gta1
 
             if (s_phones.line >= 0)
                 CheckAnswered();
+            // Eine andere Telefongruppe ist an, die eigene kam nicht nach: Nach der letzten Kette eines Auftraggebers
+            // bleibt seine Gruppe aus, und das Skript schickt zum nächsten (San Andreas 1: "Go to the phones in Sunview",
+            // ENABLE 3540/3550 statt 81/82). Die Mission ist damit vorbei, ein neuer Versuch passt nicht mehr. Vice City
+            // schaltet nach jeder Mission alle Gruppen nacheinander ein (27704 ff.), die eigene ein paar Bilder später -
+            // darum erst nach einer Weile.
+            if (s_mission.active && s_mission.otherGroupTick && GetTickCount() - s_mission.otherGroupTick > kOtherGroupWait)
+            {
+                LOG("Skript hat die Telefongruppe aus Zeile %d eingeschaltet, die eigene nicht - Mission bzw. Kette vorbei",
+                    s_mission.otherGroup);
+                s_mission.failed = false;
+                EndMission();
+            }
             switch (command)
             {
             case CmdMPhone:
@@ -4247,10 +4272,17 @@ namespace gta1
                 }
                 break;
             case CmdEnable:
-                if (s_mission.active && IsPhoneGroup(Field(line, FObj)) &&
-                    (s_mission.groups.empty() ||
-                     std::find(s_mission.groups.begin(), s_mission.groups.end(), Field(line, FObj)) != s_mission.groups.end()))
-                    EndMission();
+                if (s_mission.active && IsPhoneGroup(Field(line, FObj)))
+                {
+                    if (s_mission.groups.empty() ||
+                        std::find(s_mission.groups.begin(), s_mission.groups.end(), Field(line, FObj)) != s_mission.groups.end())
+                        EndMission();
+                    else if (!s_mission.otherGroupTick)
+                    {
+                        s_mission.otherGroupTick = GetTickCount();
+                        s_mission.otherGroup = Field(line, FObj);
+                    }
+                }
                 break;
             default:
                 break;

@@ -2311,12 +2311,18 @@ namespace overlay
 
             if (inGame)
                 DrawHeli(v);
+            logx::HeapCheck("HUD: nach Hubschrauber");
             if (havePlayer && g_cfg.gps && g_cfg.gpsArrow)
                 DrawGpsArrow(v, p);
+            logx::HeapCheck("HUD: nach GPS-Pfeil");
             if (inGame && g_hintStart && now - g_hintStart < 8000)
                 DrawHint(v);
             if (havePlayer && g_cfg.minimap && g_minimap)
+            {
+                logx::HeapCheck("HUD: vor Minimap");
                 DrawMinimap(v, p);
+                logx::HeapCheck("HUD: nach Minimap");
+            }
             const int health = havePlayer && g_cfg.hearts ? gta1::PlayerHealth() : -1;
             if (health >= 0)
                 DrawHearts(v, health, gta1::IsPlayerBurning());
@@ -2395,6 +2401,7 @@ namespace overlay
                     ConvertToSurface(v.fmt, &g_original[(size_t)y * v.width], v.Row(y), v.width);
             return;
         }
+        logx::HeapCheck("Overlay: Bild beginnt");
         g_screenW = v.width;
         g_screenH = v.height;
         MeasureReadback(v);
@@ -2411,6 +2418,7 @@ namespace overlay
 
         if (gta1::InGame() || g_menu == Menu::Open)
             UpdateNav();
+        logx::HeapCheck("Overlay: nach GPS-Route");
 
         if (g_menu == Menu::Open)
         {
@@ -2425,6 +2433,7 @@ namespace overlay
                 }
             }
             DrawMenu(v);
+            logx::HeapCheck("Overlay: nach Pausenmenü");
             if (g_cursorShown)
             {
                 DrawCursor(v);
@@ -2435,6 +2444,7 @@ namespace overlay
         }
 
         DrawHud(v);
+        logx::HeapCheck("Overlay: nach HUD");
         MaybeDumpFrame(v);
     }
 

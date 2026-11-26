@@ -212,10 +212,11 @@ LANGUAGES
   Pause menu                   Esc                     Options / Start
   Map                          M                       Share / Back
   Minimap on/off               N                       R3
-  Move / steer                 WASD or arrow keys      Left stick
+  Move / steer                 WASD or arrow keys      Left stick or D-pad
   Aim / look around            Mouse                   Right stick
   Fire                         Left click or Ctrl      R2 / RT or Circle / B
   Accelerate / brake           W / S                   R2 / L2
+                                                       (or D-pad up / down)
   Enter / exit vehicle         F or Enter              Triangle / Y
   Jump / handbrake             Space                   Cross / A
                                                        (on foot also Square / X)

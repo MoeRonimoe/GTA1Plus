@@ -679,8 +679,18 @@ namespace controls
         {
             const XINPUT_GAMEPAD& g = s.Gamepad;
             const WORD pressed = g.wButtons & ~g_padPrev;
-            const float lx = Stick(g.sThumbLX, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-            const float ly = -Stick(g.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE); // Bildschirm: unten positiv
+            float lx = Stick(g.sThumbLX, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+            float ly = -Stick(g.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE); // Bildschirm: unten positiv
+            // Steuerkreuz wie die Pfeiltasten: zu Fuß eine Richtung im Bild (auch schräg), im Fahrzeug links/rechts
+            // lenken, oben Gas, unten Bremse. Der Stick hat Vorrang, solange er bewegt wird.
+            const int padX = ((g.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) ? 1 : 0) - ((g.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) ? 1 : 0);
+            const int padY = ((g.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) ? 1 : 0) - ((g.wButtons & XINPUT_GAMEPAD_DPAD_UP) ? 1 : 0);
+            if (onFoot && lx == 0 && ly == 0 && (padX || padY))
+            {
+                const float len = std::sqrt((float)(padX * padX + padY * padY));
+                lx = padX / len;
+                ly = padY / len;
+            }
             const float rx = Stick(g.sThumbRX, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
             const float ry = -Stick(g.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
             const float rt = g.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD ? g.bRightTrigger / 255.0f : 0.0f;
@@ -742,8 +752,8 @@ namespace controls
                 in.fire |= (g.wButtons & XINPUT_GAMEPAD_B) != 0; // Hupe
                 if (rx != 0 || ry != 0)
                     StickCamera(rx, ry, g_cfg.cameraRangeVehicle); // umschauen
-                const int steer = (int)std::lround(lx * 7);
-                const int throttle = (int)std::lround(rt * 3) - (int)std::lround(lt * 3);
+                const int steer = lx != 0 ? (int)std::lround(lx * 7) : padX * 7;
+                const int throttle = rt > 0 || lt > 0 ? (int)std::lround(rt * 3) - (int)std::lround(lt * 3) : -padY * 3;
                 if (steer != 0 || throttle != 0)
                 {
                     in.drive = true;

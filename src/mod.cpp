@@ -37,6 +37,8 @@ namespace
         if (next == &Hook_PeekMessageA)
             next = s_origPeekMessageA;
 
+        if (GetCurrentThreadId() == ddhook::GameThreadId())
+            logx::HeapCheck("Nachrichten: vor PeekMessage");
         const BOOL got = next(msg, wnd, filterMin, filterMax, remove);
         // Die umgebogenen Aufrufe stammen alle aus den Nachrichtenschleifen von GTA.exe (Haupt-Thread).
         // Schon im Hauptmenü vor dem ersten Level (noch kein Flip) den Spiel-Thread festhalten.
@@ -44,14 +46,19 @@ namespace
             ddhook::NoteGameThread();
         if (GetCurrentThreadId() == ddhook::GameThreadId())
         {
+            logx::HeapCheck("Nachrichten: nach PeekMessage");
             const bool removed = (remove & PM_REMOVE) != 0;
             if (got && msg && removed)
                 controls::OnMessage(*msg);
             if (got && msg && overlay::FilterMessage(*msg, removed))
                 msg->message = WM_NULL;
+            logx::HeapCheck("Nachrichten: nach Tasten/Maus");
             overlay::OnPump();
+            logx::HeapCheck("Nachrichten: nach Overlay");
             controls::OnPump();
+            logx::HeapCheck("Nachrichten: nach Controller");
             ddhook::OnPump();
+            logx::HeapCheck("Nachrichten: nach Bildausgabe");
         }
         return got;
     }
@@ -241,6 +248,12 @@ void ModInit(HMODULE self)
     wchar_t exePath[MAX_PATH];
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
     LOG("GTA1Plus (erstellt %s) geladen, Spiel: %ls", __DATE__, exePath);
+    // Fehlersuche ([Debug] HeapCheck=1, nur in der INI): Heaps an festen Stellen jedes Bildes prüfen
+    if (GetPrivateProfileIntW(L"Debug", L"HeapCheck", 0, SiblingPath(self, L".ini").c_str()))
+    {
+        logx::EnableHeapCheck(true);
+        LOG("Diagnose: Heap-Prüfung an (langsamer)");
+    }
     text::Init(SiblingPath(self, L"_lang.ini").c_str(), g_cfg.language);
 
     KeepSoundOnGameWindow();

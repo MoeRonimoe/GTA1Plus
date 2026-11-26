@@ -111,8 +111,10 @@ namespace rumble
                     continue;
                 EnterCriticalSection(&g_lock);
                 const Kind kind = g_kind;
+                logx::HeapCheck("Vibration: vor dem Senden");
                 const bool ok = kind != Kind::None && Send(kind, (uint8_t)(target >> 8), (uint8_t)target);
                 LeaveCriticalSection(&g_lock);
+                logx::HeapCheck("Vibration: gesendet");
                 if (kind == Kind::None)
                 {
                     sent = 0;

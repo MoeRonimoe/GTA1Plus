@@ -12,6 +12,11 @@ namespace logx
     static CRITICAL_SECTION s_lock;
     static DWORD s_start;
 
+    static volatile bool s_heapCheck = false;
+    static volatile bool s_heapBroken = false;
+    static const char* volatile s_lastWhere = "Start";   // zuletzt erreichte Prüfstelle
+    static const char* volatile s_lastOk = "Start";      // zuletzt mit einwandfreien Heaps
+
     void Write(const char* fmt, ...);
 
     // Abstürze ins Log: Adresse, Modul, Register und ein Stück Stack. Das erspart bei Fehlerberichten das Raten,
@@ -26,6 +31,10 @@ namespace logx
             return EXCEPTION_CONTINUE_SEARCH;
         if (InterlockedIncrement(&s_count) > 4)
             return EXCEPTION_CONTINUE_SEARCH;
+        // Zuerst eine kurze Zeile ohne weitere Systemaufrufe: unter Wine kann der Absturz mitten in der Heap-Verwaltung
+        // liegen, und GetModuleHandleEx wartet dann auf einen Thread, der seinerseits auf den Heap wartet
+        Write("Absturz 0x%08lX bei %p, Thread %lu, letzte Stelle \"%s\"", code, r->ExceptionAddress, GetCurrentThreadId(),
+              s_lastWhere);
         const CONTEXT* c = info->ContextRecord;
         char module[MAX_PATH] = "?";
         HMODULE m = nullptr;
@@ -90,6 +99,30 @@ namespace logx
                 Write("  Module:%s", s_chain);
         }
         return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    void EnableHeapCheck(bool on)
+    {
+        s_heapCheck = on;
+    }
+
+    void HeapCheck(const char* where)
+    {
+        s_lastWhere = where;
+        if (!s_heapCheck || s_heapBroken)
+            return;
+        HANDLE heaps[64];
+        const DWORD n = GetProcessHeaps(64, heaps);
+        for (DWORD i = 0; i < n && i < 64; ++i)
+            if (!HeapValidate(heaps[i], 0, nullptr))
+            {
+                s_heapBroken = true;
+                Write("Diagnose: Heap %lu von %lu (%p%s) beschädigt, festgestellt bei \"%s\", zuletzt in Ordnung bei \"%s\" "
+                      "(Thread %lu)", i + 1, n, heaps[i], heaps[i] == GetProcessHeap() ? ", Prozess-Heap" : "", where,
+                      s_lastOk, GetCurrentThreadId());
+                return;
+            }
+        s_lastOk = where;
     }
 
     void Open(const wchar_t* path)
